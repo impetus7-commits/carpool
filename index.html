@@ -189,11 +189,18 @@ main { padding-block: 8px calc(env(safe-area-inset-bottom, 0px) + 110px); displa
 .form { display: grid; gap: 14px; }
 .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 label { display: grid; gap: 6px; font-size: 14px; font-weight: 500; color: var(--muted); }
-input, textarea {
+input, textarea, select {
   width: 100%; min-height: 50px; border-radius: 12px; border: 1px solid var(--line);
   background: var(--bg); padding: 12px 14px; font-size: 16px; color: var(--ink);
 }
 textarea { min-height: 80px; resize: vertical; }
+/* 시·분 고르기 (분은 5분 단위) */
+.tsel { display: grid; grid-template-columns: 1.4fr 1fr; gap: 6px; }
+.tsel select {
+  appearance: none; -webkit-appearance: none; padding: 12px 8px; text-align: center; text-align-last: center;
+  font-variant-numeric: tabular-nums;
+}
+.tsel select:disabled { opacity: .45; }
 .stepper { display: grid; grid-template-columns: 50px 1fr 50px; align-items: center; gap: 8px; }
 .stepper button { min-height: 50px; border-radius: 12px; border: 1px solid var(--line); background: var(--bg); font-size: 22px; }
 .stepper output { text-align: center; font: 400 26px/1 var(--f-display); font-variant-numeric: tabular-nums; }
@@ -363,6 +370,34 @@ function todayStr() {
 }
 /** 차의 출발 날짜 (날짜가 없는 예전 차량은 행사 날짜) */
 function carDate(car) { return car.date || (state.event || {}).date || ''; }
+/**
+ * 시·분 고르기 목록 (분은 5분 단위). optional이면 "미정" 항목이 생깁니다.
+ * 예전에 5분 단위가 아니게 저장된 값은 가장 가까운 5분으로 맞춥니다.
+ */
+function timeField(id, value, optional) {
+  var m = /^(\d{2}):(\d{2})$/.exec(value || '');
+  var h = m ? +m[1] : -1, mi = m ? Math.round(+m[2] / 5) * 5 : 0;
+  if (mi === 60) { mi = 55; }
+  var hs = optional ? '<option value="">미정</option>' : '';
+  for (var i = 0; i < 24; i++) {
+    hs += '<option value="' + i + '"' + (i === h ? ' selected' : '') + '>' + (i < 12 ? '오전 ' : '오후 ') + (i % 12 || 12) + '시</option>';
+  }
+  var ms = '';
+  for (var j = 0; j < 60; j += 5) {
+    ms += '<option value="' + j + '"' + (j === mi ? ' selected' : '') + '>' + (j < 10 ? '0' : '') + j + '분</option>';
+  }
+  return '<span class="tsel"><select id="' + id + 'H" aria-label="시">' + hs + '</select>' +
+    '<select id="' + id + 'M" aria-label="분"' + (h < 0 ? ' disabled' : '') + '>' + ms + '</select></span>';
+}
+function timeHookup(id) {
+  $(id + 'H').addEventListener('change', function () { $(id + 'M').disabled = this.value === ''; });
+}
+function timeValue(id) {
+  var h = $(id + 'H').value;
+  if (h === '') return '';
+  var mi = +$(id + 'M').value;
+  return (h < 10 ? '0' : '') + h + ':' + (mi < 10 ? '0' : '') + mi;
+}
 function fmtTime(t) {
   var m = /^(\d{2}):(\d{2})$/.exec(t || '');
   if (!m) return { ap: '', hm: t || '' };
@@ -570,12 +605,12 @@ function sheetCar(car) {
       '<p class="hint">' + (edit ? '비밀번호를 잊었다면 관리자에게 부탁해 주세요.' : '🔒 이 비밀번호가 있어야 나중에 차를 <b>수정·삭제</b>할 수 있어요. 꼭 기억해 두세요.') + '</p>' +
       '<div class="row2">' +
         '<label>출발 날짜<input id="carDate" type="date" required value="' + esc(cDate) + '"></label>' +
-        '<label>출발 시각<input id="carTime" type="time" required value="' + esc(c.time) + '"></label>' +
+        '<label>출발 시각' + timeField('carTime', c.time) + '</label>' +
       '</div>' +
       '<label>출발 장소<input id="carFrom" maxlength="40" placeholder="예: 학교 정문" value="' + esc(c.from) + '"></label>' +
       '<div class="row2">' +
         '<label>복귀 날짜 (선택)<input id="carBackDate" type="date" value="' + esc(c.backDate) + '"></label>' +
-        '<label>복귀 시각 (선택)<input id="carBackTime" type="time" value="' + esc(c.backTime) + '"></label>' +
+        '<label>복귀 시각 (선택)' + timeField('carBackTime', c.backTime, true) + '</label>' +
       '</div>' +
       '<p class="hint">복귀 날짜를 비워 두면 출발한 날 돌아오는 것으로 봐요.</p>' +
       '<label>복귀 장소 (선택)<input id="carBackTo" maxlength="40" placeholder="예: 학교 정문" value="' + esc(c.backTo) + '"></label>' +
@@ -594,6 +629,7 @@ function sheetCar(car) {
     function (root) {
       var min = Math.max(1, taken);
       function upd(d) { seats = Math.max(min, Math.min(8, seats + d)); $('sVal').textContent = seats; }
+      timeHookup('carBackTime');
       $('sMinus').onclick = function () { upd(-1); };
       $('sPlus').onclick = function () { upd(1); };
       var f = root.querySelector('form');
@@ -605,7 +641,7 @@ function sheetCar(car) {
         if (!dt) return Promise.reject(new Error('출발 날짜를 선택해 주세요.'));
         if (bd && bd < dt) return Promise.reject(new Error('복귀 날짜가 출발 날짜보다 빨라요.'));
         if (bd === dt) bd = '';
-        var data = { driver: d, date: dt, backDate: bd, time: $('carTime').value, from: $('carFrom').value, backTime: $('carBackTime').value, backTo: $('carBackTo').value, memo: $('carMemo').value, seats: seats };
+        var data = { driver: d, date: dt, backDate: bd, time: timeValue('carTime'), from: $('carFrom').value, backTime: timeValue('carBackTime'), backTo: $('carBackTo').value, memo: $('carMemo').value, seats: seats };
         if (!edit) {
           setMyName(d);
           data.pin = pin;

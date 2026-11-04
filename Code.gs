@@ -138,6 +138,12 @@ function saveEvent(ev, adminPin) {
   });
 }
 
+/** "HH:MM" 형식이고 분이 5분 단위인지 확인합니다. */
+function time5_(t) {
+  var m = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(t || '');
+  return !!m && +m[2] % 5 === 0;
+}
+
 function date_(d) {
   return /^\d{4}-\d{2}-\d{2}$/.test(d || '') ? d : '';
 }
@@ -147,7 +153,7 @@ function carInput_(c) {
   var driver = clean_(c.driver, 20);
   if (!driver) throw new Error('운전자 이름을 입력해 주세요.');
   if (!date_(c.date)) throw new Error('출발 날짜를 선택해 주세요.');
-  if (!/^\d{2}:\d{2}$/.test(c.time || '')) throw new Error('출발 시각을 선택해 주세요.');
+  if (!time5_(c.time)) throw new Error('출발 시각을 선택해 주세요. (분은 5분 단위)');
   var backDate = date_(c.backDate);
   if (backDate && backDate < c.date) throw new Error('복귀 날짜가 출발 날짜보다 빨라요.');
   return {
@@ -156,7 +162,7 @@ function carInput_(c) {
     driver: driver,
     time: c.time,
     from: clean_(c.from, 40),
-    backTime: /^\d{2}:\d{2}$/.test(c.backTime || '') ? c.backTime : '',
+    backTime: time5_(c.backTime) ? c.backTime : '',
     backTo: clean_(c.backTo, 40),
     memo: clean_(c.memo, 80),
     seats: Math.max(1, Math.min(MAX_SEATS, parseInt(c.seats, 10) || 0))
