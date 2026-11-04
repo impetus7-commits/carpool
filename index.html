@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>행사 카풀</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Do+Hyeon&family=IBM+Plex+Sans+KR:wght@400;500;700&display=swap">
+<style>
+/* 레이아웃: 아스팔트색 헤더 + 중앙선(노란 점선) 아래로 차량 카드가 출발 시각순으로 쌓이는 한 줄 리스트, 하단 고정 버튼 */
+:root {
+  --bg: #eef0ec;
+  --card: #ffffff;
+  --ink: #1b2430;
+  --muted: #5d6671;
+  --line: #d8dcd5;
+  --road: #232b34;
+  --road-ink: #f1f2ee;
+  --accent: #f2b705;
+  --accent-ink: #1b2430;
+  --seat: #f6f7f4;
+  --mine: #fff3c4;
+  --ok: #1d7f55;
+  --danger: #c23b2a;
+  --shadow: 0 1px 2px rgba(27,36,48,.06), 0 4px 14px rgba(27,36,48,.06);
+  --f-display: "Do Hyeon", "IBM Plex Sans KR", system-ui, sans-serif;
+  --f-body: "IBM Plex Sans KR", -apple-system, "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #111519; --card: #1a2027; --ink: #e8eaec; --muted: #9aa3ad; --line: #2b333d;
+    --road: #0a0d10; --road-ink: #e8eaec; --accent: #f5c12b; --accent-ink: #14181d;
+    --seat: #222932; --mine: #4a3d10; --ok: #4cc28f; --danger: #ef6b5a;
+    --shadow: 0 1px 2px rgba(0,0,0,.3);
+    color-scheme: dark;
+  }
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0; background: var(--bg); color: var(--ink);
+  font: 400 16px/1.5 var(--f-body);
+  -webkit-tap-highlight-color: transparent;
+}
+button, input, textarea, select { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+[hidden] { display: none !important; }
+.wrap {
+  max-width: 560px; margin: 0 auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+
+/* ---- 헤더 ---- */
+header.road {
+  background: var(--road); color: var(--road-ink);
+  padding-top: calc(env(safe-area-inset-top, 0px) + 18px);
+  position: relative;
+}
+header.road::after {
+  content: ""; display: block; height: 6px;
+  background: repeating-linear-gradient(90deg, var(--accent) 0 28px, transparent 28px 46px);
+}
+.head-in { padding-block: 0 18px; display: grid; gap: 10px; }
+.head-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.eyebrow { font-size: 13px; letter-spacing: .08em; color: var(--accent); font-weight: 700; }
+.head-actions { display: flex; gap: 6px; }
+.ghost {
+  border: 1px solid rgba(255,255,255,.22); background: transparent; color: var(--road-ink);
+  border-radius: 999px; padding: 6px 12px; font-size: 14px; min-height: 36px;
+}
+h1 {
+  margin: 0; font: 400 30px/1.15 var(--f-display); letter-spacing: -.01em;
+  text-wrap: balance; word-break: keep-all;
+}
+.meta { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 15px; opacity: .85; }
+.empty-title { opacity: .6; }
+
+/* ---- 요약 ---- */
+.summary {
+  display: flex; gap: 8px; padding-block: 16px 4px; font-size: 14px; color: var(--muted);
+  align-items: center; flex-wrap: wrap;
+}
+.summary b { color: var(--ink); font-variant-numeric: tabular-nums; }
+.live { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; font-size: 12px; }
+.live i { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); display: block; }
+.live.stale i { background: var(--danger); }
+
+/* ---- 차량 카드 ---- */
+main { padding-block: 8px calc(env(safe-area-inset-bottom, 0px) + 110px); display: grid; gap: 12px; }
+.car {
+  background: var(--card); border-radius: 16px; box-shadow: var(--shadow);
+  border: 1px solid var(--line); overflow: hidden;
+}
+.car-head { display: grid; grid-template-columns: auto 1fr auto; gap: 12px; align-items: center; padding: 14px 14px 10px; }
+.time {
+  font: 400 30px/1 var(--f-display); font-variant-numeric: tabular-nums; letter-spacing: -.02em;
+}
+.time small { display: block; font: 500 11px/1.4 var(--f-body); color: var(--muted); letter-spacing: .04em; }
+.who { min-width: 0; }
+.who strong { display: block; font-size: 17px; font-weight: 700; overflow-wrap: anywhere; }
+.who span { display: block; font-size: 14px; color: var(--muted); overflow-wrap: anywhere; }
+.left {
+  font-size: 13px; font-weight: 700; padding: 5px 10px; border-radius: 999px; white-space: nowrap;
+  background: var(--accent); color: var(--accent-ink); font-variant-numeric: tabular-nums;
+}
+.left.full { background: var(--seat); color: var(--muted); }
+.back {
+  margin: 0 14px 10px; padding: 8px 12px; border-radius: 10px; background: var(--seat);
+  display: flex; gap: 10px; align-items: baseline; font-size: 15px; font-weight: 500;
+  font-variant-numeric: tabular-nums; overflow-wrap: anywhere;
+}
+.back .k { flex: none; font-size: 12px; font-weight: 700; color: var(--muted); letter-spacing: .04em; }
+.back .none { color: var(--muted); font-weight: 400; }
+.memo { margin: 0 14px 10px; font-size: 14px; color: var(--muted); overflow-wrap: anywhere; }
+.seats {
+  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px;
+  padding: 0 14px 14px;
+}
+.seat {
+  min-height: 64px; border-radius: 12px; border: 1.5px dashed var(--line);
+  background: transparent; display: grid; place-items: center; align-content: center; gap: 2px;
+  padding: 6px 4px; text-align: center; font-size: 14px; line-height: 1.25;
+}
+.seat .n { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.seat.open { color: var(--muted); }
+.seat.open .plus { font-size: 22px; line-height: 1; color: var(--ink); }
+.seat.open:active { background: var(--seat); }
+.seat.taken { border-style: solid; border-color: transparent; background: var(--seat); font-weight: 500; }
+.seat .nm { word-break: keep-all; overflow-wrap: anywhere; }
+.seat.mine { background: var(--mine); border-color: var(--accent); }
+.seat.driver { border-style: solid; border-color: transparent; background: var(--road); color: var(--road-ink); cursor: default; }
+.seat.driver .n { color: var(--accent); }
+.car-foot {
+  display: flex; justify-content: flex-end; border-top: 1px solid var(--line); padding: 4px 6px;
+}
+.link-btn { background: none; border: 0; color: var(--muted); font-size: 13px; padding: 8px 10px; min-height: 40px; }
+
+.empty {
+  text-align: center; padding: 40px 16px; color: var(--muted); border: 1.5px dashed var(--line);
+  border-radius: 16px; display: grid; gap: 6px;
+}
+.empty strong { color: var(--ink); font-size: 17px; }
+.demo-note {
+  font-size: 13px; background: var(--mine); color: var(--ink); border-radius: 10px; padding: 8px 12px;
+}
+
+/* ---- 하단 고정 버튼 ---- */
+.dock {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 5;
+  padding-top: 12px; padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 12px);
+  background: linear-gradient(to top, var(--bg) 60%, transparent);
+}
+.primary {
+  width: 100%; min-height: 54px; border: 0; border-radius: 14px;
+  background: var(--accent); color: var(--accent-ink); font-size: 17px; font-weight: 700;
+  box-shadow: 0 4px 14px rgba(0,0,0,.15);
+}
+.primary:disabled { opacity: .6; }
+.secondary {
+  width: 100%; min-height: 50px; border-radius: 14px; border: 1px solid var(--line);
+  background: var(--card); font-size: 16px; font-weight: 500;
+}
+.danger { color: var(--danger); }
+
+/* ---- 바텀시트 ---- */
+.scrim {
+  position: fixed; inset: 0; z-index: 20; background: rgba(10,13,16,.5);
+  display: flex; align-items: flex-end; justify-content: center;
+}
+.sheet {
+  width: 100%; max-width: 560px; background: var(--card); border-radius: 20px 20px 0 0;
+  padding-top: 10px; padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 18px);
+  max-height: 90vh; overflow-y: auto; animation: up .2s ease-out;
+}
+@keyframes up { from { transform: translateY(24px); opacity: .6; } to { transform: none; opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .sheet { animation: none; } }
+.grab { width: 40px; height: 5px; border-radius: 3px; background: var(--line); margin: 0 auto 12px; }
+.sheet h2 { margin: 0 0 4px; font: 400 24px/1.25 var(--f-display); word-break: keep-all; }
+.sheet .sub { margin: 0 0 16px; color: var(--muted); font-size: 15px; }
+.form { display: grid; gap: 14px; }
+.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+label { display: grid; gap: 6px; font-size: 14px; font-weight: 500; color: var(--muted); }
+input, textarea {
+  width: 100%; min-height: 50px; border-radius: 12px; border: 1px solid var(--line);
+  background: var(--bg); padding: 12px 14px; font-size: 16px; color: var(--ink);
+}
+textarea { min-height: 80px; resize: vertical; }
+.stepper { display: grid; grid-template-columns: 50px 1fr 50px; align-items: center; gap: 8px; }
+.stepper button { min-height: 50px; border-radius: 12px; border: 1px solid var(--line); background: var(--bg); font-size: 22px; }
+.stepper output { text-align: center; font: 400 26px/1 var(--f-display); font-variant-numeric: tabular-nums; }
+.btns { display: grid; gap: 8px; margin-top: 6px; }
+input.pin { font-size: 22px; letter-spacing: .5em; font-variant-numeric: tabular-nums; }
+label .hint { font-weight: 400; font-size: 13px; }
+.err { color: var(--danger); font-size: 14px; min-height: 1em; margin: 0; }
+.share-box { display: flex; gap: 8px; }
+.share-box input { flex: 1; min-width: 0; font-size: 14px; }
+.share-box button { flex: none; padding: 0 16px; border-radius: 12px; border: 0; background: var(--road); color: var(--road-ink); font-weight: 700; }
+.hint { font-size: 14px; color: var(--muted); margin: 0; }
+hr { border: 0; border-top: 1px solid var(--line); margin: 6px 0; }
+
+.toast {
+  position: fixed; left: 50%; transform: translateX(-50%); z-index: 30;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 90px);
+  background: var(--road); color: var(--road-ink); padding: 10px 16px; border-radius: 999px;
+  font-size: 14px; max-width: calc(100% - 32px); text-align: center; box-shadow: 0 6px 20px rgba(0,0,0,.25);
+}
+</style>
+</head>
+<body>
+
+<header class="road">
+  <div class="wrap head-in">
+    <div class="head-top">
+      <span class="eyebrow">CARPOOL BOARD</span>
+      <div class="head-actions">
+        <button class="ghost" id="btnShare" type="button">링크 공유</button>
+        <button class="ghost" id="btnEvent" type="button">행사 정보</button>
+      </div>
+    </div>
+    <h1 id="evTitle">불러오는 중…</h1>
+    <div class="meta" id="evMeta"></div>
+  </div>
+</header>
+
+<div class="wrap">
+  <div class="summary" id="summary">
+    <span>차량 <b id="sCars">-</b>대</span>
+    <span>·</span>
+    <span>빈자리 <b id="sOpen">-</b>석</span>
+    <span>·</span>
+    <span>탑승 <b id="sRiders">-</b>명</span>
+    <span class="live" id="live"><i></i><span id="liveText">연결 중</span></span>
+  </div>
+  <main id="list" aria-live="polite"></main>
+</div>
+
+<div class="dock">
+  <div class="wrap"><button class="primary" id="btnAddCar" type="button">내 차 등록하기</button></div>
+</div>
+
+<div class="scrim" id="scrim" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetTitle">
+    <div class="wrap" id="sheetBody"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status" hidden></div>
+
+<script>
+/* ===== 서버 연결 (Apps Script) / 로컬 미리보기용 대체 ===== */
+var DEMO = !(window.google && google.script && google.script.run);
+
+function call(fn) {
+  var args = Array.prototype.slice.call(arguments, 1);
+  if (DEMO) return demoCall(fn, args);
+  return new Promise(function (resolve, reject) {
+    var r = google.script.run.withSuccessHandler(resolve).withFailureHandler(reject);
+    r[fn].apply(r, args);
+  });
+}
+
+function demoCall(fn, args) {
+  var KEY = 'carpool.demo';
+  var st;
+  try { st = JSON.parse(localStorage.getItem(KEY)); } catch (e) {}
+  if (!st) st = {
+    event: { title: '(예시) 가을 체육대회', date: '2026-11-14', place: '시민운동장 정문', note: '도착 후 본부석 집합' },
+    cars: [
+      { id: 'a1', driver: '(예시) 김선생', time: '08:20', from: '학교 정문', backTime: '17:30', backTo: '학교 정문', memo: '트렁크 넉넉해요', riders: ['(예시) 이민지', null, null, null], createdAt: 1 },
+      { id: 'a2', driver: '(예시) 박선생', time: '08:40', from: '역 2번 출구', memo: '', riders: ['(예시) 최서연', '(예시) 정하늘'], createdAt: 2 }
+    ]
+  };
+  function save() { try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (e) {} }
+  function find(id) { for (var i = 0; i < st.cars.length; i++) if (st.cars[i].id === id) return st.cars[i]; throw new Error('이미 삭제된 차량입니다.'); }
+  return new Promise(function (resolve, reject) {
+    setTimeout(function () {
+      try {
+        // 미리보기 전용 관리자 비밀번호는 0000 (실제 비밀번호는 Code.gs에만 있음)
+        if (fn === 'checkAdmin' || fn === 'saveEvent' || fn === 'resetCars') {
+          if (args[fn === 'saveEvent' ? 1 : 0] !== '0000') throw new Error('관리자 비밀번호가 맞지 않아요.');
+          if (fn === 'checkAdmin') return resolve(true);
+        }
+        if (fn === 'saveEvent') st.event = args[0];
+        if (fn === 'addCar') {
+          var c = args[0], r = []; for (var i = 0; i < c.seats; i++) r.push(null);
+          st.cars.push({ id: Math.random().toString(36).slice(2, 10), driver: c.driver, time: c.time, from: c.from, backTime: c.backTime, backTo: c.backTo, memo: c.memo, riders: r, pin: c.pin, createdAt: Date.now() });
+        }
+        if (fn === 'deleteCar') {
+          var dc = find(args[0]);
+          if ((dc.pin || '0000') !== args[1]) throw new Error('비밀번호가 맞지 않아요. 차를 등록한 분께 확인해 주세요.');
+          st.cars = st.cars.filter(function (c) { return c.id !== args[0]; });
+        }
+        if (fn === 'joinSeat') { var car = find(args[0]); if (car.riders[args[1]]) throw new Error('방금 다른 분이 먼저 앉았어요.'); car.riders[args[1]] = args[2]; }
+        if (fn === 'leaveSeat') find(args[0]).riders[args[1]] = null;
+        if (fn === 'resetCars') st.cars = [];
+        save();
+        st.cars.sort(function (a, b) { return a.time.localeCompare(b.time) || a.createdAt - b.createdAt; });
+        resolve({ event: st.event, cars: st.cars, url: location.href, now: Date.now() });
+      } catch (e) { reject(e); }
+    }, 150);
+  });
+}
+
+/* ===== 상태 ===== */
+var state = { event: {}, cars: [], url: '' };
+var busy = false;
+var lastOk = 0;
+var $ = function (id) { return document.getElementById(id); };
+
+function myName() { try { return localStorage.getItem('carpool.name') || ''; } catch (e) { return ''; } }
+function setMyName(n) { try { localStorage.setItem('carpool.name', n); } catch (e) {} }
+
+function esc(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+  });
+}
+function errMsg(e) { return String((e && e.message) || e).replace(/^(Exception|Error):\s*/, ''); }
+
+var DAYS = ['일', '월', '화', '수', '목', '금', '토'];
+function fmtDate(d) {
+  var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(d || '');
+  if (!m) return '';
+  var dt = new Date(+m[1], +m[2] - 1, +m[3]);
+  return (+m[2]) + '월 ' + (+m[3]) + '일 (' + DAYS[dt.getDay()] + ')';
+}
+function fmtTime(t) {
+  var m = /^(\d{2}):(\d{2})$/.exec(t || '');
+  if (!m) return { ap: '', hm: t || '' };
+  var h = +m[1];
+  return { ap: h < 12 ? '오전' : '오후', hm: (h % 12 || 12) + ':' + m[2] };
+}
+
+function backText(car) {
+  var parts = [];
+  if (car.backTime) { var b = fmtTime(car.backTime); parts.push(b.ap + ' ' + b.hm); }
+  if (car.backTo) parts.push(car.backTo + ' 도착');
+  return parts.join(' · ');
+}
+function backLine(car) {
+  var t = backText(car);
+  return '<p class="back"><span class="k">복귀</span>' +
+    (t ? '<span>' + esc(t) + '</span>' : '<span class="none">미정</span>') + '</p>';
+}
+
+/* ===== 그리기 ===== */
+function render() {
+  var ev = state.event || {};
+  $('evTitle').textContent = ev.title || '행사 이름을 정해 주세요';
+  $('evTitle').classList.toggle('empty-title', !ev.title);
+  var meta = [];
+  if (ev.date) meta.push('<span>' + esc(fmtDate(ev.date)) + '</span>');
+  if (ev.place) meta.push('<span>도착 ' + esc(ev.place) + '</span>');
+  if (ev.note) meta.push('<span>' + esc(ev.note) + '</span>');
+  $('evMeta').innerHTML = meta.join('');
+  document.title = (ev.title ? ev.title + ' ' : '') + '카풀';
+
+  var me = myName();
+  var open = 0, riders = 0;
+  var html = '';
+  if (DEMO) html += '<div class="demo-note">미리보기 모드입니다. 예시 데이터는 이 기기에만 저장됩니다. 실제 공유는 Apps Script로 배포한 주소를 쓰세요.</div>';
+
+  if (!state.cars.length) {
+    html += '<div class="empty"><strong>아직 등록된 차가 없어요</strong>차를 가져오시는 분은 아래 버튼으로 출발 시각과 자리 수를 등록해 주세요.</div>';
+  }
+  state.cars.forEach(function (car) {
+    var left = car.riders.filter(function (r) { return !r; }).length;
+    open += left; riders += car.riders.length - left;
+    var t = fmtTime(car.time);
+    html += '<article class="car">' +
+      '<div class="car-head">' +
+        '<div class="time"><small>' + t.ap + '</small>' + esc(t.hm) + '</div>' +
+        '<div class="who"><strong>' + esc(car.driver) + '</strong>' +
+          (car.from ? '<span>' + esc(car.from) + ' 출발</span>' : '') + '</div>' +
+        '<span class="left' + (left ? '' : ' full') + '">' + (left ? left + '석 남음' : '만석') + '</span>' +
+      '</div>' +
+      backLine(car) +
+      (car.memo ? '<p class="memo">' + esc(car.memo) + '</p>' : '') +
+      '<div class="seats">' +
+        '<div class="seat driver"><span class="n">운전</span><span class="nm">' + esc(car.driver) + '</span></div>' +
+        car.riders.map(function (r, i) {
+          var label = (i + 1) + '번 자리';
+          if (!r) return '<button type="button" class="seat open" data-car="' + car.id + '" data-seat="' + i + '" aria-label="' + label + ' 비어 있음, 탑승 신청">' +
+            '<span class="plus">+</span><span class="n">빈자리</span></button>';
+          var mine = me && r === me;
+          return '<button type="button" class="seat taken' + (mine ? ' mine' : '') + '" data-car="' + car.id + '" data-seat="' + i + '" aria-label="' + label + ' ' + esc(r) + '">' +
+            '<span class="n">' + (mine ? '내 자리' : (i + 1)) + '</span><span class="nm">' + esc(r) + '</span></button>';
+        }).join('') +
+      '</div>' +
+      '<div class="car-foot"><button type="button" class="link-btn" data-del="' + car.id + '">차량 삭제</button></div>' +
+    '</article>';
+  });
+  $('list').innerHTML = html;
+  $('sCars').textContent = state.cars.length;
+  $('sOpen').textContent = open;
+  $('sRiders').textContent = riders;
+}
+
+function tickLive() {
+  var age = (Date.now() - lastOk) / 1000;
+  var stale = !lastOk || age > 30;
+  $('live').classList.toggle('stale', stale);
+  $('liveText').textContent = !lastOk ? '연결 중' : stale ? '연결 끊김' : '실시간';
+}
+
+function apply(s) {
+  if (s) { state = s; lastOk = Date.now(); render(); tickLive(); }
+}
+
+function refresh() {
+  if (busy) return;
+  call('getState').then(apply).catch(function () { tickLive(); });
+}
+
+function act(fn) {
+  var args = Array.prototype.slice.call(arguments);
+  busy = true;
+  return call.apply(null, args).then(function (s) { apply(s); return s; })
+    .finally(function () { busy = false; });
+}
+
+/* ===== 바텀시트 ===== */
+var onClose = null;
+function openSheet(html, after) {
+  $('sheetBody').innerHTML = '<div class="grab"></div>' + html;
+  $('scrim').hidden = false;
+  document.body.style.overflow = 'hidden';
+  if (after) after($('sheetBody'));
+}
+function closeSheet() {
+  $('scrim').hidden = true;
+  document.body.style.overflow = '';
+  $('sheetBody').innerHTML = '';
+}
+$('scrim').addEventListener('click', function (e) { if (e.target === this) closeSheet(); });
+document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !$('scrim').hidden) closeSheet(); });
+
+var toastTimer;
+function toast(msg) {
+  var t = $('toast');
+  t.textContent = msg; t.hidden = false;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(function () { t.hidden = true; }, 2600);
+}
+
+function findCar(id) { return state.cars.filter(function (c) { return c.id === id; })[0]; }
+
+function submitWith(form, btn, run) {
+  form.addEventListener('submit', function (e) {
+    e.preventDefault();
+    var errEl = form.querySelector('.err');
+    errEl.textContent = '';
+    btn.disabled = true;
+    run().then(function () { closeSheet(); })
+      .catch(function (err) { errEl.textContent = errMsg(err); btn.disabled = false; refresh(); });
+  });
+}
+
+/* 빈자리 → 이름 넣기 */
+function sheetJoin(car, seat) {
+  var t = fmtTime(car.time);
+  openSheet(
+    '<h2 id="sheetTitle">' + esc(car.driver) + '님 차에 탑승</h2>' +
+    '<p class="sub">' + t.ap + ' ' + esc(t.hm) + ' 출발' + (car.from ? ' · ' + esc(car.from) : '') +
+      (backText(car) ? '<br>복귀 ' + esc(backText(car)) : '') + '<br>' + (seat + 1) + '번 자리</p>' +
+    '<form class="form" id="fJoin" autocomplete="off">' +
+      '<label>내 이름<input id="joinName" name="name" maxlength="20" required placeholder="예: 홍길동" value="' + esc(myName()) + '"></label>' +
+      '<p class="err"></p>' +
+      '<div class="btns"><button class="primary" type="submit">이 자리에 앉기</button>' +
+      '<button class="secondary" type="button" data-close>취소</button></div>' +
+    '</form>',
+    function (root) {
+      var f = root.querySelector('form'), inp = $('joinName');
+      setTimeout(function () { inp.focus(); }, 50);
+      submitWith(f, f.querySelector('.primary'), function () {
+        var n = inp.value.trim();
+        setMyName(n);
+        return act('joinSeat', car.id, seat, n).then(function () { toast(n + '님, ' + car.driver + '님 차에 탑승 신청 완료!'); });
+      });
+    });
+}
+
+/* 찬 자리 → 취소 */
+function sheetLeave(car, seat) {
+  var name = car.riders[seat];
+  var mine = name === myName();
+  openSheet(
+    '<h2 id="sheetTitle">' + (mine ? '내 자리를 취소할까요?' : esc(name) + '님 자리') + '</h2>' +
+    '<p class="sub">' + esc(car.driver) + '님 차 · ' + (seat + 1) + '번 자리' + (mine ? '' : '<br>본인이 아니라면 취소하기 전에 꼭 확인해 주세요.') + '</p>' +
+    '<form class="form"><p class="err"></p><div class="btns">' +
+      '<button class="primary" type="submit">탑승 취소하기</button>' +
+      '<button class="secondary" type="button" data-close>닫기</button></div></form>',
+    function (root) {
+      var f = root.querySelector('form');
+      submitWith(f, f.querySelector('.primary'), function () {
+        return act('leaveSeat', car.id, seat).then(function () { toast('탑승을 취소했어요.'); });
+      });
+    });
+}
+
+/* 차량 등록 */
+function sheetAddCar() {
+  var seats = 3;
+  openSheet(
+    '<h2 id="sheetTitle">내 차 등록하기</h2>' +
+    '<p class="sub">등록하면 빈자리가 생기고, 다른 분들이 눌러서 이름을 넣을 수 있어요.</p>' +
+    '<form class="form" id="fCar" autocomplete="off">' +
+      '<label>운전자 이름<input id="carDriver" maxlength="20" required placeholder="예: 김민수" value="' + esc(myName()) + '"></label>' +
+      '<div class="row2">' +
+        '<label>출발 시각<input id="carTime" type="time" required value="08:30"></label>' +
+        '<label>출발 장소<input id="carFrom" maxlength="40" placeholder="예: 학교 정문"></label>' +
+      '</div>' +
+      '<div class="row2">' +
+        '<label>복귀 시각 (선택)<input id="carBackTime" type="time"></label>' +
+        '<label>복귀 장소 (선택)<input id="carBackTo" maxlength="40" placeholder="예: 학교 정문"></label>' +
+      '</div>' +
+      '<label>태울 수 있는 인원 (운전자 제외)' +
+        '<div class="stepper"><button type="button" id="sMinus" aria-label="한 명 줄이기">−</button>' +
+        '<output id="sVal">3</output>' +
+        '<button type="button" id="sPlus" aria-label="한 명 늘리기">+</button></div></label>' +
+      '<label>메모 (선택)<input id="carMemo" maxlength="80" placeholder="예: 010-1234-5678 / 짐 많으면 미리 말해주세요"></label>' +
+      '<label>삭제용 비밀번호 (숫자 4자리)<input id="carPin" class="pin" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" required autocomplete="off" placeholder="••••">' +
+        '<span class="hint">나중에 이 차를 삭제할 때 필요해요. 꼭 기억해 두세요.</span></label>' +
+      '<p class="err"></p>' +
+      '<div class="btns"><button class="primary" type="submit">등록하기</button>' +
+      '<button class="secondary" type="button" data-close>취소</button></div>' +
+    '</form>',
+    function (root) {
+      function upd(d) { seats = Math.max(1, Math.min(8, seats + d)); $('sVal').textContent = seats; }
+      $('sMinus').onclick = function () { upd(-1); };
+      $('sPlus').onclick = function () { upd(1); };
+      var f = root.querySelector('form');
+      submitWith(f, f.querySelector('.primary'), function () {
+        var d = $('carDriver').value.trim();
+        setMyName(d);
+        var pin = $('carPin').value.trim();
+        if (!/^\d{4}$/.test(pin)) return Promise.reject(new Error('삭제용 비밀번호 숫자 4자리를 입력해 주세요.'));
+        return act('addCar', { driver: d, time: $('carTime').value, from: $('carFrom').value, backTime: $('carBackTime').value, backTo: $('carBackTo').value, memo: $('carMemo').value, seats: seats, pin: pin })
+          .then(function () { toast('차량을 등록했어요. 링크를 단톡방에 공유해 보세요.'); });
+      });
+    });
+}
+
+/* 차량 삭제 */
+function sheetDelete(car) {
+  var n = car.riders.filter(Boolean).length;
+  openSheet(
+    '<h2 id="sheetTitle">' + esc(car.driver) + '님 차를 삭제할까요?</h2>' +
+    '<p class="sub">' + (n ? '탑승 신청한 ' + n + '명의 이름도 함께 지워집니다.' : '아직 탑승 신청한 사람은 없어요.') + '</p>' +
+    '<form class="form" autocomplete="off">' +
+      '<label>등록할 때 정한 비밀번호 4자리<input id="delPin" class="pin" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" required autocomplete="off" placeholder="••••"></label>' +
+      '<p class="err"></p><div class="btns">' +
+      '<button class="primary" type="submit">삭제하기</button>' +
+      '<button class="secondary" type="button" data-close>닫기</button></div></form>',
+    function (root) {
+      var f = root.querySelector('form');
+      setTimeout(function () { $('delPin').focus(); }, 50);
+      submitWith(f, f.querySelector('.primary'), function () {
+        var pin = $('delPin').value.trim();
+        if (!/^\d{4}$/.test(pin)) return Promise.reject(new Error('비밀번호 숫자 4자리를 입력해 주세요.'));
+        return act('deleteCar', car.id, pin).then(function () { toast('차량을 삭제했어요.'); });
+      });
+    });
+}
+
+/* 관리자 확인 (비밀번호는 서버에서만 검사, 이 화면이 열려 있는 동안만 기억) */
+var adminPin = '';
+function sheetAdmin() {
+  openSheet(
+    '<h2 id="sheetTitle">관리자 확인</h2>' +
+    '<p class="sub">행사 정보 수정과 차량 전체 비우기는 관리자만 할 수 있어요.</p>' +
+    '<form class="form" autocomplete="off">' +
+      '<label>관리자 비밀번호 4자리<input id="admPin" class="pin" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" required autocomplete="off" placeholder="••••"></label>' +
+      '<p class="err"></p><div class="btns">' +
+      '<button class="primary" type="submit">확인</button>' +
+      '<button class="secondary" type="button" data-close>닫기</button></div></form>',
+    function (root) {
+      var f = root.querySelector('form'), btn = f.querySelector('.primary');
+      setTimeout(function () { $('admPin').focus(); }, 50);
+      f.addEventListener('submit', function (e) {
+        e.preventDefault();
+        var pin = $('admPin').value.trim();
+        btn.disabled = true;
+        call('checkAdmin', pin).then(function () { adminPin = pin; sheetEvent(); })
+          .catch(function (err) { f.querySelector('.err').textContent = errMsg(err); btn.disabled = false; $('admPin').select(); });
+      });
+    });
+}
+
+/* 행사 정보 */
+function sheetEvent() {
+  if (!adminPin) return sheetAdmin();
+  var ev = state.event || {};
+  openSheet(
+    '<h2 id="sheetTitle">행사 정보</h2>' +
+    '<form class="form" id="fEv" autocomplete="off">' +
+      '<label>행사 이름<input id="evT" maxlength="40" required placeholder="예: 가을 체육대회" value="' + esc(ev.title) + '"></label>' +
+      '<div class="row2">' +
+        '<label>날짜<input id="evD" type="date" value="' + esc(ev.date) + '"></label>' +
+        '<label>도착지<input id="evP" maxlength="60" placeholder="예: 시민운동장" value="' + esc(ev.place) + '"></label>' +
+      '</div>' +
+      '<label>안내 (선택)<input id="evN" maxlength="120" placeholder="예: 9시까지 정문 집합" value="' + esc(ev.note) + '"></label>' +
+      '<p class="err"></p>' +
+      '<div class="btns"><button class="primary" type="submit">저장하기</button>' +
+      '<button class="secondary" type="button" data-close>닫기</button></div>' +
+      '<hr><p class="hint">행사가 끝나면 다음 행사를 위해 차량과 탑승 기록을 비울 수 있어요.</p>' +
+      '<button class="secondary danger" type="button" id="btnReset">차량 전체 비우기</button>' +
+    '</form>',
+    function (root) {
+      var f = root.querySelector('form');
+      submitWith(f, f.querySelector('.primary'), function () {
+        return act('saveEvent', { title: $('evT').value, date: $('evD').value, place: $('evP').value, note: $('evN').value }, adminPin)
+          .then(function () { toast('행사 정보를 저장했어요.'); });
+      });
+      var armed = false;
+      $('btnReset').onclick = function () {
+        var b = this;
+        if (!armed) { armed = true; b.textContent = '정말 모두 지울까요? 한 번 더 누르세요'; return; }
+        b.disabled = true;
+        act('resetCars', adminPin).then(function () { closeSheet(); toast('모든 차량을 비웠어요.'); })
+          .catch(function (e) { f.querySelector('.err').textContent = errMsg(e); b.disabled = false; });
+      };
+    });
+}
+
+/* 링크 공유 */
+function sheetShare() {
+  var url = state.url || location.href;
+  var ev = state.event || {};
+  var msg = '[' + (ev.title || '행사') + ' 카풀]' + (ev.date ? ' ' + fmtDate(ev.date) : '') +
+    '\n차 가져오시는 분은 등록, 타실 분은 빈자리를 눌러 이름을 넣어 주세요.\n' + url;
+  openSheet(
+    '<h2 id="sheetTitle">카카오톡으로 공유하기</h2>' +
+    '<p class="sub">아래 안내문을 복사해서 단톡방에 붙여 넣으세요. 링크를 연 사람은 로그인 없이 바로 신청할 수 있어요.</p>' +
+    '<div class="form">' +
+      '<textarea id="shareMsg" rows="4" readonly>' + esc(msg) + '</textarea>' +
+      '<button class="primary" type="button" id="cpMsg">안내문 복사</button>' +
+      '<div class="share-box"><input id="shareUrl" readonly value="' + esc(url) + '" aria-label="공유 링크"><button type="button" id="cpUrl">링크만</button></div>' +
+      '<button class="secondary" type="button" data-close>닫기</button>' +
+    '</div>',
+    function () {
+      $('cpMsg').onclick = function () { copy($('shareMsg')); };
+      $('cpUrl').onclick = function () { copy($('shareUrl')); };
+    });
+}
+
+function copy(el) {
+  var text = el.value;
+  function fallback() {
+    el.focus(); el.select(); el.setSelectionRange(0, text.length);
+    var ok = false;
+    try { ok = document.execCommand('copy'); } catch (e) {}
+    toast(ok ? '복사했어요. 카톡에 붙여 넣으세요.' : '선택된 글자를 길게 눌러 복사해 주세요.');
+  }
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(function () { toast('복사했어요. 카톡에 붙여 넣으세요.'); }, fallback);
+  } else fallback();
+}
+
+/* ===== 이벤트 연결 ===== */
+$('list').addEventListener('click', function (e) {
+  var b = e.target.closest('button');
+  if (!b) return;
+  if (b.dataset.del) { var c = findCar(b.dataset.del); if (c) sheetDelete(c); return; }
+  if (b.dataset.car) {
+    var car = findCar(b.dataset.car), i = +b.dataset.seat;
+    if (!car) return;
+    if (car.riders[i]) sheetLeave(car, i); else sheetJoin(car, i);
+  }
+});
+$('sheetBody').addEventListener('click', function (e) { if (e.target.closest('[data-close]')) closeSheet(); });
+$('btnAddCar').onclick = sheetAddCar;
+$('btnEvent').onclick = sheetEvent;
+$('btnShare').onclick = sheetShare;
+
+/* 5초마다 새로고침 (화면이 보일 때만) */
+refresh();
+setInterval(function () { if (!document.hidden) refresh(); tickLive(); }, 5000);
+document.addEventListener('visibilitychange', function () { if (!document.hidden) refresh(); });
+</script>
+</body>
+</html>
