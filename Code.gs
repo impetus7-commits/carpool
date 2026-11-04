@@ -1,5 +1,6 @@
 /**
  * 행사 카풀 보드 — Google Apps Script 웹앱 서버
+ * 함수: getState, addCar, updateCar, deleteCar, joinSeat, leaveSeat, saveEvent, resetCars, checkAdmin
  * 데이터는 스크립트 속성(PropertiesService)에 저장합니다.
  *   event      : 행사 정보 JSON
  *   car_<id>   : 차량 1대 JSON (운전자, 출발 시각/장소, 좌석, 탑승자)
@@ -133,26 +134,38 @@ function saveEvent(ev, adminPin) {
   });
 }
 
-function addCar(c) {
+/** 차량 입력값을 검사·정리합니다 (등록과 수정에서 같이 씀). */
+function carInput_(c) {
   var driver = clean_(c.driver, 20);
-  var seats = Math.max(1, Math.min(MAX_SEATS, parseInt(c.seats, 10) || 0));
   if (!driver) throw new Error('운전자 이름을 입력해 주세요.');
   if (!/^\d{2}:\d{2}$/.test(c.time || '')) throw new Error('출발 시각을 선택해 주세요.');
-  var backTime = /^\d{2}:\d{2}$/.test(c.backTime || '') ? c.backTime : '';
+  return {
+    driver: driver,
+    time: c.time,
+    from: clean_(c.from, 40),
+    backTime: /^\d{2}:\d{2}$/.test(c.backTime || '') ? c.backTime : '',
+    backTo: clean_(c.backTo, 40),
+    memo: clean_(c.memo, 80),
+    seats: Math.max(1, Math.min(MAX_SEATS, parseInt(c.seats, 10) || 0))
+  };
+}
+
+function addCar(c) {
+  var v = carInput_(c);
   var pin = String(c.pin || '');
-  if (!/^\d{4}$/.test(pin)) throw new Error('삭제용 비밀번호 숫자 4자리를 입력해 주세요.');
+  if (!/^\d{4}$/.test(pin)) throw new Error('비밀번호 숫자 4자리를 입력해 주세요.');
   return withLock_(function (store) {
     var id = Utilities.getUuid().slice(0, 8);
     var riders = [];
-    for (var i = 0; i < seats; i++) riders.push(null);
+    for (var i = 0; i < v.seats; i++) riders.push(null);
     store.setProperty('car_' + id, JSON.stringify({
       id: id,
-      driver: driver,
-      time: c.time,
-      from: clean_(c.from, 40),
-      backTime: backTime,
-      backTo: clean_(c.backTo, 40),
-      memo: clean_(c.memo, 80),
+      driver: v.driver,
+      time: v.time,
+      from: v.from,
+      backTime: v.backTime,
+      backTo: v.backTo,
+      memo: v.memo,
       riders: riders,
       pinHash: hashPin_(id, pin),
       createdAt: Date.now()
@@ -160,23 +173,64 @@ function addCar(c) {
   });
 }
 
-/** 등록할 때 정한 4자리 비밀번호(또는 관리자 비밀번호)가 맞아야 삭제됩니다. 5번 틀리면 10분 동안 막힙니다. */
+/**
+ * 차량 비밀번호(또는 관리자 비밀번호)를 확인합니다. 5번 틀리면 10분 동안 막힙니다.
+ * 반드시 잠금 안에서 부릅니다.
+ */
+function verifyCarPin_(car, pin) {
+  if (!car.pinHash) return; // 비밀번호 기능 이전에 등록된 차
+  pin = String(pin || '');
+  var key = 'car_' + car.id;
+  guard_(key);
+  var isAdmin = adminPin_() && pin === adminPin_();
+  if (isAdmin) guard_('admin'); // 관리자 비밀번호가 잠긴 동안에는 관리자 비밀번호로도 불가
+  if (!isAdmin && hashPin_(car.id, pin) !== car.pinHash) {
+    fail_('admin'); // 이 경로로 관리자 비밀번호를 맞혀 보는 것도 막음
+    throw new Error(failMsg_('비밀번호가 맞지 않아요. 차를 등록한 분께 확인해 주세요.', fail_(key)));
+  }
+  pass_(key);
+  if (isAdmin) pass_('admin');
+}
+
+/**
+ * 차량 정보를 수정합니다. 비밀번호가 맞아야 합니다.
+ * 자리 수를 줄일 때는 탑승자를 앞쪽 빈자리로 옮기고, 탑승자보다 적게 줄일 수는 없습니다.
+ * c.newPin 이 있으면 비밀번호도 바꿉니다.
+ */
+function updateCar(id, pin, c) {
+  var v = carInput_(c);
+  var newPin = String(c.newPin || '');
+  if (newPin && !/^\d{4}$/.test(newPin)) throw new Error('새 비밀번호는 숫자 4자리로 입력해 주세요.');
+  return withLock_(function (store) {
+    var car = readCar_(store, id);
+    verifyCarPin_(car, pin);
+    var taken = car.riders.filter(function (r) { return r; });
+    if (taken.length > v.seats) {
+      throw new Error('이미 ' + taken.length + '명이 탑승 신청해서 ' + v.seats + '석으로 줄일 수 없어요.');
+    }
+    var riders = [];
+    for (var i = 0; i < v.seats; i++) riders.push(i < car.riders.length ? car.riders[i] || null : null);
+    // 잘려 나간 자리의 탑승자를 남은 빈자리로 옮김
+    car.riders.slice(v.seats).forEach(function (r) {
+      if (r) riders[riders.indexOf(null)] = r;
+    });
+    car.driver = v.driver;
+    car.time = v.time;
+    car.from = v.from;
+    car.backTime = v.backTime;
+    car.backTo = v.backTo;
+    car.memo = v.memo;
+    car.riders = riders;
+    if (newPin) car.pinHash = hashPin_(car.id, newPin);
+    store.setProperty('car_' + car.id, JSON.stringify(car));
+  });
+}
+
+/** 등록할 때 정한 4자리 비밀번호(또는 관리자 비밀번호)가 맞아야 삭제됩니다. */
 function deleteCar(id, pin) {
   return withLock_(function (store) {
     var car = readCar_(store, id);
-    pin = String(pin || '');
-    var key = 'car_' + car.id;
-    if (car.pinHash) {
-      guard_(key);
-      var isAdmin = adminPin_() && pin === adminPin_();
-      if (isAdmin) guard_('admin'); // 관리자 비밀번호가 잠긴 동안에는 관리자 비밀번호로도 삭제 불가
-      if (!isAdmin && hashPin_(car.id, pin) !== car.pinHash) {
-        fail_('admin'); // 이 경로로 관리자 비밀번호를 맞혀 보는 것도 막음
-        throw new Error(failMsg_('비밀번호가 맞지 않아요. 차를 등록한 분께 확인해 주세요.', fail_(key)));
-      }
-      pass_(key);
-      if (isAdmin) pass_('admin');
-    }
+    verifyCarPin_(car, pin);
     store.deleteProperty('car_' + car.id);
   });
 }

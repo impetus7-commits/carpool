@@ -301,6 +301,17 @@ function demoCall(fn, args) {
           if ((dc.pin || '0000') !== args[1] && args[1] !== '0000') fail('car_' + dc.id, '비밀번호가 맞지 않아요. 차를 등록한 분께 확인해 주세요.');
           st.cars = st.cars.filter(function (c) { return c.id !== args[0]; });
         }
+        if (fn === 'updateCar') {
+          var uc = find(args[0]), u = args[2];
+          guard('car_' + uc.id);
+          if ((uc.pin || '0000') !== args[1] && args[1] !== '0000') fail('car_' + uc.id, '비밀번호가 맞지 않아요. 차를 등록한 분께 확인해 주세요.');
+          var tk = uc.riders.filter(Boolean);
+          if (tk.length > u.seats) throw new Error('이미 ' + tk.length + '명이 탑승 신청해서 ' + u.seats + '석으로 줄일 수 없어요.');
+          var nr = []; for (var j = 0; j < u.seats; j++) nr.push(uc.riders[j] || null);
+          uc.riders.slice(u.seats).forEach(function (r) { if (r) nr[nr.indexOf(null)] = r; });
+          ['driver', 'time', 'from', 'backTime', 'backTo', 'memo'].forEach(function (k) { uc[k] = u[k]; });
+          uc.riders = nr; if (u.newPin) uc.pin = u.newPin;
+        }
         if (fn === 'joinSeat') { var car = find(args[0]); if (car.riders[args[1]]) throw new Error('방금 다른 분이 먼저 앉았어요.'); car.riders[args[1]] = args[2]; }
         if (fn === 'leaveSeat') find(args[0]).riders[args[1]] = null;
         if (fn === 'resetCars') st.cars = [];
@@ -398,7 +409,8 @@ function render() {
             '<span class="n">' + (mine ? '내 자리' : (i + 1)) + '</span><span class="nm">' + esc(r) + '</span></button>';
         }).join('') +
       '</div>' +
-      '<div class="car-foot"><button type="button" class="link-btn" data-del="' + car.id + '">차량 삭제</button></div>' +
+      '<div class="car-foot"><button type="button" class="link-btn" data-edit="' + car.id + '">수정</button>' +
+        '<button type="button" class="link-btn" data-del="' + car.id + '">차량 삭제</button></div>' +
     '</article>';
   });
   $('list').innerHTML = html;
@@ -435,6 +447,7 @@ var onClose = null;
 function openSheet(html, after) {
   $('sheetBody').innerHTML = '<div class="grab"></div>' + html;
   $('scrim').hidden = false;
+  $('scrim').firstElementChild.scrollTop = 0; // 이전 시트의 스크롤 위치를 지움
   document.body.style.overflow = 'hidden';
   if (after) after($('sheetBody'));
 }
@@ -509,45 +522,62 @@ function sheetLeave(car, seat) {
     });
 }
 
-/* 차량 등록 */
-function sheetAddCar() {
-  var seats = 3;
+/* 차량 등록 / 수정 (car가 있으면 수정) */
+function sheetCar(car) {
+  var edit = !!car;
+  var c = car || { driver: myName(), time: '08:30', from: '', backTime: '', backTo: '', memo: '', riders: [null, null, null] };
+  var seats = c.riders.length;
+  var taken = c.riders.filter(Boolean).length;
+  var pinLabel = edit ? '비밀번호 4자리' : '비밀번호 (숫자 4자리)';
   openSheet(
-    '<h2 id="sheetTitle">내 차 등록하기</h2>' +
-    '<p class="sub">등록하면 빈자리가 생기고, 다른 분들이 눌러서 이름을 넣을 수 있어요.</p>' +
+    '<h2 id="sheetTitle">' + (edit ? '차량 정보 수정' : '내 차 등록하기') + '</h2>' +
+    '<p class="sub">' + (edit ? '등록할 때 정한 비밀번호를 넣어야 저장돼요.' : '등록하면 빈자리가 생기고, 다른 분들이 눌러서 이름을 넣을 수 있어요.') + '</p>' +
     '<form class="form" id="fCar" autocomplete="off">' +
-      '<label>운전자 이름<input id="carDriver" maxlength="20" required placeholder="예: 김민수" value="' + esc(myName()) + '"></label>' +
       '<div class="row2">' +
-        '<label>출발 시각<input id="carTime" type="time" required value="08:30"></label>' +
-        '<label>출발 장소<input id="carFrom" maxlength="40" placeholder="예: 학교 정문"></label>' +
+        '<label>운전자 이름<input id="carDriver" maxlength="20" required placeholder="예: 김민수" value="' + esc(c.driver) + '"></label>' +
+        '<label>' + pinLabel + '<input id="carPin" class="pin" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" required autocomplete="off" placeholder="••••"></label>' +
+      '</div>' +
+      '<p class="hint">' + (edit ? '비밀번호를 잊었다면 관리자에게 부탁해 주세요.' : '🔒 이 비밀번호가 있어야 나중에 차를 <b>수정·삭제</b>할 수 있어요. 꼭 기억해 두세요.') + '</p>' +
+      '<div class="row2">' +
+        '<label>출발 시각<input id="carTime" type="time" required value="' + esc(c.time) + '"></label>' +
+        '<label>출발 장소<input id="carFrom" maxlength="40" placeholder="예: 학교 정문" value="' + esc(c.from) + '"></label>' +
       '</div>' +
       '<div class="row2">' +
-        '<label>복귀 시각 (선택)<input id="carBackTime" type="time"></label>' +
-        '<label>복귀 장소 (선택)<input id="carBackTo" maxlength="40" placeholder="예: 학교 정문"></label>' +
+        '<label>복귀 시각 (선택)<input id="carBackTime" type="time" value="' + esc(c.backTime) + '"></label>' +
+        '<label>복귀 장소 (선택)<input id="carBackTo" maxlength="40" placeholder="예: 학교 정문" value="' + esc(c.backTo) + '"></label>' +
       '</div>' +
       '<label>태울 수 있는 인원 (운전자 제외)' +
         '<div class="stepper"><button type="button" id="sMinus" aria-label="한 명 줄이기">−</button>' +
-        '<output id="sVal">3</output>' +
-        '<button type="button" id="sPlus" aria-label="한 명 늘리기">+</button></div></label>' +
-      '<label>메모 (선택)<input id="carMemo" maxlength="80" placeholder="예: 010-1234-5678 / 짐 많으면 미리 말해주세요"></label>' +
-      '<label>삭제용 비밀번호 (숫자 4자리)<input id="carPin" class="pin" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" required autocomplete="off" placeholder="••••">' +
-        '<span class="hint">나중에 이 차를 삭제할 때 필요해요. 꼭 기억해 두세요.</span></label>' +
+        '<output id="sVal">' + seats + '</output>' +
+        '<button type="button" id="sPlus" aria-label="한 명 늘리기">+</button></div>' +
+        (edit && taken ? '<span class="hint">지금 ' + taken + '명이 탑승 신청했어요. ' + taken + '석보다 줄일 수 없어요.</span>' : '') +
+      '</label>' +
+      '<label>메모 (선택)<input id="carMemo" maxlength="80" placeholder="예: 010-1234-5678 / 짐 많으면 미리 말해주세요" value="' + esc(c.memo) + '"></label>' +
+      (edit ? '<label>새 비밀번호 (바꿀 때만)<input id="carNewPin" class="pin" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" autocomplete="off" placeholder="••••"></label>' : '') +
       '<p class="err"></p>' +
-      '<div class="btns"><button class="primary" type="submit">등록하기</button>' +
+      '<div class="btns"><button class="primary" type="submit">' + (edit ? '저장하기' : '등록하기') + '</button>' +
       '<button class="secondary" type="button" data-close>취소</button></div>' +
     '</form>',
     function (root) {
-      function upd(d) { seats = Math.max(1, Math.min(8, seats + d)); $('sVal').textContent = seats; }
+      var min = Math.max(1, taken);
+      function upd(d) { seats = Math.max(min, Math.min(8, seats + d)); $('sVal').textContent = seats; }
       $('sMinus').onclick = function () { upd(-1); };
       $('sPlus').onclick = function () { upd(1); };
       var f = root.querySelector('form');
       submitWith(f, f.querySelector('.primary'), function () {
         var d = $('carDriver').value.trim();
-        setMyName(d);
         var pin = $('carPin').value.trim();
-        if (!/^\d{4}$/.test(pin)) return Promise.reject(new Error('삭제용 비밀번호 숫자 4자리를 입력해 주세요.'));
-        return act('addCar', { driver: d, time: $('carTime').value, from: $('carFrom').value, backTime: $('carBackTime').value, backTo: $('carBackTo').value, memo: $('carMemo').value, seats: seats, pin: pin })
-          .then(function () { toast('차량을 등록했어요. 링크를 단톡방에 공유해 보세요.'); });
+        if (!/^\d{4}$/.test(pin)) return Promise.reject(new Error('비밀번호 숫자 4자리를 입력해 주세요.'));
+        var data = { driver: d, time: $('carTime').value, from: $('carFrom').value, backTime: $('carBackTime').value, backTo: $('carBackTo').value, memo: $('carMemo').value, seats: seats };
+        if (!edit) {
+          setMyName(d);
+          data.pin = pin;
+          return act('addCar', data).then(function () { toast('차량을 등록했어요. 링크를 단톡방에 공유해 보세요.'); });
+        }
+        var np = $('carNewPin').value.trim();
+        if (np && !/^\d{4}$/.test(np)) return Promise.reject(new Error('새 비밀번호는 숫자 4자리로 입력해 주세요.'));
+        data.newPin = np;
+        return act('updateCar', car.id, pin, data).then(function () { toast('차량 정보를 고쳤어요.'); });
       });
     });
 }
@@ -672,6 +702,7 @@ function copy(el) {
 $('list').addEventListener('click', function (e) {
   var b = e.target.closest('button');
   if (!b) return;
+  if (b.dataset.edit) { var ec = findCar(b.dataset.edit); if (ec) sheetCar(ec); return; }
   if (b.dataset.del) { var c = findCar(b.dataset.del); if (c) sheetDelete(c); return; }
   if (b.dataset.car) {
     var car = findCar(b.dataset.car), i = +b.dataset.seat;
@@ -680,7 +711,7 @@ $('list').addEventListener('click', function (e) {
   }
 });
 $('sheetBody').addEventListener('click', function (e) { if (e.target.closest('[data-close]')) closeSheet(); });
-$('btnAddCar').onclick = sheetAddCar;
+$('btnAddCar').onclick = function () { sheetCar(); };
 $('btnEvent').onclick = sheetEvent;
 $('btnShare').onclick = sheetShare;
 
