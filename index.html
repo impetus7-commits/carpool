@@ -271,6 +271,10 @@ function call(fn) {
   if (DEMO) return demoCall(fn, args);
   return new Promise(function (resolve, reject) {
     var r = google.script.run.withSuccessHandler(resolve).withFailureHandler(reject);
+    if (typeof r[fn] !== 'function') {
+      // 화면(index)만 새것이고 서버(Code)가 예전 것일 때
+      return reject(new Error('서버(Code) 파일이 최신이 아니에요. 관리자에게 Code 파일 업데이트와 "새 버전" 배포를 부탁해 주세요.'));
+    }
     r[fn].apply(r, args);
   });
 }
