@@ -139,6 +139,11 @@ main { padding-block: 8px calc(env(safe-area-inset-bottom, 0px) + 110px); displa
 }
 .link-btn { background: none; border: 0; color: var(--muted); font-size: 13px; padding: 8px 10px; min-height: 40px; }
 
+.day {
+  margin: 10px 2px -2px; font: 400 20px/1.2 var(--f-display); display: flex; align-items: center; gap: 10px;
+}
+.day::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+.day:first-child, .demo-note + .day { margin-top: 0; }
 .empty {
   text-align: center; padding: 40px 16px; color: var(--muted); border: 1.5px dashed var(--line);
   border-radius: 16px; display: grid; gap: 6px;
@@ -270,8 +275,8 @@ function demoCall(fn, args) {
   if (!st) st = {
     event: { title: '(예시) 가을 체육대회', date: '2026-11-14', place: '시민운동장 정문', note: '도착 후 본부석 집합' },
     cars: [
-      { id: 'a1', driver: '(예시) 김선생', time: '08:20', from: '학교 정문', backTime: '17:30', backTo: '학교 정문', memo: '트렁크 넉넉해요', riders: ['(예시) 이민지', null, null, null], createdAt: 1 },
-      { id: 'a2', driver: '(예시) 박선생', time: '08:40', from: '역 2번 출구', memo: '', riders: ['(예시) 최서연', '(예시) 정하늘'], createdAt: 2 }
+      { id: 'a1', driver: '(예시) 김선생', date: '2026-11-14', time: '08:20', from: '학교 정문', backTime: '17:30', backTo: '학교 정문', memo: '트렁크 넉넉해요', riders: ['(예시) 이민지', null, null, null], createdAt: 1 },
+      { id: 'a2', driver: '(예시) 박선생', date: '2026-11-14', time: '08:40', from: '역 2번 출구', memo: '', riders: ['(예시) 최서연', '(예시) 정하늘'], createdAt: 2 }
     ]
   };
   function save() { try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (e) {} }
@@ -293,7 +298,7 @@ function demoCall(fn, args) {
         if (fn === 'saveEvent') st.event = args[0];
         if (fn === 'addCar') {
           var c = args[0], r = []; for (var i = 0; i < c.seats; i++) r.push(null);
-          st.cars.push({ id: Math.random().toString(36).slice(2, 10), driver: c.driver, time: c.time, from: c.from, backTime: c.backTime, backTo: c.backTo, memo: c.memo, riders: r, pin: c.pin, createdAt: Date.now() });
+          st.cars.push({ id: Math.random().toString(36).slice(2, 10), driver: c.driver, date: c.date, backDate: c.backDate, time: c.time, from: c.from, backTime: c.backTime, backTo: c.backTo, memo: c.memo, riders: r, pin: c.pin, createdAt: Date.now() });
         }
         if (fn === 'deleteCar') {
           var dc = find(args[0]);
@@ -309,14 +314,14 @@ function demoCall(fn, args) {
           if (tk.length > u.seats) throw new Error('이미 ' + tk.length + '명이 탑승 신청해서 ' + u.seats + '석으로 줄일 수 없어요.');
           var nr = []; for (var j = 0; j < u.seats; j++) nr.push(uc.riders[j] || null);
           uc.riders.slice(u.seats).forEach(function (r) { if (r) nr[nr.indexOf(null)] = r; });
-          ['driver', 'time', 'from', 'backTime', 'backTo', 'memo'].forEach(function (k) { uc[k] = u[k]; });
+          ['driver', 'date', 'time', 'from', 'backDate', 'backTime', 'backTo', 'memo'].forEach(function (k) { uc[k] = u[k]; });
           uc.riders = nr; if (u.newPin) uc.pin = u.newPin;
         }
         if (fn === 'joinSeat') { var car = find(args[0]); if (car.riders[args[1]]) throw new Error('방금 다른 분이 먼저 앉았어요.'); car.riders[args[1]] = args[2]; }
         if (fn === 'leaveSeat') find(args[0]).riders[args[1]] = null;
         if (fn === 'resetCars') st.cars = [];
         save();
-        st.cars.sort(function (a, b) { return a.time.localeCompare(b.time) || a.createdAt - b.createdAt; });
+        st.cars.sort(function (a, b) { return ((a.date || '') + a.time).localeCompare((b.date || '') + b.time) || a.createdAt - b.createdAt; });
         resolve({ event: st.event, cars: st.cars, url: location.href, now: Date.now() });
       } catch (e) { reject(e); }
     }, 150);
@@ -346,6 +351,18 @@ function fmtDate(d) {
   var dt = new Date(+m[1], +m[2] - 1, +m[3]);
   return (+m[2]) + '월 ' + (+m[3]) + '일 (' + DAYS[dt.getDay()] + ')';
 }
+function fmtShort(d) {
+  var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(d || '');
+  if (!m) return '';
+  return (+m[2]) + '/' + (+m[3]) + '(' + DAYS[new Date(+m[1], +m[2] - 1, +m[3]).getDay()] + ')';
+}
+function fmtRange(a, b) { return fmtDate(a) + (b && b !== a ? ' ~ ' + fmtDate(b) : ''); }
+function todayStr() {
+  var d = new Date(Date.now() + 9 * 3600000); // 한국 시간
+  return d.toISOString().slice(0, 10);
+}
+/** 차의 출발 날짜 (날짜가 없는 예전 차량은 행사 날짜) */
+function carDate(car) { return car.date || (state.event || {}).date || ''; }
 function fmtTime(t) {
   var m = /^(\d{2}):(\d{2})$/.exec(t || '');
   if (!m) return { ap: '', hm: t || '' };
@@ -354,8 +371,10 @@ function fmtTime(t) {
 }
 
 function backText(car) {
-  var parts = [];
-  if (car.backTime) { var b = fmtTime(car.backTime); parts.push(b.ap + ' ' + b.hm); }
+  var parts = [], when = [];
+  if (car.backDate && car.backDate !== carDate(car)) when.push(fmtShort(car.backDate));
+  if (car.backTime) { var b = fmtTime(car.backTime); when.push(b.ap + ' ' + b.hm); }
+  if (when.length) parts.push(when.join(' '));
   if (car.backTo) parts.push(car.backTo + ' 도착');
   return parts.join(' · ');
 }
@@ -371,7 +390,7 @@ function render() {
   $('evTitle').textContent = ev.title || '행사 이름을 정해 주세요';
   $('evTitle').classList.toggle('empty-title', !ev.title);
   var meta = [];
-  if (ev.date) meta.push('<span>' + esc(fmtDate(ev.date)) + '</span>');
+  if (ev.date) meta.push('<span>' + esc(fmtRange(ev.date, ev.endDate)) + '</span>');
   if (ev.place) meta.push('<span>도착 ' + esc(ev.place) + '</span>');
   if (ev.note) meta.push('<span>' + esc(ev.note) + '</span>');
   $('evMeta').innerHTML = meta.join('');
@@ -383,9 +402,18 @@ function render() {
   if (DEMO) html += '<div class="demo-note">미리보기 모드입니다. 예시 데이터는 이 기기에만 저장됩니다. 실제 공유는 Apps Script로 배포한 주소를 쓰세요.</div>';
 
   if (!state.cars.length) {
-    html += '<div class="empty"><strong>아직 등록된 차가 없어요</strong>차를 가져오시는 분은 아래 버튼으로 출발 시각과 자리 수를 등록해 주세요.</div>';
+    html += '<div class="empty"><strong>아직 등록된 차가 없어요</strong>차를 가져오시는 분은 아래 버튼으로 출발 날짜·시각과 자리 수를 등록해 주세요.</div>';
   }
+  // 여러 날에 걸친 경우 날짜별로 묶어서 보여 줌
+  var days = {};
+  state.cars.forEach(function (c) { days[carDate(c)] = 1; });
+  var byDay = Object.keys(days).length > 1 || !!ev.endDate;
+  var lastDay = null;
   state.cars.forEach(function (car) {
+    if (byDay && carDate(car) !== lastDay) {
+      lastDay = carDate(car);
+      html += '<h3 class="day">' + esc(fmtDate(lastDay) || '날짜 미정') + '</h3>';
+    }
     var left = car.riders.filter(function (r) { return !r; }).length;
     open += left; riders += car.riders.length - left;
     var t = fmtTime(car.time);
@@ -485,7 +513,7 @@ function sheetJoin(car, seat) {
   var t = fmtTime(car.time);
   openSheet(
     '<h2 id="sheetTitle">' + esc(car.driver) + '님 차에 탑승</h2>' +
-    '<p class="sub">' + t.ap + ' ' + esc(t.hm) + ' 출발' + (car.from ? ' · ' + esc(car.from) : '') +
+    '<p class="sub">' + esc(fmtDate(carDate(car))) + ' ' + t.ap + ' ' + esc(t.hm) + ' 출발' + (car.from ? ' · ' + esc(car.from) : '') +
       (backText(car) ? '<br>복귀 ' + esc(backText(car)) : '') + '<br>' + (seat + 1) + '번 자리</p>' +
     '<form class="form" id="fJoin" autocomplete="off">' +
       '<label>내 이름<input id="joinName" name="name" maxlength="20" required placeholder="예: 홍길동" value="' + esc(myName()) + '"></label>' +
@@ -525,7 +553,9 @@ function sheetLeave(car, seat) {
 /* 차량 등록 / 수정 (car가 있으면 수정) */
 function sheetCar(car) {
   var edit = !!car;
-  var c = car || { driver: myName(), time: '08:30', from: '', backTime: '', backTo: '', memo: '', riders: [null, null, null] };
+  var ev = state.event || {};
+  var c = car || { driver: myName(), date: ev.date || todayStr(), time: '08:30', from: '', backDate: '', backTime: '', backTo: '', memo: '', riders: [null, null, null] };
+  var cDate = carDate(c) || ev.date || todayStr();
   var seats = c.riders.length;
   var taken = c.riders.filter(Boolean).length;
   var pinLabel = edit ? '비밀번호 4자리' : '비밀번호 (숫자 4자리)';
@@ -539,13 +569,16 @@ function sheetCar(car) {
       '</div>' +
       '<p class="hint">' + (edit ? '비밀번호를 잊었다면 관리자에게 부탁해 주세요.' : '🔒 이 비밀번호가 있어야 나중에 차를 <b>수정·삭제</b>할 수 있어요. 꼭 기억해 두세요.') + '</p>' +
       '<div class="row2">' +
+        '<label>출발 날짜<input id="carDate" type="date" required value="' + esc(cDate) + '"></label>' +
         '<label>출발 시각<input id="carTime" type="time" required value="' + esc(c.time) + '"></label>' +
-        '<label>출발 장소<input id="carFrom" maxlength="40" placeholder="예: 학교 정문" value="' + esc(c.from) + '"></label>' +
       '</div>' +
+      '<label>출발 장소<input id="carFrom" maxlength="40" placeholder="예: 학교 정문" value="' + esc(c.from) + '"></label>' +
       '<div class="row2">' +
+        '<label>복귀 날짜 (선택)<input id="carBackDate" type="date" value="' + esc(c.backDate) + '"></label>' +
         '<label>복귀 시각 (선택)<input id="carBackTime" type="time" value="' + esc(c.backTime) + '"></label>' +
-        '<label>복귀 장소 (선택)<input id="carBackTo" maxlength="40" placeholder="예: 학교 정문" value="' + esc(c.backTo) + '"></label>' +
       '</div>' +
+      '<p class="hint">복귀 날짜를 비워 두면 출발한 날 돌아오는 것으로 봐요.</p>' +
+      '<label>복귀 장소 (선택)<input id="carBackTo" maxlength="40" placeholder="예: 학교 정문" value="' + esc(c.backTo) + '"></label>' +
       '<label>태울 수 있는 인원 (운전자 제외)' +
         '<div class="stepper"><button type="button" id="sMinus" aria-label="한 명 줄이기">−</button>' +
         '<output id="sVal">' + seats + '</output>' +
@@ -568,7 +601,11 @@ function sheetCar(car) {
         var d = $('carDriver').value.trim();
         var pin = $('carPin').value.trim();
         if (!/^\d{4}$/.test(pin)) return Promise.reject(new Error('비밀번호 숫자 4자리를 입력해 주세요.'));
-        var data = { driver: d, time: $('carTime').value, from: $('carFrom').value, backTime: $('carBackTime').value, backTo: $('carBackTo').value, memo: $('carMemo').value, seats: seats };
+        var dt = $('carDate').value, bd = $('carBackDate').value;
+        if (!dt) return Promise.reject(new Error('출발 날짜를 선택해 주세요.'));
+        if (bd && bd < dt) return Promise.reject(new Error('복귀 날짜가 출발 날짜보다 빨라요.'));
+        if (bd === dt) bd = '';
+        var data = { driver: d, date: dt, backDate: bd, time: $('carTime').value, from: $('carFrom').value, backTime: $('carBackTime').value, backTo: $('carBackTo').value, memo: $('carMemo').value, seats: seats };
         if (!edit) {
           setMyName(d);
           data.pin = pin;
@@ -637,9 +674,11 @@ function sheetEvent() {
     '<form class="form" id="fEv" autocomplete="off">' +
       '<label>행사 이름<input id="evT" maxlength="40" required placeholder="예: 가을 체육대회" value="' + esc(ev.title) + '"></label>' +
       '<div class="row2">' +
-        '<label>날짜<input id="evD" type="date" value="' + esc(ev.date) + '"></label>' +
-        '<label>도착지<input id="evP" maxlength="60" placeholder="예: 시민운동장" value="' + esc(ev.place) + '"></label>' +
+        '<label>시작 날짜<input id="evD" type="date" value="' + esc(ev.date) + '"></label>' +
+        '<label>끝나는 날짜 (선택)<input id="evE" type="date" value="' + esc(ev.endDate) + '"></label>' +
       '</div>' +
+      '<p class="hint">하루 행사면 끝나는 날짜는 비워 두세요.</p>' +
+      '<label>도착지<input id="evP" maxlength="60" placeholder="예: 시민운동장" value="' + esc(ev.place) + '"></label>' +
       '<label>안내 (선택)<input id="evN" maxlength="120" placeholder="예: 9시까지 정문 집합" value="' + esc(ev.note) + '"></label>' +
       '<p class="err"></p>' +
       '<div class="btns"><button class="primary" type="submit">저장하기</button>' +
@@ -650,7 +689,7 @@ function sheetEvent() {
     function (root) {
       var f = root.querySelector('form');
       submitWith(f, f.querySelector('.primary'), function () {
-        return act('saveEvent', { title: $('evT').value, date: $('evD').value, place: $('evP').value, note: $('evN').value }, adminPin)
+        return act('saveEvent', { title: $('evT').value, date: $('evD').value, endDate: $('evE').value, place: $('evP').value, note: $('evN').value }, adminPin)
           .then(function () { toast('행사 정보를 저장했어요.'); });
       });
       var armed = false;
@@ -668,7 +707,7 @@ function sheetEvent() {
 function sheetShare() {
   var url = state.url || location.href;
   var ev = state.event || {};
-  var msg = '[' + (ev.title || '행사') + ' 카풀]' + (ev.date ? ' ' + fmtDate(ev.date) : '') +
+  var msg = '[' + (ev.title || '행사') + ' 카풀]' + (ev.date ? ' ' + fmtRange(ev.date, ev.endDate) : '') +
     '\n차 가져오시는 분은 등록, 타실 분은 빈자리를 눌러 이름을 넣어 주세요.\n' + url;
   openSheet(
     '<h2 id="sheetTitle">카카오톡으로 공유하기</h2>' +

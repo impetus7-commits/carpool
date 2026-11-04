@@ -82,11 +82,14 @@ function getState() {
       } catch (e) {}
     }
   });
-  cars.sort(function (a, b) {
-    return (a.time || '').localeCompare(b.time || '') || a.createdAt - b.createdAt;
-  });
   var event = {};
   try { event = JSON.parse(props.event || '{}'); } catch (e) {}
+  // 출발 날짜+시각순 (날짜가 없는 예전 차량은 행사 날짜로 봄)
+  cars.sort(function (a, b) {
+    var ka = (a.date || event.date || '') + ' ' + (a.time || '');
+    var kb = (b.date || event.date || '') + ' ' + (b.time || '');
+    return ka.localeCompare(kb) || a.createdAt - b.createdAt;
+  });
   return { event: event, cars: cars, url: ScriptApp.getService().getUrl(), now: Date.now() };
 }
 
@@ -127,19 +130,29 @@ function saveEvent(ev, adminPin) {
     checkAdmin_(adminPin);
     store.setProperty('event', JSON.stringify({
       title: clean_(ev.title, 40),
-      date: clean_(ev.date, 10),
+      date: date_(ev.date),
+      endDate: date_(ev.endDate) > date_(ev.date) ? date_(ev.endDate) : '', // 여러 날 행사일 때 끝나는 날
       place: clean_(ev.place, 60),
       note: clean_(ev.note, 120)
     }));
   });
 }
 
+function date_(d) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(d || '') ? d : '';
+}
+
 /** 차량 입력값을 검사·정리합니다 (등록과 수정에서 같이 씀). */
 function carInput_(c) {
   var driver = clean_(c.driver, 20);
   if (!driver) throw new Error('운전자 이름을 입력해 주세요.');
+  if (!date_(c.date)) throw new Error('출발 날짜를 선택해 주세요.');
   if (!/^\d{2}:\d{2}$/.test(c.time || '')) throw new Error('출발 시각을 선택해 주세요.');
+  var backDate = date_(c.backDate);
+  if (backDate && backDate < c.date) throw new Error('복귀 날짜가 출발 날짜보다 빨라요.');
   return {
+    date: c.date,
+    backDate: backDate,
     driver: driver,
     time: c.time,
     from: clean_(c.from, 40),
@@ -161,8 +174,10 @@ function addCar(c) {
     store.setProperty('car_' + id, JSON.stringify({
       id: id,
       driver: v.driver,
+      date: v.date,
       time: v.time,
       from: v.from,
+      backDate: v.backDate,
       backTime: v.backTime,
       backTo: v.backTo,
       memo: v.memo,
@@ -215,7 +230,9 @@ function updateCar(id, pin, c) {
       if (r) riders[riders.indexOf(null)] = r;
     });
     car.driver = v.driver;
+    car.date = v.date;
     car.time = v.time;
+    car.backDate = v.backDate;
     car.from = v.from;
     car.backTime = v.backTime;
     car.backTo = v.backTo;
