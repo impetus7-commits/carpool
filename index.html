@@ -275,13 +275,19 @@ function demoCall(fn, args) {
     ]
   };
   function save() { try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (e) {} }
+  // 미리보기용 잠금: 5번 틀리면 10분 (실제 잠금은 Code.gs에서 처리)
+  var LK = window.__demoLock || (window.__demoLock = {});
+  function guard(k) { var l = LK['lock_' + k] || 0; if (l > Date.now()) throw new Error('비밀번호를 여러 번 틀려서 잠시 막혔어요. ' + Math.ceil((l - Date.now()) / 60000) + '분 뒤에 다시 시도해 주세요.'); }
+  function fail(k, base) { var n = (LK['fail_' + k] || 0) + 1; if (n >= 5) { LK['lock_' + k] = Date.now() + 600000; LK['fail_' + k] = 0; throw new Error('비밀번호를 5번 틀려서 10분 동안 막혔어요.'); } LK['fail_' + k] = n; throw new Error(base + ' (남은 기회 ' + (5 - n) + '번)'); }
   function find(id) { for (var i = 0; i < st.cars.length; i++) if (st.cars[i].id === id) return st.cars[i]; throw new Error('이미 삭제된 차량입니다.'); }
   return new Promise(function (resolve, reject) {
     setTimeout(function () {
       try {
         // 미리보기 전용 관리자 비밀번호는 0000 (실제 비밀번호는 Code.gs에만 있음)
         if (fn === 'checkAdmin' || fn === 'saveEvent' || fn === 'resetCars') {
-          if (args[fn === 'saveEvent' ? 1 : 0] !== '0000') throw new Error('관리자 비밀번호가 맞지 않아요.');
+          guard('admin');
+          if (args[fn === 'saveEvent' ? 1 : 0] !== '0000') fail('admin', '관리자 비밀번호가 맞지 않아요.');
+          LK.fail_admin = 0;
           if (fn === 'checkAdmin') return resolve(true);
         }
         if (fn === 'saveEvent') st.event = args[0];
@@ -291,7 +297,8 @@ function demoCall(fn, args) {
         }
         if (fn === 'deleteCar') {
           var dc = find(args[0]);
-          if ((dc.pin || '0000') !== args[1]) throw new Error('비밀번호가 맞지 않아요. 차를 등록한 분께 확인해 주세요.');
+          guard('car_' + dc.id);
+          if ((dc.pin || '0000') !== args[1] && args[1] !== '0000') fail('car_' + dc.id, '비밀번호가 맞지 않아요. 차를 등록한 분께 확인해 주세요.');
           st.cars = st.cars.filter(function (c) { return c.id !== args[0]; });
         }
         if (fn === 'joinSeat') { var car = find(args[0]); if (car.riders[args[1]]) throw new Error('방금 다른 분이 먼저 앉았어요.'); car.riders[args[1]] = args[2]; }

@@ -12,15 +12,51 @@ function adminPin_() {
   return typeof ADMIN_PIN === 'undefined' ? '' : String(ADMIN_PIN);
 }
 
+/* ---------- 비밀번호 잠금: 5번 틀리면 10분 동안 막음 ---------- */
+
+var MAX_FAILS = 5;     // 허용하는 연속 실패 횟수
+var LOCK_SEC = 600;    // 잠금 시간(초) = 10분
+
+function guard_(key) {
+  var until = +CacheService.getScriptCache().get('lock_' + key) || 0;
+  var left = until - Date.now();
+  if (left > 0) {
+    throw new Error('비밀번호를 여러 번 틀려서 잠시 막혔어요. ' + Math.ceil(left / 60000) + '분 뒤에 다시 시도해 주세요.');
+  }
+}
+
+/** 실패를 1회 기록하고 남은 기회를 돌려줍니다. 0이면 방금 잠긴 것입니다. */
+function fail_(key) {
+  var cache = CacheService.getScriptCache();
+  var n = (+cache.get('fail_' + key) || 0) + 1;
+  if (n >= MAX_FAILS) {
+    cache.put('lock_' + key, String(Date.now() + LOCK_SEC * 1000), LOCK_SEC);
+    cache.remove('fail_' + key);
+    return 0;
+  }
+  cache.put('fail_' + key, String(n), LOCK_SEC);
+  return MAX_FAILS - n;
+}
+
+function pass_(key) {
+  CacheService.getScriptCache().remove('fail_' + key);
+}
+
+function failMsg_(base, left) {
+  return left ? base + ' (남은 기회 ' + left + '번)' : '비밀번호를 ' + MAX_FAILS + '번 틀려서 ' + (LOCK_SEC / 60) + '분 동안 막혔어요.';
+}
+
+/** 반드시 잠금(withLock_/locked_) 안에서 부릅니다. */
 function checkAdmin_(pin) {
+  guard_('admin');
   var real = adminPin_();
-  if (!real || String(pin || '') !== real) throw new Error('관리자 비밀번호가 맞지 않아요.');
+  if (!real || String(pin || '') !== real) throw new Error(failMsg_('관리자 비밀번호가 맞지 않아요.', fail_('admin')));
+  pass_('admin');
 }
 
 /** 관리자 비밀번호 확인만 합니다. */
 function checkAdmin(pin) {
-  checkAdmin_(pin);
-  return true;
+  return locked_(function () { checkAdmin_(pin); return true; });
 }
 
 function doGet() {
@@ -55,14 +91,18 @@ function getState() {
 
 /* ---------- 쓰기 (모두 잠금 안에서 처리) ---------- */
 
-function withLock_(fn) {
+function locked_(fn) {
   var lock = LockService.getScriptLock();
   lock.waitLock(10000);
   try {
-    fn(PropertiesService.getScriptProperties());
+    return fn(PropertiesService.getScriptProperties());
   } finally {
     lock.releaseLock();
   }
+}
+
+function withLock_(fn) {
+  locked_(fn);
   return getState();
 }
 
@@ -82,8 +122,8 @@ function hashPin_(id, pin) {
 }
 
 function saveEvent(ev, adminPin) {
-  checkAdmin_(adminPin);
   return withLock_(function (store) {
+    checkAdmin_(adminPin);
     store.setProperty('event', JSON.stringify({
       title: clean_(ev.title, 40),
       date: clean_(ev.date, 10),
@@ -120,13 +160,22 @@ function addCar(c) {
   });
 }
 
-/** 등록할 때 정한 4자리 비밀번호가 맞아야 삭제됩니다. */
+/** 등록할 때 정한 4자리 비밀번호(또는 관리자 비밀번호)가 맞아야 삭제됩니다. 5번 틀리면 10분 동안 막힙니다. */
 function deleteCar(id, pin) {
   return withLock_(function (store) {
     var car = readCar_(store, id);
-    // 운전자 비밀번호 또는 관리자 비밀번호로 삭제 가능
-    if (car.pinHash && !(adminPin_() && String(pin || '') === adminPin_()) && hashPin_(car.id, String(pin || '')) !== car.pinHash) {
-      throw new Error('비밀번호가 맞지 않아요. 차를 등록한 분께 확인해 주세요.');
+    pin = String(pin || '');
+    var key = 'car_' + car.id;
+    if (car.pinHash) {
+      guard_(key);
+      var isAdmin = adminPin_() && pin === adminPin_();
+      if (isAdmin) guard_('admin'); // 관리자 비밀번호가 잠긴 동안에는 관리자 비밀번호로도 삭제 불가
+      if (!isAdmin && hashPin_(car.id, pin) !== car.pinHash) {
+        fail_('admin'); // 이 경로로 관리자 비밀번호를 맞혀 보는 것도 막음
+        throw new Error(failMsg_('비밀번호가 맞지 않아요. 차를 등록한 분께 확인해 주세요.', fail_(key)));
+      }
+      pass_(key);
+      if (isAdmin) pass_('admin');
     }
     store.deleteProperty('car_' + car.id);
   });
@@ -154,8 +203,8 @@ function leaveSeat(id, seat) {
 
 /** 다음 행사를 위해 차량·탑승 기록을 모두 지웁니다 (행사 정보는 유지). */
 function resetCars(adminPin) {
-  checkAdmin_(adminPin);
   return withLock_(function (store) {
+    checkAdmin_(adminPin);
     Object.keys(store.getProperties()).forEach(function (k) {
       if (k.indexOf('car_') === 0) store.deleteProperty(k);
     });
