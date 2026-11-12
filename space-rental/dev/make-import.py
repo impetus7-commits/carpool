@@ -162,7 +162,7 @@ function ledgerClearRooms_() {
   var sh = sheet_('공간');
   var last = sh.getLastRow();
   if (last < 2) return;
-  sh.copyTo(book_()).setName('공간_백업_' + Utilities.formatDate(new Date(), 'Asia/Seoul', 'MMdd_HHmmss'));
+  sh.copyTo(sh.getParent()).setName('공간_백업_' + Utilities.formatDate(new Date(), 'Asia/Seoul', 'MMdd_HHmmss'));
   sh.getRange(2, 1, last - 1, sh.getLastColumn()).clearContent();
   delete tabCache_['공간'];
 }
