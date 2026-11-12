@@ -476,9 +476,23 @@ function onOpen() {
     .addToUi();
 }
 
-/** 필요한 탭을 만들고, 비어 있으면 예시 데이터를 채웁니다. 여러 번 실행해도 기존 내용은 지우지 않습니다. */
+/**
+ * 필요한 탭을 만들고, 비어 있으면 예시 데이터를 채웁니다. 여러 번 실행해도 기존 내용은 지우지 않습니다.
+ * 연결된 시트가 없으면(시트 밖에서 만든 프로젝트) "학교 공간 대여" 시트를 새로 만들어 연결합니다.
+ * 끝나면 아래 [실행 로그]에 시트 주소가 나옵니다.
+ */
 function setup() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
+  if (!ss) {
+    var props = PropertiesService.getScriptProperties();
+    var id = props.getProperty('SHEET_ID');
+    if (id) {
+      ss = SpreadsheetApp.openById(id);
+    } else {
+      ss = SpreadsheetApp.create('학교 공간 대여');
+      props.setProperty('SHEET_ID', ss.getId());
+    }
+  }
   Object.keys(TABS_).forEach(function (name) {
     var head = TABS_[name];
     var sh = ss.getSheetByName(name) || ss.insertSheet(name);
@@ -512,7 +526,15 @@ function setup() {
   var first = ss.getSheetByName('시트1') || ss.getSheetByName('Sheet1');
   if (first && first.getLastRow() === 0 && ss.getSheets().length > 1) ss.deleteSheet(first);
 
-  SpreadsheetApp.getUi().alert('설정이 끝났습니다.\n\n1) [사용자] 탭에 교직원·학생 계정을 등록하세요.\n2) [공간] 탭을 학교에 맞게 고치세요.\n3) 오른쪽 위 [배포 → 새 배포]로 웹앱을 배포하세요.');
+  SpreadsheetApp.flush();
+  var made = ss.getSheets().map(function (s) { return s.getName(); }).join(', ');
+  console.log('설정이 끝났습니다. 탭: ' + made);
+  console.log('구글시트 주소: ' + ss.getUrl());
+  try {
+    SpreadsheetApp.getUi().alert('설정이 끝났습니다.\n\n1) [사용자] 탭에 교직원·학생 계정을 등록하세요.\n2) [공간] 탭을 학교에 맞게 고치세요.\n3) 앱스크립트 편집기 오른쪽 위 [배포 → 새 배포]로 웹앱을 배포하세요.');
+  } catch (e) {
+    // 시트 화면이 열려 있지 않으면 알림 창을 띄울 수 없습니다. 실행 로그의 주소로 시트를 여세요.
+  }
 }
 
 ;

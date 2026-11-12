@@ -7,8 +7,21 @@
 var TZ_ = 'Asia/Seoul';
 var tabCache_ = {};
 
+/**
+ * 데이터를 담는 구글시트.
+ * 시트의 [확장 프로그램 → Apps Script]로 만든 프로젝트면 그 시트를 쓰고,
+ * script.google.com 에서 따로 만든 프로젝트면 setup 이 만들어 둔 시트(스크립트 속성 SHEET_ID)를 씁니다.
+ */
+function book_() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  if (ss) return ss;
+  var id = PropertiesService.getScriptProperties().getProperty('SHEET_ID');
+  if (id) return SpreadsheetApp.openById(id);
+  throw new Error('연결된 구글시트가 없어요. 앱스크립트 편집기에서 setup 함수를 먼저 실행해 주세요.');
+}
+
 function sheet_(name) {
-  var sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(name);
+  var sh = book_().getSheetByName(name);
   if (!sh) throw new Error("'" + name + "' 탭이 없어요. 시트 메뉴 [공간대여 → 처음 설정]을 먼저 실행해 주세요.");
   return sh;
 }
@@ -86,4 +99,4 @@ function withLock_(fn) {
 function today_() { return Utilities.formatDate(new Date(), TZ_, 'yyyy-MM-dd'); }
 function nowStr_() { return Utilities.formatDate(new Date(), TZ_, 'yyyy-MM-dd HH:mm:ss'); }
 function newId_() { return Utilities.getUuid().replace(/-/g, '').slice(0, 10).toUpperCase(); }
-function sheetUrl_() { return SpreadsheetApp.getActiveSpreadsheet().getUrl(); }
+function sheetUrl_() { return book_().getUrl(); }
