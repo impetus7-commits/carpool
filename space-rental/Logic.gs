@@ -172,6 +172,141 @@ function recommend_(rooms, dayBookings, periods, q) {
   return out;
 }
 
+/* ---------- 기존 사용 대장 자동 가져오기 (계산 부분) ---------- */
+
+var SYNC_MEMO_ = '기존 사용 대장에서 옮김';
+// 대장의 C~K 칸과 그 뒤 한 칸(L) → 교시 이름. 시간대로 적힌 대장도 같은 자리의 교시로 옮깁니다.
+var SYNC_SLOTS_ = ['1교시', '2교시', '3교시', '4교시', '점심', '5교시', '6교시', '7교시', '방과후', '야간'];
+
+/** 대장에서 옮겨 온 예약인지 */
+function isLedger_(b) { return String(b.id).indexOf('L-') === 0 && b.memo === SYNC_MEMO_; }
+
+function ledgerKey_(s) {
+  return String(s == null ? '' : s).toLowerCase().replace(/[\s()\[\]{}（）·・.,_\-\/]/g, '');
+}
+
+/** 이름에서 찾을 열쇠들: 전체, 괄호 밖, 괄호 안, 끝의 '실'을 뗀 것 */
+function ledgerNames_(name) {
+  var keys = [ledgerKey_(name)];
+  var m = /^(.*?)[(（](.*?)[)）]\s*$/.exec(String(name));
+  if (m) { keys.push(ledgerKey_(m[1])); keys.push(ledgerKey_(m[2])); }
+  keys.slice().forEach(function (k) { if (/실$/.test(k)) keys.push(k.slice(0, -1)); });
+  return keys.filter(function (k, i) { return k.length >= 2 && keys.indexOf(k) === i; });
+}
+
+/**
+ * 대장의 시트 이름마다 [공간] 탭의 줄을 찾습니다.
+ * rooms = [{id, name}] → [{title, room | null, how}]
+ */
+function ledgerMatchRooms_(titles, rooms) {
+  var rs = rooms.map(function (r) { return { id: r.id, name: r.name, keys: ledgerNames_(r.name) }; });
+  var out = titles.map(function (t) { return { title: t, keys: ledgerNames_(t), room: null, how: '' }; });
+  var used = {};
+  var take = function (m, hit, how) {
+    if (hit.length === 1) { m.room = { id: hit[0].id, name: hit[0].name }; m.how = how; used[hit[0].id] = true; }
+    else if (hit.length > 1) m.how = '이름이 비슷한 공간이 ' + hit.length + '개';
+  };
+  // 1) 전체 이름이 같은 것
+  out.forEach(function (m) {
+    take(m, rs.filter(function (r) { return !used[r.id] && r.keys[0] === m.keys[0]; }), '이름 일치');
+  });
+  // 2) 괄호 안팎·'실'을 뗀 이름이 같은 것
+  out.forEach(function (m) {
+    if (m.room || m.how) return;
+    take(m, rs.filter(function (r) {
+      return !used[r.id] && r.keys.some(function (k) { return m.keys.indexOf(k) >= 0; });
+    }), '이름 일치');
+  });
+  // 3) 이름이 들어 있는 것 — 후보가 하나뿐이고, 그 공간을 노리는 다른 시트가 없을 때만
+  out.forEach(function (m) {
+    if (m.room || m.how) return;
+    var k = m.keys[0];
+    var near = function (key, r) { return r.keys[0].length >= 3 && (r.keys[0].indexOf(key) >= 0 || key.indexOf(r.keys[0]) >= 0); };
+    var hit = rs.filter(function (r) { return !used[r.id] && near(k, r); });
+    if (hit.length === 1) {
+      var rivals = out.filter(function (o) { return o !== m && !o.room && near(o.keys[0], hit[0]); });
+      if (rivals.length) return;
+    }
+    take(m, hit, '비슷한 이름');
+  });
+  return out.map(function (m) { return { title: m.title, room: m.room, how: m.how }; });
+}
+
+/**
+ * 대장 한 시트의 줄들 → 날짜별 칸 내용.
+ * grid = [[날짜('yyyy-MM-dd' 또는 ''), 칸0 … 칸9], …]  (위에서 아래 순서)
+ * from 이후 날짜만. 같은 날짜가 두 번 나오면 아래쪽 줄만 씁니다 (위쪽은 지난 학년도).
+ */
+function ledgerRows_(grid, from) {
+  var days = {};
+  grid.forEach(function (row) {
+    var d = row[0];
+    if (!isDate_(d) || d < from) return;
+    days[d] = SYNC_SLOTS_.map(function (x, i) {
+      return String(row[i + 1] == null ? '' : row[i + 1]).split(/\s+/).filter(Boolean).join(' ').slice(0, 100);
+    });
+  });
+  return Object.keys(days).sort().map(function (d) { return { date: d, slots: days[d] }; });
+}
+
+/** 날짜별 칸 내용 → 예약들. 이어진 칸에 같은 내용이 있으면 한 건으로 묶습니다. */
+function ledgerBookings_(rows, roomId, slotIds) {
+  var out = [];
+  rows.forEach(function (r) {
+    var i = 0;
+    while (i < r.slots.length) {
+      if (!r.slots[i]) { i++; continue; }
+      var j = i;
+      while (j + 1 < r.slots.length && r.slots[j + 1] === r.slots[i]) j++;
+      var ids = slotIds.slice(i, j + 1);
+      out.push({
+        id: 'L-' + roomId + '-' + r.date.replace(/-/g, '') + '-' + ids[0],
+        roomId: roomId, date: r.date, periods: ids, purpose: r.slots[i]
+      });
+      i = j + 1;
+    }
+  });
+  return out;
+}
+
+/** 지금 [예약] 탭에 있는 대장 예약(existing)과 대장에서 방금 읽은 것(desired)의 차이 */
+function ledgerDiff_(existing, desired) {
+  var have = {}, want = {};
+  existing.forEach(function (b) { have[b.id] = b; });
+  desired.forEach(function (b) { want[b.id] = b; });
+  var same = function (a, b) {
+    return a.roomId === b.roomId && a.date === b.date && a.purpose === b.purpose &&
+      a.periods.join(',') === b.periods.join(',') && a.status === '확정';
+  };
+  return {
+    add: desired.filter(function (b) { return !have[b.id]; }),
+    remove: existing.filter(function (b) { return !want[b.id]; }),
+    change: desired.filter(function (b) { return have[b.id] && !same(have[b.id], b); })
+      .map(function (b) { return { before: have[b.id], after: b }; })
+  };
+}
+
+/** from 이후 날짜에서 같은 공간·날짜·교시에 겹쳐 있는 살아 있는 예약 쌍 */
+function findClashes_(bookings, from) {
+  var groups = {};
+  bookings.forEach(function (b) {
+    if (!isActive_(b) || b.date < from) return;
+    var k = b.roomId + '|' + b.date;
+    (groups[k] || (groups[k] = [])).push(b);
+  });
+  var out = [];
+  Object.keys(groups).sort().forEach(function (k) {
+    var g = groups[k];
+    for (var i = 0; i < g.length; i++) {
+      for (var j = i + 1; j < g.length; j++) {
+        var both = g[i].periods.filter(function (p) { return g[j].periods.indexOf(p) >= 0; });
+        if (both.length) out.push({ roomId: g[i].roomId, date: g[i].date, periods: both, a: g[i], b: g[j] });
+      }
+    }
+  });
+  return out.sort(function (x, y) { return x.date < y.date ? -1 : x.date > y.date ? 1 : 0; });
+}
+
 if (typeof module !== 'undefined') {
   module.exports = {
     splitList_: splitList_, isDate_: isDate_, addDays_: addDays_, weekday_: weekday_,

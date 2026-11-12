@@ -238,3 +238,66 @@ test('일정 요약: 한 공간의 기간 안 살아 있는 예약만 날짜순�
   assert.throws(() => s.getRoomRange('A202', '2026-11-30', '2026-11-01'), /기간이 올바르지/);
   assert.throws(() => s.getRoomRange('A202', '2026-01-01', '2026-12-31'), /100일까지만/);
 });
+
+test('대장 가져오기: 시트 이름을 [공간] 탭 이름과 짝짓는다', () => {
+  const s = server();
+  const rooms = [{ id: 'R1', name: '미네르바 1실' }, { id: 'R2', name: '대강의실' }, { id: 'R3', name: '설렘온1실 (본관 2층)' },
+    { id: 'R4', name: '건산홀' }, { id: 'R5', name: '온라인 스튜디오' }, { id: 'R6', name: '체육관' }, { id: 'R7', name: '체육관 탁구장' }];
+  const m = plain(s.ledgerMatchRooms_(['미네르바1실', '대강의실(아름자리)', '설렘온1실', '건산홀(246석)', '다운자리(스튜디오)', '체육관', '동진실'], rooms));
+  assert.deepEqual(m.map((x) => x.room && x.room.id), ['R1', 'R2', 'R3', 'R4', null, 'R6', null]);
+});
+
+test('대장 가져오기: 오늘 이후만, 같은 날짜는 아래 줄만, 이어진 같은 내용은 한 건', () => {
+  const s = server();
+  const e = ['', '', '', '', '', '', '', '', '', ''];
+  const grid = [
+    ['', '1교시', '2교시'].concat(e.slice(2)),
+    ['2026-11-11', '지난 날'].concat(e.slice(1)),
+    ['2026-11-13', '위쪽 줄(작년)', '위쪽 줄(작년)'].concat(e.slice(2)),
+    ['2026-11-12', '회의', '회의', '', '수업\n(수학과)', '', '', '', '', '', '야간 행사'],
+    ['2026-11-13', '', '', '', '', '', '동아리', '동아리', '동아리', '', ''],
+  ];
+  const rows = plain(s.ledgerRows_(grid, '2026-11-12'));
+  assert.deepEqual(rows.map((r) => r.date), ['2026-11-12', '2026-11-13']);
+  const ids = ['P1', 'P2', 'P3', 'P4', 'PL', 'P5', 'P6', 'P7', 'PA', 'PN'];
+  const b = plain(s.ledgerBookings_(rows, 'R9', ids));
+  assert.deepEqual(b.map((x) => [x.id, x.periods.join(','), x.purpose]), [
+    ['L-R9-20261112-P1', 'P1,P2', '회의'],
+    ['L-R9-20261112-P4', 'P4', '수업 (수학과)'],
+    ['L-R9-20261112-PN', 'PN', '야간 행사'],
+    ['L-R9-20261113-P5', 'P5,P6,P7', '동아리'],
+  ]);
+});
+
+test('대장 가져오기: 추가·변경·삭제를 가려내고, 겹친 예약을 찾는다', () => {
+  const s = server();
+  const mk = (id, periods, purpose, extra) => Object.assign({ id, roomId: 'R1', date: '2026-11-13', periods, purpose, status: '확정', memo: s.SYNC_MEMO_ }, extra);
+  const existing = [mk('L-a', ['P1'], '그대로'), mk('L-b', ['P2'], '바뀔 것'), mk('L-c', ['P3'], '지워질 것'), mk('L-d', ['P4'], '취소됐던 것', { status: '취소' })];
+  const desired = [mk('L-a', ['P1'], '그대로'), mk('L-b', ['P2', 'P3'], '바뀔 것'), mk('L-d', ['P4'], '취소됐던 것'), mk('L-e', ['P5'], '새로 적음')];
+  const d = plain(s.ledgerDiff_(existing, desired));
+  assert.deepEqual(d.add.map((x) => x.id), ['L-e']);
+  assert.deepEqual(d.remove.map((x) => x.id), ['L-c']);
+  assert.deepEqual(d.change.map((x) => x.after.id), ['L-b', 'L-d']);
+
+  const web = { id: 'R123', roomId: 'R1', date: '2026-11-13', periods: ['P3', 'P4'], purpose: '웹', status: '확정', memo: '' };
+  const clashes = plain(s.findClashes_(desired.concat([web, mk('L-old', ['P3'], '지난 날', { date: '2026-11-01' })]), '2026-11-12'));
+  assert.equal(clashes.length, 2);
+  assert.deepEqual(clashes.map((c) => c.periods.join(',')).sort(), ['P3', 'P4']);
+});
+
+test('대장 가져오기를 켜면 대장에서 온 예약은 웹에서 고치거나 취소할 수 없다', () => {
+  const s = server(ADMIN);
+  s.mockReset_();
+  const row = { 'ID': 'L-A202-20261113-P5', '공간ID': 'A202', '날짜': '2026-11-13', '교시': 'P5', '이름': '기존 대장', '역할': '교직원', '목적': '동아리', '상태': '확정', '비고': s.SYNC_MEMO_ };
+  s.appendRows_('예약', [row]);
+  assert.equal(plain(s.getDay('2026-11-13'))[0].ledger, true);
+  assert.equal(s.cancelBooking(row.ID, 'one').cancelled, 1, '대장 주소가 없으면 평소처럼 취소할 수 있다');
+  s.updateRows_('예약', [{ _row: 2, '상태': '확정' }]);
+  s.appendRows_('설정', [{ '항목': '대장주소1', '값': 'https://docs.google.com/spreadsheets/d/1AbCdEfGhIjKlMnOpQrStUvWxYz0123456789/edit' }]);
+  assert.equal(plain(s.getInit()).ledgerOn, true);
+  assert.throws(() => s.cancelBooking(row.ID, 'one'), /대장\(구글시트\)에서 고치면/);
+  assert.throws(() => s.updateBooking(row.ID, base()), /대장\(구글시트\)에서 고치면/);
+  s.MOCK.user = TEACHER;
+  assert.throws(() => s.createBooking(base({ periods: ['P5'] })), /5교시에 이미 예약/);
+  assert.throws(() => s.runLedgerSync(), /관리자만/);
+});

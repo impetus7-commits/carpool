@@ -451,6 +451,141 @@ function recommend_(rooms, dayBookings, periods, q) {
   return out;
 }
 
+/* ---------- 기존 사용 대장 자동 가져오기 (계산 부분) ---------- */
+
+var SYNC_MEMO_ = '기존 사용 대장에서 옮김';
+// 대장의 C~K 칸과 그 뒤 한 칸(L) → 교시 이름. 시간대로 적힌 대장도 같은 자리의 교시로 옮깁니다.
+var SYNC_SLOTS_ = ['1교시', '2교시', '3교시', '4교시', '점심', '5교시', '6교시', '7교시', '방과후', '야간'];
+
+/** 대장에서 옮겨 온 예약인지 */
+function isLedger_(b) { return String(b.id).indexOf('L-') === 0 && b.memo === SYNC_MEMO_; }
+
+function ledgerKey_(s) {
+  return String(s == null ? '' : s).toLowerCase().replace(/[\s()\[\]{}（）·・.,_\-\/]/g, '');
+}
+
+/** 이름에서 찾을 열쇠들: 전체, 괄호 밖, 괄호 안, 끝의 '실'을 뗀 것 */
+function ledgerNames_(name) {
+  var keys = [ledgerKey_(name)];
+  var m = /^(.*?)[(（](.*?)[)）]\s*$/.exec(String(name));
+  if (m) { keys.push(ledgerKey_(m[1])); keys.push(ledgerKey_(m[2])); }
+  keys.slice().forEach(function (k) { if (/실$/.test(k)) keys.push(k.slice(0, -1)); });
+  return keys.filter(function (k, i) { return k.length >= 2 && keys.indexOf(k) === i; });
+}
+
+/**
+ * 대장의 시트 이름마다 [공간] 탭의 줄을 찾습니다.
+ * rooms = [{id, name}] → [{title, room | null, how}]
+ */
+function ledgerMatchRooms_(titles, rooms) {
+  var rs = rooms.map(function (r) { return { id: r.id, name: r.name, keys: ledgerNames_(r.name) }; });
+  var out = titles.map(function (t) { return { title: t, keys: ledgerNames_(t), room: null, how: '' }; });
+  var used = {};
+  var take = function (m, hit, how) {
+    if (hit.length === 1) { m.room = { id: hit[0].id, name: hit[0].name }; m.how = how; used[hit[0].id] = true; }
+    else if (hit.length > 1) m.how = '이름이 비슷한 공간이 ' + hit.length + '개';
+  };
+  // 1) 전체 이름이 같은 것
+  out.forEach(function (m) {
+    take(m, rs.filter(function (r) { return !used[r.id] && r.keys[0] === m.keys[0]; }), '이름 일치');
+  });
+  // 2) 괄호 안팎·'실'을 뗀 이름이 같은 것
+  out.forEach(function (m) {
+    if (m.room || m.how) return;
+    take(m, rs.filter(function (r) {
+      return !used[r.id] && r.keys.some(function (k) { return m.keys.indexOf(k) >= 0; });
+    }), '이름 일치');
+  });
+  // 3) 이름이 들어 있는 것 — 후보가 하나뿐이고, 그 공간을 노리는 다른 시트가 없을 때만
+  out.forEach(function (m) {
+    if (m.room || m.how) return;
+    var k = m.keys[0];
+    var near = function (key, r) { return r.keys[0].length >= 3 && (r.keys[0].indexOf(key) >= 0 || key.indexOf(r.keys[0]) >= 0); };
+    var hit = rs.filter(function (r) { return !used[r.id] && near(k, r); });
+    if (hit.length === 1) {
+      var rivals = out.filter(function (o) { return o !== m && !o.room && near(o.keys[0], hit[0]); });
+      if (rivals.length) return;
+    }
+    take(m, hit, '비슷한 이름');
+  });
+  return out.map(function (m) { return { title: m.title, room: m.room, how: m.how }; });
+}
+
+/**
+ * 대장 한 시트의 줄들 → 날짜별 칸 내용.
+ * grid = [[날짜('yyyy-MM-dd' 또는 ''), 칸0 … 칸9], …]  (위에서 아래 순서)
+ * from 이후 날짜만. 같은 날짜가 두 번 나오면 아래쪽 줄만 씁니다 (위쪽은 지난 학년도).
+ */
+function ledgerRows_(grid, from) {
+  var days = {};
+  grid.forEach(function (row) {
+    var d = row[0];
+    if (!isDate_(d) || d < from) return;
+    days[d] = SYNC_SLOTS_.map(function (x, i) {
+      return String(row[i + 1] == null ? '' : row[i + 1]).split(/\s+/).filter(Boolean).join(' ').slice(0, 100);
+    });
+  });
+  return Object.keys(days).sort().map(function (d) { return { date: d, slots: days[d] }; });
+}
+
+/** 날짜별 칸 내용 → 예약들. 이어진 칸에 같은 내용이 있으면 한 건으로 묶습니다. */
+function ledgerBookings_(rows, roomId, slotIds) {
+  var out = [];
+  rows.forEach(function (r) {
+    var i = 0;
+    while (i < r.slots.length) {
+      if (!r.slots[i]) { i++; continue; }
+      var j = i;
+      while (j + 1 < r.slots.length && r.slots[j + 1] === r.slots[i]) j++;
+      var ids = slotIds.slice(i, j + 1);
+      out.push({
+        id: 'L-' + roomId + '-' + r.date.replace(/-/g, '') + '-' + ids[0],
+        roomId: roomId, date: r.date, periods: ids, purpose: r.slots[i]
+      });
+      i = j + 1;
+    }
+  });
+  return out;
+}
+
+/** 지금 [예약] 탭에 있는 대장 예약(existing)과 대장에서 방금 읽은 것(desired)의 차이 */
+function ledgerDiff_(existing, desired) {
+  var have = {}, want = {};
+  existing.forEach(function (b) { have[b.id] = b; });
+  desired.forEach(function (b) { want[b.id] = b; });
+  var same = function (a, b) {
+    return a.roomId === b.roomId && a.date === b.date && a.purpose === b.purpose &&
+      a.periods.join(',') === b.periods.join(',') && a.status === '확정';
+  };
+  return {
+    add: desired.filter(function (b) { return !have[b.id]; }),
+    remove: existing.filter(function (b) { return !want[b.id]; }),
+    change: desired.filter(function (b) { return have[b.id] && !same(have[b.id], b); })
+      .map(function (b) { return { before: have[b.id], after: b }; })
+  };
+}
+
+/** from 이후 날짜에서 같은 공간·날짜·교시에 겹쳐 있는 살아 있는 예약 쌍 */
+function findClashes_(bookings, from) {
+  var groups = {};
+  bookings.forEach(function (b) {
+    if (!isActive_(b) || b.date < from) return;
+    var k = b.roomId + '|' + b.date;
+    (groups[k] || (groups[k] = [])).push(b);
+  });
+  var out = [];
+  Object.keys(groups).sort().forEach(function (k) {
+    var g = groups[k];
+    for (var i = 0; i < g.length; i++) {
+      for (var j = i + 1; j < g.length; j++) {
+        var both = g[i].periods.filter(function (p) { return g[j].periods.indexOf(p) >= 0; });
+        if (both.length) out.push({ roomId: g[i].roomId, date: g[i].date, periods: both, a: g[i], b: g[j] });
+      }
+    }
+  });
+  return out.sort(function (x, y) { return x.date < y.date ? -1 : x.date > y.date ? 1 : 0; });
+}
+
 if (typeof module !== 'undefined') {
   module.exports = {
     splitList_: splitList_, isDate_: isDate_, addDays_: addDays_, weekday_: weekday_,
@@ -594,7 +729,7 @@ function setup() {
  *
  * 화면에서 부르는 함수:
  *   getInit, getDay, recommend, createBooking, updateBooking, cancelBooking,
- *   myBookings, adminBookings, decide, getHistory, getPhoto, getRoomRange
+ *   myBookings, adminBookings, decide, getHistory, getPhoto, getRoomRange, runLedgerSync
  *
  * 데이터는 Store.gs 의 readTab_/appendRows_/updateRows_ 로만 읽고 씁니다.
  * 모든 쓰기는 withLock_ 안에서 처리하고 [기록] 탭에 남깁니다.
@@ -701,7 +836,7 @@ function publicBooking_(b, me) {
     id: b.id, groupId: b.groupId, roomId: b.roomId, date: b.date, periods: b.periods, status: b.status,
     name: open ? b.name : '', dept: open ? b.dept : '', role: open ? b.role : '',
     purpose: open ? b.purpose : '', people: open ? b.people : 0,
-    memo: open ? b.memo : '', createdAt: open ? b.createdAt : '',
+    memo: open ? b.memo : '', createdAt: open ? b.createdAt : '', ledger: isLedger_(b),
     mine: !!me.email && b.email === me.email
   };
 }
@@ -750,7 +885,7 @@ function logRow_(me, action, before, after, ctx) {
   return {
     '일시': nowStr_(), '이메일': me.email, '이름': me.name, '동작': action,
     '예약ID': b.id, '공간': roomLabel_(room), '날짜': b.date,
-    '내용': periodNames_(b.periods, ctx.periods) + ' · ' + b.purpose + ' · ' + b.people + '명 · 신청자 ' + b.name + ' · ' + b.status,
+    '내용': periodNames_(b.periods, ctx.periods) + ' · ' + b.purpose + (b.people ? ' · ' + b.people + '명' : '') + ' · 신청자 ' + b.name + ' · ' + b.status,
     '변경전': before ? snapshot_(before) : '', '변경후': after ? snapshot_(after) : ''
   };
 }
@@ -764,6 +899,7 @@ function getInit() {
     me: me, settings: settings_(), rooms: rooms_(), periods: periods_(),
     today: today_(), now: now.slice(11, 16)
   };
+  out.ledgerOn = ledgerOn_();
   if (me.admin) out.sheetUrl = sheetUrl_();
   return out;
 }
@@ -941,6 +1077,18 @@ function createBooking(data) {
   });
 }
 
+/** [설정] 탭에 대장 주소가 적혀 있으면 자동 가져오기를 쓰는 것으로 봅니다. */
+function ledgerOn_() {
+  return readTab_('설정').some(function (r) { return /^대장주소/.test(String(r['항목'])) && String(r['값']).trim(); });
+}
+
+/** 대장에서 온 예약은 대장에서만 고칩니다 (웹에서 고쳐도 다음 가져오기 때 대장 값으로 돌아가므로). */
+function refuseLedger_(b) {
+  if (isLedger_(b) && ledgerOn_()) {
+    throw new Error('기존 사용 대장에서 가져온 예약이에요. 대장(구글시트)에서 고치면 자동으로 반영돼요.');
+  }
+}
+
 function findBooking_(all, id) {
   var b = all.filter(function (x) { return x.id === id; })[0];
   if (!b) throw new Error('예약을 찾을 수 없어요. 화면을 새로 고쳐 주세요.');
@@ -963,6 +1111,7 @@ function updateBooking(id, data) {
     var all = bookings_();
     var b = findBooking_(all, id);
     requireOwner_(b, me, today_());
+    refuseLedger_(b);
     if (!isActive_(b)) throw new Error('이미 ' + b.status + '된 예약은 고칠 수 없어요.');
 
     var room = rooms.filter(function (r) { return r.id === b.roomId; })[0];
@@ -994,6 +1143,7 @@ function cancelBooking(id, scope) {
     var all = bookings_();
     var b = findBooking_(all, id);
     requireOwner_(b, me, today_());
+    refuseLedger_(b);
     if (!isActive_(b)) throw new Error('이미 ' + b.status + '된 예약이에요.');
 
     var targets = [b];
@@ -1036,6 +1186,10 @@ function adminBookings(q) {
   };
   return {
     from: from, to: to,
+    ledgerOn: ledgerOn_(), sync: ledgerStatus_(),
+    clashes: findClashes_(all, today).map(function (c) {
+      return { roomId: c.roomId, date: c.date, periods: c.periods, a: withEmail(c.a), b: withEmail(c.b) };
+    }),
     pending: all.filter(function (b) { return b.status === '승인대기'; }).map(withEmail),
     list: all.filter(function (b) { return b.date >= from && b.date <= to; }).map(withEmail)
   };
@@ -1067,6 +1221,12 @@ function decide(id, approve, reason, scope) {
     appendRows_('기록', logs);
     return { done: targets.length };
   });
+}
+
+/** 관리자가 화면에서 누르는 "지금 가져오기" */
+function runLedgerSync() {
+  requireAdmin_();
+  return syncLedger();
 }
 
 /** 최근 기록 (새것부터). q = 검색어 */
@@ -1156,6 +1316,8 @@ function nowStr_() {
 }
 function newId_() { return ('000000' + (++MOCK.seq)).slice(-6) + Math.random().toString(36).slice(2, 6).toUpperCase(); }
 function sheetUrl_() { return '#'; }
+function ledgerStatus_() { return MOCK.syncStatus || ''; }
+function syncLedger() { MOCK.syncStatus = nowStr_() + ' · 변경 없음'; return '변경 없음'; }
 function photoData_(id) { return 'data:image/gif;base64,R0lGODlhAQABAAAAACw='; }
 
 ;
@@ -1193,7 +1355,7 @@ function photoData_(id) { return 'data:image/gif;base64,R0lGODlhAQABAAAAACw='; }
 
   var server = { getInit: getInit, getDay: getDay, recommend: recommend, createBooking: createBooking,
     updateBooking: updateBooking, cancelBooking: cancelBooking, myBookings: myBookings,
-    adminBookings: adminBookings, decide: decide, getHistory: getHistory, getPhoto: getPhoto, getRoomRange: getRoomRange };
+    adminBookings: adminBookings, decide: decide, getHistory: getHistory, getPhoto: getPhoto, getRoomRange: getRoomRange, runLedgerSync: runLedgerSync };
 
   function runner(ok, bad) {
     var r = {
@@ -1238,7 +1400,7 @@ var S = {
   days: {}, sheet: null,
   find: { date: '', periods: [], people: '', purpose: '', facilities: [], keyword: '', results: null, busy: false, err: '' },
   mine: null,
-  admin: { tab: 'pending', data: null, hist: null, q: '', from: '', to: '' },
+  admin: { tab: 'pending', data: null, hist: null, q: '', from: '', to: '', syncing: false },
   pendingCount: 0,
   photos: {}   // 드라이브 파일 ID → 서버가 읽어 준 그림(data: 주소) 또는 'fail'
 };
@@ -1384,7 +1546,7 @@ function loadAdmin() {
     S.admin.data = d;
     S.admin.from = d.from;
     S.admin.to = d.to;
-    S.pendingCount = groupUp(d.pending).length;
+    S.pendingCount = groupUp(d.pending).length + d.clashes.length;
   });
 }
 function loadHist() { return call('getHistory', S.admin.q).then(function (h) { S.admin.hist = h; }); }
@@ -1409,7 +1571,7 @@ function navHtml(cls) {
   var items = [['map', '공간'], ['find', '추천'], ['mine', '내 예약']];
   if (S.init.me.admin) items.push(['admin', '관리']);
   return '<nav class="nav ' + cls + '" aria-label="메뉴">' + items.map(function (it) {
-    var n = it[0] === 'admin' && S.pendingCount ? '<span class="n" aria-label="승인 대기 ' + S.pendingCount + '건">' + S.pendingCount + '</span>' : '';
+    var n = it[0] === 'admin' && S.pendingCount ? '<span class="n" aria-label="확인할 일 ' + S.pendingCount + '건">' + S.pendingCount + '</span>' : '';
     return '<button type="button" data-a="view" data-v="' + it[0] + '" class="' + (S.view === it[0] ? 'on' : '') + '"' +
       (S.view === it[0] ? ' aria-current="page"' : '') + '>' + ICON[it[0]] + '<span>' + it[1] + '</span>' + n + '</button>';
   }).join('') + '</nav>';
@@ -1797,6 +1959,7 @@ function recCard(x, rank) {
 function bookingActs(b, admin) {
   var live = b.status === '확정' || b.status === '승인대기';
   if (!live || (!admin && b.date < S.init.today)) return '';
+  if (b.ledger && S.init.ledgerOn) return '<span class="badge dim">대장에서 수정</span>';
   return '<button type="button" class="btn small" data-a="edit" data-id="' + esc(b.id) + '">수정</button>' +
     '<button type="button" class="btn small danger" data-a="cancel" data-id="' + esc(b.id) + '">취소</button>';
 }
@@ -1840,7 +2003,8 @@ function viewMine() {
 /* ---------- 그리기: 관리 ---------- */
 function viewAdmin() {
   var a = S.admin;
-  var tabs = [['pending', '승인 대기' + (S.pendingCount ? ' ' + S.pendingCount : '')], ['list', '전체 예약'], ['hist', '기록']];
+  var nPend = a.data ? groupUp(a.data.pending).length : 0, nClash = a.data ? a.data.clashes.length : 0;
+  var tabs = [['pending', '승인 대기' + (nPend ? ' ' + nPend : '')], ['clash', '겹침' + (nClash ? ' ' + nClash : '')], ['list', '전체 예약'], ['hist', '기록']];
   var h = '<p class="eyebrow">관리</p><h2 class="title" style="margin-bottom:12px">예약 관리</h2><div class="tabs">' + tabs.map(function (t) {
     return '<button type="button" class="chip ' + (a.tab === t[0] ? 'on' : '') + '" data-a="atab" data-t="' + t[0] + '" aria-pressed="' + (a.tab === t[0]) + '">' + esc(t[1]) + '</button>';
   }).join('') + (S.init.sheetUrl ? '<a class="chip" href="' + esc(S.init.sheetUrl) + '" target="_blank" rel="noopener" style="text-decoration:none;color:inherit;display:inline-flex;align-items:center">구글시트 열기 ↗</a>' : '') + '</div>';
@@ -1850,13 +2014,33 @@ function viewAdmin() {
     if (!a.hist) return h + '<div class="spin"></div>';
     if (!a.hist.length) return h + '<div class="card empty">기록이 없어요.</div>';
     return h + '<div class="card pad">' + a.hist.map(function (x) {
-      var cls = x.action === '취소' || x.action === '반려' ? 'no' : x.action === '수정' ? 'wait' : 'ok';
+      var cls = x.action === '취소' || x.action === '반려' || x.action === '대장삭제' ? 'no' : x.action === '수정' || x.action === '대장변경' ? 'wait' : 'ok';
       return '<div class="hrow"><div><span class="badge ' + cls + '">' + esc(x.action) + '</span> <b>' + esc(x.name) + '</b> <span class="when">' + esc(x.at) + ' · ' + esc(x.email) + '</span></div>' +
         '<div>' + esc(x.room) + ' · ' + esc(x.date) + ' · ' + esc(x.text) + '</div>' +
         (x.before || x.after ? '<details><summary>변경 전·후 보기</summary>' + (x.before ? '<pre>전: ' + esc(x.before) + '</pre>' : '') + (x.after ? '<pre>후: ' + esc(x.after) + '</pre>' : '') + '</details>' : '') + '</div>';
     }).join('') + '</div><p class="sub" style="margin-top:10px">최근 기록부터 보여요. 전체 기록은 구글시트의 [기록] 탭에 있어요.</p>';
   }
   if (!a.data) return h + '<div class="spin"></div>';
+  if (a.tab === 'clash') {
+    if (a.data.ledgerOn) {
+      h += '<div class="notice"><b>기존 대장 자동 가져오기</b> · ' + esc(a.data.sync || '아직 가져온 적이 없어요') +
+        ' <button type="button" class="btn small" style="margin-left:6px" data-a="sync-now"' + (a.syncing ? ' disabled' : '') + '>' + (a.syncing ? '가져오는 중…' : '지금 가져오기') + '</button></div>';
+    }
+    if (!a.data.clashes.length) return h + '<div class="card empty">같은 시간에 겹친 예약이 없어요.</div>';
+    h += '<p class="sub" style="margin-bottom:10px">같은 공간·같은 교시에 예약이 두 건 있어요. 대장에 나중에 적힌 내용이 웹 예약과 겹친 경우예요. 한쪽을 취소하거나 대장을 고쳐 주세요.</p>';
+    return h + a.data.clashes.map(function (c) {
+      var r = room(c.roomId);
+      var line = function (b) {
+        return '<div class="drow"><span class="grow">' + (b.ledger ? '<span class="badge wait">대장</span> ' : '<span class="badge ok">웹</span> ') +
+          '<b>' + esc(b.ledger ? b.purpose : b.name) + '</b>' + (b.ledger ? '' : ' · ' + esc(b.purpose)) + ' · ' + esc(pnames(b.periods)) + '</span>' +
+          statusBadge(b.status) + bookingActs(b, true) + '</div>';
+      };
+      return '<article class="card item"><p class="eyebrow">' + esc(r ? roomLabel(r) : '') + '</p>' +
+        '<h3>' + esc(r ? r.name : '(삭제된 공간)') + ' · ' + esc(fmt(c.date)) + '</h3>' +
+        '<p class="meta" style="color:var(--busy)">겹친 교시: ' + esc(pnames(c.periods)) + '</p>' +
+        '<div style="margin-top:8px">' + line(c.a) + line(c.b) + '</div></article>';
+    }).join('');
+  }
   if (a.tab === 'pending') {
     var gs = groupUp(a.data.pending);
     if (!gs.length) return h + '<div class="card empty">승인을 기다리는 신청이 없어요.</div>';
@@ -1885,7 +2069,9 @@ function viewAdmin() {
 
 /* ---------- 동작 ---------- */
 function findBooking(id) {
-  var pools = [S.mine || [], S.admin.data ? S.admin.data.list : [], S.admin.data ? S.admin.data.pending : []];
+  var clash = [];
+  if (S.admin.data) S.admin.data.clashes.forEach(function (c) { clash.push(c.a, c.b); });
+  var pools = [S.mine || [], S.admin.data ? S.admin.data.list : [], S.admin.data ? S.admin.data.pending : [], clash];
   for (var i = 0; i < pools.length; i++) {
     for (var j = 0; j < pools[i].length; j++) if (pools[i][j].id === id) return pools[i][j];
   }
@@ -2063,6 +2249,15 @@ var A = {
       S.sheet = null;
       return refreshAfterWrite().then(render);
     }).catch(fail);
+  },
+  'sync-now': function () {
+    S.admin.syncing = true;
+    render();
+    call('runLedgerSync').then(function (msg) {
+      S.admin.syncing = false;
+      toast('대장 가져오기: ' + msg);
+      return refreshAfterWrite().then(render);
+    }).catch(function (e) { S.admin.syncing = false; render(); toast(e.message); });
   },
   atab: function (el) {
     S.admin.tab = el.dataset.t;

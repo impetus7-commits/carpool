@@ -286,7 +286,7 @@ var S = {
   days: {}, sheet: null,
   find: { date: '', periods: [], people: '', purpose: '', facilities: [], keyword: '', results: null, busy: false, err: '' },
   mine: null,
-  admin: { tab: 'pending', data: null, hist: null, q: '', from: '', to: '' },
+  admin: { tab: 'pending', data: null, hist: null, q: '', from: '', to: '', syncing: false },
   pendingCount: 0,
   photos: {}   // 드라이브 파일 ID → 서버가 읽어 준 그림(data: 주소) 또는 'fail'
 };
@@ -432,7 +432,7 @@ function loadAdmin() {
     S.admin.data = d;
     S.admin.from = d.from;
     S.admin.to = d.to;
-    S.pendingCount = groupUp(d.pending).length;
+    S.pendingCount = groupUp(d.pending).length + d.clashes.length;
   });
 }
 function loadHist() { return call('getHistory', S.admin.q).then(function (h) { S.admin.hist = h; }); }
@@ -457,7 +457,7 @@ function navHtml(cls) {
   var items = [['map', '공간'], ['find', '추천'], ['mine', '내 예약']];
   if (S.init.me.admin) items.push(['admin', '관리']);
   return '<nav class="nav ' + cls + '" aria-label="메뉴">' + items.map(function (it) {
-    var n = it[0] === 'admin' && S.pendingCount ? '<span class="n" aria-label="승인 대기 ' + S.pendingCount + '건">' + S.pendingCount + '</span>' : '';
+    var n = it[0] === 'admin' && S.pendingCount ? '<span class="n" aria-label="확인할 일 ' + S.pendingCount + '건">' + S.pendingCount + '</span>' : '';
     return '<button type="button" data-a="view" data-v="' + it[0] + '" class="' + (S.view === it[0] ? 'on' : '') + '"' +
       (S.view === it[0] ? ' aria-current="page"' : '') + '>' + ICON[it[0]] + '<span>' + it[1] + '</span>' + n + '</button>';
   }).join('') + '</nav>';
@@ -845,6 +845,7 @@ function recCard(x, rank) {
 function bookingActs(b, admin) {
   var live = b.status === '확정' || b.status === '승인대기';
   if (!live || (!admin && b.date < S.init.today)) return '';
+  if (b.ledger && S.init.ledgerOn) return '<span class="badge dim">대장에서 수정</span>';
   return '<button type="button" class="btn small" data-a="edit" data-id="' + esc(b.id) + '">수정</button>' +
     '<button type="button" class="btn small danger" data-a="cancel" data-id="' + esc(b.id) + '">취소</button>';
 }
@@ -888,7 +889,8 @@ function viewMine() {
 /* ---------- 그리기: 관리 ---------- */
 function viewAdmin() {
   var a = S.admin;
-  var tabs = [['pending', '승인 대기' + (S.pendingCount ? ' ' + S.pendingCount : '')], ['list', '전체 예약'], ['hist', '기록']];
+  var nPend = a.data ? groupUp(a.data.pending).length : 0, nClash = a.data ? a.data.clashes.length : 0;
+  var tabs = [['pending', '승인 대기' + (nPend ? ' ' + nPend : '')], ['clash', '겹침' + (nClash ? ' ' + nClash : '')], ['list', '전체 예약'], ['hist', '기록']];
   var h = '<p class="eyebrow">관리</p><h2 class="title" style="margin-bottom:12px">예약 관리</h2><div class="tabs">' + tabs.map(function (t) {
     return '<button type="button" class="chip ' + (a.tab === t[0] ? 'on' : '') + '" data-a="atab" data-t="' + t[0] + '" aria-pressed="' + (a.tab === t[0]) + '">' + esc(t[1]) + '</button>';
   }).join('') + (S.init.sheetUrl ? '<a class="chip" href="' + esc(S.init.sheetUrl) + '" target="_blank" rel="noopener" style="text-decoration:none;color:inherit;display:inline-flex;align-items:center">구글시트 열기 ↗</a>' : '') + '</div>';
@@ -898,13 +900,33 @@ function viewAdmin() {
     if (!a.hist) return h + '<div class="spin"></div>';
     if (!a.hist.length) return h + '<div class="card empty">기록이 없어요.</div>';
     return h + '<div class="card pad">' + a.hist.map(function (x) {
-      var cls = x.action === '취소' || x.action === '반려' ? 'no' : x.action === '수정' ? 'wait' : 'ok';
+      var cls = x.action === '취소' || x.action === '반려' || x.action === '대장삭제' ? 'no' : x.action === '수정' || x.action === '대장변경' ? 'wait' : 'ok';
       return '<div class="hrow"><div><span class="badge ' + cls + '">' + esc(x.action) + '</span> <b>' + esc(x.name) + '</b> <span class="when">' + esc(x.at) + ' · ' + esc(x.email) + '</span></div>' +
         '<div>' + esc(x.room) + ' · ' + esc(x.date) + ' · ' + esc(x.text) + '</div>' +
         (x.before || x.after ? '<details><summary>변경 전·후 보기</summary>' + (x.before ? '<pre>전: ' + esc(x.before) + '</pre>' : '') + (x.after ? '<pre>후: ' + esc(x.after) + '</pre>' : '') + '</details>' : '') + '</div>';
     }).join('') + '</div><p class="sub" style="margin-top:10px">최근 기록부터 보여요. 전체 기록은 구글시트의 [기록] 탭에 있어요.</p>';
   }
   if (!a.data) return h + '<div class="spin"></div>';
+  if (a.tab === 'clash') {
+    if (a.data.ledgerOn) {
+      h += '<div class="notice"><b>기존 대장 자동 가져오기</b> · ' + esc(a.data.sync || '아직 가져온 적이 없어요') +
+        ' <button type="button" class="btn small" style="margin-left:6px" data-a="sync-now"' + (a.syncing ? ' disabled' : '') + '>' + (a.syncing ? '가져오는 중…' : '지금 가져오기') + '</button></div>';
+    }
+    if (!a.data.clashes.length) return h + '<div class="card empty">같은 시간에 겹친 예약이 없어요.</div>';
+    h += '<p class="sub" style="margin-bottom:10px">같은 공간·같은 교시에 예약이 두 건 있어요. 대장에 나중에 적힌 내용이 웹 예약과 겹친 경우예요. 한쪽을 취소하거나 대장을 고쳐 주세요.</p>';
+    return h + a.data.clashes.map(function (c) {
+      var r = room(c.roomId);
+      var line = function (b) {
+        return '<div class="drow"><span class="grow">' + (b.ledger ? '<span class="badge wait">대장</span> ' : '<span class="badge ok">웹</span> ') +
+          '<b>' + esc(b.ledger ? b.purpose : b.name) + '</b>' + (b.ledger ? '' : ' · ' + esc(b.purpose)) + ' · ' + esc(pnames(b.periods)) + '</span>' +
+          statusBadge(b.status) + bookingActs(b, true) + '</div>';
+      };
+      return '<article class="card item"><p class="eyebrow">' + esc(r ? roomLabel(r) : '') + '</p>' +
+        '<h3>' + esc(r ? r.name : '(삭제된 공간)') + ' · ' + esc(fmt(c.date)) + '</h3>' +
+        '<p class="meta" style="color:var(--busy)">겹친 교시: ' + esc(pnames(c.periods)) + '</p>' +
+        '<div style="margin-top:8px">' + line(c.a) + line(c.b) + '</div></article>';
+    }).join('');
+  }
   if (a.tab === 'pending') {
     var gs = groupUp(a.data.pending);
     if (!gs.length) return h + '<div class="card empty">승인을 기다리는 신청이 없어요.</div>';
@@ -933,7 +955,9 @@ function viewAdmin() {
 
 /* ---------- 동작 ---------- */
 function findBooking(id) {
-  var pools = [S.mine || [], S.admin.data ? S.admin.data.list : [], S.admin.data ? S.admin.data.pending : []];
+  var clash = [];
+  if (S.admin.data) S.admin.data.clashes.forEach(function (c) { clash.push(c.a, c.b); });
+  var pools = [S.mine || [], S.admin.data ? S.admin.data.list : [], S.admin.data ? S.admin.data.pending : [], clash];
   for (var i = 0; i < pools.length; i++) {
     for (var j = 0; j < pools[i].length; j++) if (pools[i][j].id === id) return pools[i][j];
   }
@@ -1111,6 +1135,15 @@ var A = {
       S.sheet = null;
       return refreshAfterWrite().then(render);
     }).catch(fail);
+  },
+  'sync-now': function () {
+    S.admin.syncing = true;
+    render();
+    call('runLedgerSync').then(function (msg) {
+      S.admin.syncing = false;
+      toast('대장 가져오기: ' + msg);
+      return refreshAfterWrite().then(render);
+    }).catch(function (e) { S.admin.syncing = false; render(); toast(e.message); });
   },
   atab: function (el) {
     S.admin.tab = el.dataset.t;

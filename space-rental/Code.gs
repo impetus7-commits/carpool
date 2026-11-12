@@ -3,7 +3,7 @@
  *
  * 화면에서 부르는 함수:
  *   getInit, getDay, recommend, createBooking, updateBooking, cancelBooking,
- *   myBookings, adminBookings, decide, getHistory, getPhoto, getRoomRange
+ *   myBookings, adminBookings, decide, getHistory, getPhoto, getRoomRange, runLedgerSync
  *
  * 데이터는 Store.gs 의 readTab_/appendRows_/updateRows_ 로만 읽고 씁니다.
  * 모든 쓰기는 withLock_ 안에서 처리하고 [기록] 탭에 남깁니다.
@@ -110,7 +110,7 @@ function publicBooking_(b, me) {
     id: b.id, groupId: b.groupId, roomId: b.roomId, date: b.date, periods: b.periods, status: b.status,
     name: open ? b.name : '', dept: open ? b.dept : '', role: open ? b.role : '',
     purpose: open ? b.purpose : '', people: open ? b.people : 0,
-    memo: open ? b.memo : '', createdAt: open ? b.createdAt : '',
+    memo: open ? b.memo : '', createdAt: open ? b.createdAt : '', ledger: isLedger_(b),
     mine: !!me.email && b.email === me.email
   };
 }
@@ -159,7 +159,7 @@ function logRow_(me, action, before, after, ctx) {
   return {
     '일시': nowStr_(), '이메일': me.email, '이름': me.name, '동작': action,
     '예약ID': b.id, '공간': roomLabel_(room), '날짜': b.date,
-    '내용': periodNames_(b.periods, ctx.periods) + ' · ' + b.purpose + ' · ' + b.people + '명 · 신청자 ' + b.name + ' · ' + b.status,
+    '내용': periodNames_(b.periods, ctx.periods) + ' · ' + b.purpose + (b.people ? ' · ' + b.people + '명' : '') + ' · 신청자 ' + b.name + ' · ' + b.status,
     '변경전': before ? snapshot_(before) : '', '변경후': after ? snapshot_(after) : ''
   };
 }
@@ -173,6 +173,7 @@ function getInit() {
     me: me, settings: settings_(), rooms: rooms_(), periods: periods_(),
     today: today_(), now: now.slice(11, 16)
   };
+  out.ledgerOn = ledgerOn_();
   if (me.admin) out.sheetUrl = sheetUrl_();
   return out;
 }
@@ -350,6 +351,18 @@ function createBooking(data) {
   });
 }
 
+/** [설정] 탭에 대장 주소가 적혀 있으면 자동 가져오기를 쓰는 것으로 봅니다. */
+function ledgerOn_() {
+  return readTab_('설정').some(function (r) { return /^대장주소/.test(String(r['항목'])) && String(r['값']).trim(); });
+}
+
+/** 대장에서 온 예약은 대장에서만 고칩니다 (웹에서 고쳐도 다음 가져오기 때 대장 값으로 돌아가므로). */
+function refuseLedger_(b) {
+  if (isLedger_(b) && ledgerOn_()) {
+    throw new Error('기존 사용 대장에서 가져온 예약이에요. 대장(구글시트)에서 고치면 자동으로 반영돼요.');
+  }
+}
+
 function findBooking_(all, id) {
   var b = all.filter(function (x) { return x.id === id; })[0];
   if (!b) throw new Error('예약을 찾을 수 없어요. 화면을 새로 고쳐 주세요.');
@@ -372,6 +385,7 @@ function updateBooking(id, data) {
     var all = bookings_();
     var b = findBooking_(all, id);
     requireOwner_(b, me, today_());
+    refuseLedger_(b);
     if (!isActive_(b)) throw new Error('이미 ' + b.status + '된 예약은 고칠 수 없어요.');
 
     var room = rooms.filter(function (r) { return r.id === b.roomId; })[0];
@@ -403,6 +417,7 @@ function cancelBooking(id, scope) {
     var all = bookings_();
     var b = findBooking_(all, id);
     requireOwner_(b, me, today_());
+    refuseLedger_(b);
     if (!isActive_(b)) throw new Error('이미 ' + b.status + '된 예약이에요.');
 
     var targets = [b];
@@ -445,6 +460,10 @@ function adminBookings(q) {
   };
   return {
     from: from, to: to,
+    ledgerOn: ledgerOn_(), sync: ledgerStatus_(),
+    clashes: findClashes_(all, today).map(function (c) {
+      return { roomId: c.roomId, date: c.date, periods: c.periods, a: withEmail(c.a), b: withEmail(c.b) };
+    }),
     pending: all.filter(function (b) { return b.status === '승인대기'; }).map(withEmail),
     list: all.filter(function (b) { return b.date >= from && b.date <= to; }).map(withEmail)
   };
@@ -476,6 +495,12 @@ function decide(id, approve, reason, scope) {
     appendRows_('기록', logs);
     return { done: targets.length };
   });
+}
+
+/** 관리자가 화면에서 누르는 "지금 가져오기" */
+function runLedgerSync() {
+  requireAdmin_();
+  return syncLedger();
 }
 
 /** 최근 기록 (새것부터). q = 검색어 */
