@@ -5,6 +5,7 @@
 - 2026학년도(2026-03-01 ~ 2027-02-28) 칸만 옮깁니다.
 - [공간] 탭은 바꾸지 않습니다. 실행할 때 [공간] 탭에서 같은 이름의 공간을 찾아 그 ID 로 예약을 만듭니다.
 - 같은 날 이어진 칸에 같은 내용이 있으면 예약 한 건으로 묶습니다.
+- 같은 날짜 행이 두 번 있으면 아래쪽 행만 씁니다 (위쪽은 2025년, 아래쪽이 2026년).
 - 만들어진 Import.gs 에는 사용 내역(이름 포함)이 들어 있으므로 저장소에 올리지 않습니다.
 """
 import sys, json, datetime, collections, openpyxl
@@ -35,7 +36,7 @@ def clean(v):
     return ' '.join(str(v).split()) if v is not None else ''
 
 out_path, files = sys.argv[1], sys.argv[2:]
-sheets, bookings, report = [], [], []
+sheets, bookings, report, dropped = [], [], [], []
 for f in files:
     wb = openpyxl.load_workbook(f, data_only=True)
     for ws in wb:
@@ -54,11 +55,14 @@ for f in files:
                 for r in range(rng.min_row, rng.max_row + 1):
                     for c in range(rng.min_col, min(rng.max_col, 12) + 1):
                         if v is not None: grid[(r, c)] = v
-        days = collections.defaultdict(lambda: [[] for _ in SLOTS])   # 같은 날짜 행이 두 번 있으면 합침
+        days = {}   # 같은 날짜 행이 두 번 있으면 아래쪽 행만 씀 (위쪽은 2025년, 아래쪽이 2026년)
         for r in range(1, ws.max_row + 1):
             d = grid.get((r, 1))
             if not isinstance(d, datetime.datetime) or not (START <= d <= END):
                 continue
+            if d in days:
+                dropped.append((SHEETS[ws.title][0], d.strftime('%Y-%m-%d'), [t for x in days[d] for t in x]))
+            days[d] = [[] for _ in SLOTS]
             for i in range(len(SLOTS)):
                 t = clean(grid.get((r, 3 + i)))
                 if t and t not in days[d][i]:
@@ -246,4 +250,5 @@ function importLedger() {
        '[\n  ' + ',\n  '.join(json.dumps(b, ensure_ascii=False, separators=(',', ':')) for b in bookings) + '\n]')
 open(out_path, 'w', encoding='utf-8').write(js)
 for name, c, b in report: print('%-22s 칸 %5d  예약 %5d' % (name, c, b))
+for name, d, texts in dropped: print('같은 날짜가 두 번: %s %s — 위쪽 행은 2025년으로 보고 뺌 %s' % (name, d, texts or '(빈 행)'))
 print('합계: 교실 %d곳, 예약 %d건 → %s (%d KB)' % (len(sheets), len(bookings), out_path, len(js.encode()) // 1024))
