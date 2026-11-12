@@ -32,7 +32,7 @@
 
   var server = { getInit: getInit, getDay: getDay, recommend: recommend, createBooking: createBooking,
     updateBooking: updateBooking, cancelBooking: cancelBooking, myBookings: myBookings,
-    adminBookings: adminBookings, decide: decide, getHistory: getHistory };
+    adminBookings: adminBookings, decide: decide, getHistory: getHistory, getPhoto: getPhoto };
 
   function runner(ok, bad) {
     var r = {

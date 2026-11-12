@@ -152,7 +152,7 @@ input.in, select.in { width: 100%; border: 1px solid var(--line); background: va
 .sheet-body { overflow-y: auto; padding: 0 18px; -webkit-overflow-scrolling: touch; }
 .sheet-body > :last-child:not(.sticky-go) { margin-bottom: max(20px, env(safe-area-inset-bottom)); }
 .gallery { display: flex; gap: 8px; overflow-x: auto; scroll-snap-type: x mandatory; margin: 0 -18px 12px; padding: 0 18px; }
-.gallery img { height: 210px; max-width: 86%; border-radius: 12px; scroll-snap-align: center; object-fit: cover; background: var(--soft); flex: none; }
+.gallery img { height: 210px; min-width: 120px; max-width: 86%; border-radius: 12px; scroll-snap-align: center; object-fit: cover; background: var(--soft); flex: none; }
 .nophoto { height: 120px; border-radius: 12px; display: grid; place-items: center; color: var(--sub); font-size: 14px; margin-bottom: 12px; background: repeating-linear-gradient(135deg, var(--soft), var(--soft) 10px, transparent 10px, transparent 20px); border: 1px dashed var(--line); }
 .video { position: relative; padding-top: 56.25%; margin: 10px 0; border-radius: 12px; overflow: hidden; background: #000; }
 .video iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
@@ -244,6 +244,12 @@ function splitList_(s) {
   return String(s == null ? '' : s).split(/[,\n;、]+/)
     .map(function (x) { return x.trim(); })
     .filter(Boolean);
+}
+
+/** 구글 드라이브 주소에서 파일 ID 를 꺼냅니다. 드라이브 주소가 아니면 '' */
+function driveId_(url) {
+  var m = /drive\.google\.com\/.*(?:\/d\/|[?&]id=)([\w-]{20,})/.exec(String(url || ''));
+  return m ? m[1] : '';
 }
 
 function pad2_(n) { return (n < 10 ? '0' : '') + n; }
@@ -543,7 +549,7 @@ function setup() {
  *
  * 화면에서 부르는 함수:
  *   getInit, getDay, recommend, createBooking, updateBooking, cancelBooking,
- *   myBookings, adminBookings, decide, getHistory
+ *   myBookings, adminBookings, decide, getHistory, getPhoto
  *
  * 데이터는 Store.gs 의 readTab_/appendRows_/updateRows_ 로만 읽고 씁니다.
  * 모든 쓰기는 withLock_ 안에서 처리하고 [기록] 탭에 남깁니다.
@@ -741,6 +747,20 @@ function myBookings() {
   return bookings_().filter(function (b) { return b.email === me.email && b.date >= from; })
     .sort(byDateThenPeriod_(order))
     .map(function (b) { return publicBooking_(b, me); });
+}
+
+/**
+ * [공간] 탭에 등록된 드라이브 사진을 서버가 대신 읽어 돌려줍니다.
+ * 사진이 "링크가 있는 모든 사용자"로 공유되어 있지 않아도, 배포한 계정이 볼 수 있으면 화면에 보입니다.
+ * [공간] 탭에 적힌 사진만 읽을 수 있습니다.
+ */
+function getPhoto(fileId) {
+  var id = String(fileId || '');
+  var listed = rooms_().some(function (r) {
+    return r.photos.some(function (u) { return driveId_(u) === id; });
+  });
+  if (!id || !listed) throw new Error('[공간] 탭에 등록된 사진이 아니에요.');
+  return photoData_(id);
 }
 
 /* ---------- 쓰기 API ---------- */
@@ -1080,6 +1100,7 @@ function nowStr_() {
 }
 function newId_() { return ('000000' + (++MOCK.seq)).slice(-6) + Math.random().toString(36).slice(2, 6).toUpperCase(); }
 function sheetUrl_() { return '#'; }
+function photoData_(id) { return 'data:image/gif;base64,R0lGODlhAQABAAAAACw='; }
 
 ;
 /**
@@ -1116,7 +1137,7 @@ function sheetUrl_() { return '#'; }
 
   var server = { getInit: getInit, getDay: getDay, recommend: recommend, createBooking: createBooking,
     updateBooking: updateBooking, cancelBooking: cancelBooking, myBookings: myBookings,
-    adminBookings: adminBookings, decide: decide, getHistory: getHistory };
+    adminBookings: adminBookings, decide: decide, getHistory: getHistory, getPhoto: getPhoto };
 
   function runner(ok, bad) {
     var r = {
@@ -1162,7 +1183,8 @@ var S = {
   find: { date: '', periods: [], people: '', purpose: '', facilities: [], keyword: '', results: null, busy: false, err: '' },
   mine: null,
   admin: { tab: 'pending', data: null, hist: null, q: '', from: '', to: '' },
-  pendingCount: 0
+  pendingCount: 0,
+  photos: {}   // 드라이브 파일 ID → 서버가 읽어 준 그림(data: 주소) 또는 'fail'
 };
 var WD = ['일', '월', '화', '수', '목', '금', '토'];
 
@@ -1232,6 +1254,15 @@ function uniq(key) {
     if (r.bookable) r[key].forEach(function (v) { if (out.indexOf(v) < 0) out.push(v); });
   });
   return out;
+}
+function driveId(url) {
+  var m = /drive\.google\.com\/.*(?:\/d\/|[?&]id=)([\w-]{20,})/.exec(url);
+  return m ? m[1] : '';
+}
+function photoHtml(url, alt) {
+  var fid = driveId(url), got = fid && S.photos[fid];
+  if (got === 'fail') return '<div class="nophoto" style="flex:none;width:86%;height:210px;margin:0">사진을 불러올 수 없어요</div>';
+  return '<img src="' + esc(got || mediaImg(url)) + '" alt="' + esc(alt) + '" loading="lazy" referrerpolicy="no-referrer"' + (fid ? ' data-fid="' + esc(fid) + '"' : '') + '>';
 }
 function mediaImg(url) {
   var m = /drive\.google\.com\/.*(?:\/d\/|[?&]id=)([\w-]{20,})/.exec(url);
@@ -1450,9 +1481,7 @@ function sheetRoom(sh) {
   var r = room(sh.id);
   var h = sheetHead(roomLabel(r), r.name) + '<div class="sheet-body">';
   if (r.photos.length) {
-    h += '<div class="gallery">' + r.photos.map(function (u, i) {
-      return '<img src="' + esc(mediaImg(u)) + '" alt="' + esc(r.name) + ' 사진 ' + (i + 1) + '" loading="lazy" referrerpolicy="no-referrer">';
-    }).join('') + '</div>';
+    h += '<div class="gallery">' + r.photos.map(function (u, i) { return photoHtml(u, r.name + ' 사진 ' + (i + 1)); }).join('') + '</div>';
   } else {
     h += '<div class="nophoto">사진 준비 중</div>';
   }
@@ -1911,6 +1940,23 @@ document.addEventListener('submit', function (e) {
 document.addEventListener('keydown', function (e) {
   if (e.key === 'Escape' && S.sheet) A.close();
 });
+
+/* 드라이브 사진이 바로 열리지 않으면(공유가 제한된 파일) 서버에 대신 읽어 달라고 합니다. */
+document.addEventListener('error', function (e) {
+  var el = e.target;
+  if (!el || el.tagName !== 'IMG' || !el.dataset.fid || el.dataset.tried) return;
+  el.dataset.tried = '1';
+  var fid = el.dataset.fid;
+  var each = function (fn) { Array.prototype.forEach.call(document.querySelectorAll('img[data-fid="' + fid + '"]'), fn); };
+  call('getPhoto', fid).then(function (src) {
+    if (!src) throw new Error('empty');
+    S.photos[fid] = src;
+    each(function (img) { img.dataset.tried = '1'; img.src = src; });
+  }).catch(function () {
+    S.photos[fid] = 'fail';
+    renderSheet();
+  });
+}, true);
 
 /* 다른 사람의 신청이 보이도록 1분마다, 그리고 화면으로 돌아올 때 새로 읽습니다. */
 function quietRefresh() {

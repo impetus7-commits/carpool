@@ -81,6 +81,38 @@ function updateRows_(name, list) {
   delete tabCache_[name];
 }
 
+/** 드라이브 사진을 data: 주소로 돌려줍니다. 너비 1200 으로 줄인 그림을 먼저 받고, 안 되면 원본(5MB 이하)이나 작은 미리보기를 씁니다. */
+function photoData_(id) {
+  var encode = function (type, bytes) { return 'data:' + type + ';base64,' + Utilities.base64Encode(bytes); };
+  try {
+    var res = UrlFetchApp.fetch('https://drive.google.com/thumbnail?id=' + encodeURIComponent(id) + '&sz=w1200', {
+      headers: { Authorization: 'Bearer ' + ScriptApp.getOAuthToken() }, muteHttpExceptions: true
+    });
+    var type = String(res.getHeaders()['Content-Type'] || '').split(';')[0];
+    if (res.getResponseCode() === 200 && type.indexOf('image/') === 0) return encode(type, res.getContent());
+  } catch (e) {
+    // 아래 방법으로 다시 시도
+  }
+  var file;
+  try {
+    file = DriveApp.getFileById(id);
+  } catch (e) {
+    throw new Error('사진 파일을 열 수 없어요. 웹앱을 배포한 계정이 볼 수 있는 파일인지 확인해 주세요.');
+  }
+  var kind = String(file.getMimeType());
+  if (file.getSize() <= 5 * 1024 * 1024 && /^image\/(jpeg|png|gif|webp)$/.test(kind)) return encode(kind, file.getBlob().getBytes());
+  var thumb = file.getThumbnail();
+  if (!thumb) throw new Error('사진을 읽을 수 없어요. JPG 나 PNG 파일로 올려 주세요.');
+  return encode(thumb.getContentType(), thumb.getBytes());
+}
+
+/** 사진을 서버가 읽을 수 있도록 권한을 허용합니다. 편집기에서 한 번 실행하세요. */
+function allowPhotos() {
+  DriveApp.getRootFolder();
+  UrlFetchApp.fetch('https://www.google.com/generate_204', { muteHttpExceptions: true });
+  console.log('사진 읽기 권한이 허용되었습니다. [배포 → 배포 관리 → 수정 → 새 버전]으로 다시 배포해 주세요.');
+}
+
 function currentEmail_() {
   return String(Session.getActiveUser().getEmail() || '').toLowerCase();
 }

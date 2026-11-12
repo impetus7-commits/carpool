@@ -3,7 +3,7 @@
  *
  * 화면에서 부르는 함수:
  *   getInit, getDay, recommend, createBooking, updateBooking, cancelBooking,
- *   myBookings, adminBookings, decide, getHistory
+ *   myBookings, adminBookings, decide, getHistory, getPhoto
  *
  * 데이터는 Store.gs 의 readTab_/appendRows_/updateRows_ 로만 읽고 씁니다.
  * 모든 쓰기는 withLock_ 안에서 처리하고 [기록] 탭에 남깁니다.
@@ -201,6 +201,20 @@ function myBookings() {
   return bookings_().filter(function (b) { return b.email === me.email && b.date >= from; })
     .sort(byDateThenPeriod_(order))
     .map(function (b) { return publicBooking_(b, me); });
+}
+
+/**
+ * [공간] 탭에 등록된 드라이브 사진을 서버가 대신 읽어 돌려줍니다.
+ * 사진이 "링크가 있는 모든 사용자"로 공유되어 있지 않아도, 배포한 계정이 볼 수 있으면 화면에 보입니다.
+ * [공간] 탭에 적힌 사진만 읽을 수 있습니다.
+ */
+function getPhoto(fileId) {
+  var id = String(fileId || '');
+  var listed = rooms_().some(function (r) {
+    return r.photos.some(function (u) { return driveId_(u) === id; });
+  });
+  if (!id || !listed) throw new Error('[공간] 탭에 등록된 사진이 아니에요.');
+  return photoData_(id);
 }
 
 /* ---------- 쓰기 API ---------- */

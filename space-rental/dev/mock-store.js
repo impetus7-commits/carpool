@@ -65,3 +65,4 @@ function nowStr_() {
 }
 function newId_() { return ('000000' + (++MOCK.seq)).slice(-6) + Math.random().toString(36).slice(2, 6).toUpperCase(); }
 function sheetUrl_() { return '#'; }
+function photoData_(id) { return 'data:image/gif;base64,R0lGODlhAQABAAAAACw='; }

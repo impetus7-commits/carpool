@@ -212,3 +212,14 @@ test('추천: 검색어로 찾는다', () => {
   assert.equal(list[0].roomId, 'A401');
   assert.ok(list[0].reasons.some((x) => /'피아노'가 시설에 있음/.test(x)));
 });
+
+test('사진: [공간] 탭에 등록된 드라이브 파일만 서버가 대신 읽어 준다', () => {
+  const s = server(TEACHER);
+  const id = '1AbCdEfGhIjKlMnOpQrStUvWxYz012345';
+  s.mockReset_();
+  s.MOCK.db['공간'][1]['사진'] = 'https://drive.google.com/file/d/' + id + '/view?usp=sharing, https://drive.google.com/open?id=2AbCdEfGhIjKlMnOpQrStUvWxYz012345';
+  assert.match(s.getPhoto(id), /^data:image\//);
+  assert.match(s.getPhoto('2AbCdEfGhIjKlMnOpQrStUvWxYz012345'), /^data:image\//);
+  assert.throws(() => s.getPhoto('9ZZZdEfGhIjKlMnOpQrStUvWxYz012345'), /등록된 사진이 아니에요/);
+  assert.throws(() => s.getPhoto(''), /등록된 사진이 아니에요/);
+});

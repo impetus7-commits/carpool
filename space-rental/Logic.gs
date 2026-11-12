@@ -12,6 +12,12 @@ function splitList_(s) {
     .filter(Boolean);
 }
 
+/** 구글 드라이브 주소에서 파일 ID 를 꺼냅니다. 드라이브 주소가 아니면 '' */
+function driveId_(url) {
+  var m = /drive\.google\.com\/.*(?:\/d\/|[?&]id=)([\w-]{20,})/.exec(String(url || ''));
+  return m ? m[1] : '';
+}
+
 function pad2_(n) { return (n < 10 ? '0' : '') + n; }
 
 function toUtc_(s) {
