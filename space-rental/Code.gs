@@ -196,7 +196,7 @@ function recommend(q) {
 function myBookings() {
   var me = me_();
   if (!me.registered) return [];
-  var from = addDays_(today_(), -30);
+  var from = addDays_(today_(), -365);   // 지난 1년 치까지 보여 줌
   var order = periodOrder_(periods_());
   return bookings_().filter(function (b) { return b.email === me.email && b.date >= from; })
     .sort(byDateThenPeriod_(order))

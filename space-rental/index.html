@@ -469,7 +469,7 @@ function viewMap() {
   var list = roomsOf(S.building, S.floor);
   h += '<section class="card plan-card"><p class="eyebrow">' + esc(fmt(S.date)) + ' · ' + esc(S.period === 'all' ? '하루 전체' : pname(S.period)) + '</p>' +
     '<h2 class="title">' + esc(S.building + ' ' + floorLabel(S.floor)) + '</h2>' +
-    '<p class="sub">공간을 누르면 소개를 보고 신청할 수 있어요.</p>' +
+    '<p class="sub">' + (S.date < S.init.today ? '지난 날짜의 사용 내역을 보고 있어요. 공간을 누르면 그날의 교시별 내역이 보여요.' : '공간을 누르면 소개를 보고 신청할 수 있어요.') + '</p>' +
     '<div class="plan"><div class="rooms">' + list.map(roomCell).join('') + '</div><div class="corridor">복 도</div></div>' +
     '<div class="legend"><span><i class="dot free"></i>비어 있음</span><span><i class="dot busy"></i>사용 중</span>' +
     '<span><i class="dot wait"></i>승인 대기</span><span><i class="dot part"></i>일부 교시 예약</span><span><i class="dot off"></i>신청 불가</span></div>' +
@@ -478,11 +478,11 @@ function viewMap() {
 }
 function dateBar(kind, date) {
   var t = S.init.today;
-  return '<div class="datebar"><button type="button" class="btn" data-a="shift" data-k="' + kind + '" data-d="-1" aria-label="이전 날"' + (date <= t ? ' disabled' : '') + '>‹</button>' +
-    '<input class="in" type="date" data-date="' + kind + '" value="' + date + '" min="' + t + '" aria-label="날짜">' +
+  return '<div class="datebar"><button type="button" class="btn" data-a="shift" data-k="' + kind + '" data-d="-1" aria-label="이전 날">‹</button>' +
+    '<input class="in" type="date" data-date="' + kind + '" value="' + date + '" aria-label="날짜">' +
     '<button type="button" class="btn" data-a="shift" data-k="' + kind + '" data-d="1" aria-label="다음 날">›</button>' +
     (date !== t ? '<button type="button" class="btn" data-a="shift" data-k="' + kind + '" data-d="0">오늘</button>' : '') +
-    '<span class="dlabel">' + esc(fmt(date)) + '</span></div>';
+    '<span class="dlabel">' + esc(fmt(date)) + (date < t ? ' <span class="badge dim">지난 날짜</span>' : '') + '</span></div>';
 }
 function roomCell(r) {
   var s = roomState(r);
@@ -563,8 +563,9 @@ function sheetRoom(sh) {
   if (!S.days[sh.date]) return h + '<div class="spin"></div></div>';
   if (sh.confirm) return h + confirmHtml(sh) + '</div>';
 
-  var book = canBook();
-  h += '<p class="sub" style="margin-bottom:8px">' + (book ? '비어 있는 교시를 눌러 고른 뒤 아래에서 신청하세요.' : '등록된 계정만 신청할 수 있어요.') + '</p>';
+  var past = sh.date < S.init.today;
+  var book = canBook() && !past;
+  h += '<p class="sub" style="margin-bottom:8px">' + (past ? '지난 날짜의 사용 내역이에요. 신청은 오늘부터 할 수 있어요.' : book ? '비어 있는 교시를 눌러 고른 뒤 아래에서 신청하세요.' : '등록된 계정만 신청할 수 있어요.') + '</p>';
   h += book ? periodRows(r.id, sh.date, sh.sel, null) : periodRows(r.id, sh.date, [], null).replace(/data-a="pick"/g, 'disabled');
   if (!book) return h + '</div>';
 
@@ -720,7 +721,7 @@ function viewMine() {
   h += now.length ? now.map(function (g) { return groupCard(g, false); }).join('')
     : '<div class="card empty">다가오는 예약이 없어요.<br><button type="button" class="btn primary" style="margin-top:14px" data-a="view" data-v="map">공간 둘러보기</button></div>';
   if (past.length) {
-    h += '<details class="more"><summary>지난 예약·취소·반려 ' + past.length + '건 (최근 30일)</summary>' + past.map(function (g) { return groupCard(g, false); }).join('') + '</details>';
+    h += '<details class="more"><summary>지난 예약·취소·반려 ' + past.length + '건 (최근 1년)</summary>' + past.map(function (g) { return groupCard(g, false); }).join('') + '</details>';
   }
   return h;
 }
@@ -785,9 +786,9 @@ function fail(e) {
 }
 function setDate(kind, date) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return;
-  if (date < S.init.today) date = S.init.today;
   if (kind === 'sheet' && S.sheet) {
     S.sheet.date = date; S.sheet.sel = []; S.sheet.err = ''; S.sheet.confirm = null;
+    S.date = date;
     if (S.sheet.f.repeat) { S.sheet.f.days = [wd(date)]; if (S.sheet.f.until < date) S.sheet.f.until = addDays(date, 28); }
     renderSheet();
     loadDay(date).then(renderSheet, fail);
@@ -804,7 +805,7 @@ function openRoom(id, opt) {
     type: 'room', id: id, date: date, sel: (opt.periods || []).slice(), video: false, err: '', busy: false, confirm: null,
     f: { purpose: opt.purpose || '', people: opt.people || '', repeat: false, days: [wd(date)], until: addDays(date, 28) }
   };
-  if (S.period !== 'all' && !opt.periods && !bookingAt(id, date, S.period)) S.sheet.sel = [S.period];
+  if (S.period !== 'all' && !opt.periods && date >= S.init.today && !bookingAt(id, date, S.period)) S.sheet.sel = [S.period];
   renderSheet();
   loadDay(date).then(function () {
     if (!S.sheet || S.sheet.id !== id) return;
