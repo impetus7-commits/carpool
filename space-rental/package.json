@@ -1,0 +1,9 @@
+{
+  "name": "space-rental",
+  "private": true,
+  "description": "학교 공간 대여 웹앱 (구글시트 + 앱스크립트)",
+  "scripts": {
+    "test": "node --test tests/server.test.js",
+    "preview": "node dev/build-preview.js"
+  }
+}

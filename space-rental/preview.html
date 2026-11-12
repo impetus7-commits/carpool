@@ -1,0 +1,1926 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<base target="_top">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>학교 공간 대여</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Hahmlet:wght@600;700&family=IBM+Plex+Sans+KR:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #f3f0e8; --card: #fffdf8; --ink: #1b2333; --sub: #5d6778; --line: #d9d2c3; --soft: #ebe6da;
+  --brand: #1f3a5f; --brand-ink: #ffffff; --brand-soft: #e3eaf3;
+  --free: #1f7350; --free-bg: #dff0e6;
+  --busy: #a83f31; --busy-bg: #f6dfda;
+  --wait: #8a5d00; --wait-bg: #f7e9c2;
+  --mine: #1f3a5f; --mine-bg: #dbe6f5;
+  --grid: rgba(31, 58, 95, .07);
+  --shadow: 0 1px 2px rgba(27, 35, 51, .06), 0 8px 24px rgba(27, 35, 51, .08);
+  --display: 'Hahmlet', 'Noto Serif KR', serif;
+  --body: 'IBM Plex Sans KR', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #11151c; --card: #1a2029; --ink: #e9ecf2; --sub: #9aa4b5; --line: #2e3745; --soft: #232b37;
+    --brand: #9fc0ec; --brand-ink: #10203a; --brand-soft: #22324a;
+    --free: #72cfa2; --free-bg: #173427;
+    --busy: #f29384; --busy-bg: #3f211d;
+    --wait: #e8c05f; --wait-bg: #3a2f12;
+    --mine: #9fc0ec; --mine-bg: #22324a;
+    --grid: rgba(159, 192, 236, .07);
+    --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 8px 24px rgba(0, 0, 0, .35);
+  }
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 400 16px/1.55 var(--body); word-break: keep-all; overflow-wrap: anywhere; }
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+h1, h2, h3, p { margin: 0; }
+:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; border-radius: 6px; }
+
+/* ----- 머리 ----- */
+.top { position: sticky; top: 0; z-index: 20; background: var(--brand); color: var(--brand-ink); padding: max(10px, env(safe-area-inset-top)) 16px 10px; }
+.top-in { max-width: 1180px; margin: 0 auto; display: flex; align-items: center; gap: 16px; }
+.brand { min-width: 0; flex: 1; }
+.brand small { display: block; font-size: 12px; letter-spacing: .08em; opacity: .8; }
+.brand h1 { font: 700 20px/1.25 var(--display); }
+.who { font-size: 13px; text-align: right; line-height: 1.3; opacity: .95; }
+.who b { display: block; font-weight: 600; }
+.nav { display: flex; gap: 4px; }
+.nav button { border: 0; background: transparent; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 4px; font-size: 12px; font-weight: 500; flex: 1; border-radius: 10px; position: relative; }
+.nav svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.nav .n { position: absolute; top: 2px; left: calc(50% + 6px); background: var(--busy); color: #fff; border-radius: 99px; font-size: 11px; min-width: 18px; padding: 0 5px; line-height: 18px; }
+.nav.bottom { position: fixed; z-index: 20; left: 0; right: 0; bottom: 0; background: var(--card); border-top: 1px solid var(--line); padding: 6px 8px max(6px, env(safe-area-inset-bottom)); color: var(--sub); }
+.nav.bottom button.on { color: var(--brand); background: var(--brand-soft); }
+.nav.inline { display: none; }
+main { max-width: 1180px; margin: 0 auto; padding: 16px 16px 110px; }
+
+/* ----- 공통 ----- */
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; box-shadow: var(--shadow); }
+.eyebrow { font-size: 12px; font-weight: 600; letter-spacing: .08em; color: var(--sub); }
+.title { font: 700 22px/1.3 var(--display); }
+.sub { color: var(--sub); font-size: 14px; }
+.btn { border: 1px solid var(--line); background: var(--card); border-radius: 10px; padding: 10px 14px; font-weight: 500; min-height: 44px; }
+.btn.primary { background: var(--brand); color: var(--brand-ink); border-color: var(--brand); font-weight: 600; }
+.btn.danger { color: var(--busy); border-color: var(--busy); }
+.btn.small { min-height: 36px; padding: 6px 12px; font-size: 14px; }
+.btn.wide { width: 100%; }
+.btn:disabled { opacity: .5; cursor: default; }
+.chip { border: 1px solid var(--line); background: var(--card); border-radius: 99px; padding: 7px 14px; font-size: 14px; white-space: nowrap; min-height: 38px; }
+.chip.on { background: var(--brand); color: var(--brand-ink); border-color: var(--brand); font-weight: 600; }
+.chips { display: flex; gap: 8px; flex-wrap: wrap; }
+.chips.scroll { flex-wrap: nowrap; overflow-x: auto; padding: 2px 16px 6px; margin: 0 -16px; scrollbar-width: none; }
+.chips.scroll::-webkit-scrollbar { display: none; }
+.tag { display: inline-block; font-size: 13px; padding: 2px 10px; border-radius: 99px; background: var(--soft); margin: 0 6px 6px 0; }
+.badge { display: inline-block; font-size: 12px; font-weight: 600; padding: 2px 9px; border-radius: 99px; white-space: nowrap; }
+.badge.ok { background: var(--free-bg); color: var(--free); }
+.badge.wait { background: var(--wait-bg); color: var(--wait); }
+.badge.no { background: var(--busy-bg); color: var(--busy); }
+.badge.dim { background: var(--soft); color: var(--sub); }
+.notice { background: var(--brand-soft); border-radius: 12px; padding: 10px 14px; font-size: 14px; margin-bottom: 14px; }
+.notice.warn { background: var(--wait-bg); color: var(--wait); }
+.err { background: var(--busy-bg); color: var(--busy); border-radius: 10px; padding: 10px 12px; font-size: 14px; margin: 10px 0; }
+.empty { text-align: center; color: var(--sub); padding: 40px 16px; }
+label.f { display: block; font-size: 13px; font-weight: 600; color: var(--sub); margin: 14px 0 6px; }
+input.in, select.in { width: 100%; border: 1px solid var(--line); background: var(--card); border-radius: 10px; padding: 10px 12px; min-height: 44px; }
+.row { display: flex; gap: 10px; align-items: center; }
+.row > .grow { flex: 1; min-width: 0; }
+.spin { width: 28px; height: 28px; border: 3px solid var(--line); border-top-color: var(--brand); border-radius: 50%; margin: 60px auto; animation: sp 1s linear infinite; }
+@keyframes sp { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spin { animation-duration: 3s; } .sheet { transition: none !important; } }
+
+/* ----- 날짜·교시 고르기 ----- */
+.ctl { margin-bottom: 14px; }
+.datebar { display: flex; gap: 6px; align-items: center; margin-bottom: 10px; flex-wrap: wrap; }
+.datebar .btn { padding: 0 12px; }
+.datebar input { flex: 1; min-width: 150px; max-width: 220px; }
+.datebar .dlabel { font-weight: 600; margin-left: 6px; font-size: 14px; }
+
+/* ----- 건물 단면 ----- */
+.mapgrid { display: grid; gap: 14px; }
+.bldg-card { padding: 16px; }
+.btabs { display: flex; gap: 6px; margin: 10px 0 14px; flex-wrap: wrap; }
+.bldg { border: 2px solid var(--ink); border-radius: 4px 4px 0 0; border-bottom-width: 6px; position: relative; margin-top: 18px; }
+.bldg::before { content: ''; position: absolute; left: -8px; right: -8px; top: -12px; height: 10px; background: var(--ink); border-radius: 3px 3px 0 0; }
+.fl { display: grid; grid-template-columns: 62px 1fr auto; align-items: center; gap: 10px; width: 100%; border: 0; border-bottom: 1px solid var(--line); background: transparent; padding: 10px 12px; text-align: left; min-height: 52px; }
+.fl:last-child { border-bottom: 0; }
+.fl b { font: 700 16px var(--display); }
+.fl em { font-style: normal; font-size: 13px; color: var(--sub); white-space: nowrap; }
+.fl.on { background: var(--brand); color: var(--brand-ink); }
+.fl.on em { color: inherit; opacity: .85; }
+.dots { display: flex; gap: 4px; flex-wrap: wrap; }
+.dot { width: 16px; height: 16px; border-radius: 3px; border: 1.5px solid; }
+.dot.free { background: var(--free-bg); border-color: var(--free); }
+.dot.busy { background: var(--busy); border-color: var(--busy); }
+.dot.wait { background: var(--wait-bg); border-color: var(--wait); }
+.dot.part { background: linear-gradient(135deg, var(--free-bg) 50%, var(--busy) 50%); border-color: var(--sub); }
+.dot.off { border-style: dashed; border-color: var(--sub); opacity: .55; background: transparent; }
+.fl.on .dot { box-shadow: 0 0 0 1.5px var(--brand-ink); border-color: transparent; }
+
+/* ----- 층 배치도 ----- */
+.plan-card { padding: 16px; }
+.plan { margin-top: 12px; border: 2px solid var(--ink); border-radius: 6px; background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px); background-size: 20px 20px; }
+.rooms { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; padding: 10px; }
+.room { text-align: left; border: 2px solid; border-radius: 6px; padding: 10px; min-height: 108px; display: flex; flex-direction: column; gap: 2px; background: var(--card); }
+.room .rn { font-weight: 600; line-height: 1.3; }
+.room .rc { font-size: 13px; color: var(--sub); }
+.room .st { margin-top: auto; font-size: 13px; font-weight: 600; }
+.room.free { border-color: var(--free); background: var(--free-bg); } .room.free .st { color: var(--free); }
+.room.busy { border-color: var(--busy); background: var(--busy-bg); } .room.busy .st { color: var(--busy); }
+.room.wait { border-color: var(--wait); background: var(--wait-bg); } .room.wait .st { color: var(--wait); }
+.room.part { border-color: var(--sub); }
+.room.mine { border-color: var(--mine); background: var(--mine-bg); } .room.mine .st { color: var(--mine); }
+.room.off { border-style: dashed; border-color: var(--line); background: transparent; color: var(--sub); }
+.strip { display: flex; gap: 2px; margin: 6px 0 4px; }
+.strip i { flex: 1; height: 6px; border-radius: 2px; background: var(--free); opacity: .35; }
+.strip i.busy { background: var(--busy); opacity: 1; }
+.strip i.wait { background: var(--wait); opacity: 1; }
+.strip i.mine { background: var(--mine); opacity: 1; }
+.corridor { border-top: 2px dashed var(--ink); text-align: center; font-size: 12px; letter-spacing: .3em; color: var(--sub); padding: 6px; background: var(--card); border-radius: 0 0 4px 4px; }
+.legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 13px; color: var(--sub); margin-top: 12px; }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+
+/* ----- 시트 (상세·신청) ----- */
+.scrim { position: fixed; inset: 0; z-index: 40; background: rgba(10, 14, 22, .5); }
+.sheet { position: fixed; z-index: 41; left: 0; right: 0; bottom: 0; max-height: 94dvh; background: var(--card); border-radius: 20px 20px 0 0; display: flex; flex-direction: column; box-shadow: var(--shadow); }
+.sheet-head { display: flex; align-items: flex-start; gap: 10px; padding: 18px 18px 10px; }
+.sheet-head .grow { flex: 1; min-width: 0; }
+.x { border: 0; background: var(--soft); width: 40px; height: 40px; border-radius: 50%; font-size: 20px; line-height: 1; flex: none; }
+.sheet-body { overflow-y: auto; padding: 0 18px; -webkit-overflow-scrolling: touch; }
+.sheet-body > :last-child:not(.sticky-go) { margin-bottom: max(20px, env(safe-area-inset-bottom)); }
+.gallery { display: flex; gap: 8px; overflow-x: auto; scroll-snap-type: x mandatory; margin: 0 -18px 12px; padding: 0 18px; }
+.gallery img { height: 210px; max-width: 86%; border-radius: 12px; scroll-snap-align: center; object-fit: cover; background: var(--soft); flex: none; }
+.nophoto { height: 120px; border-radius: 12px; display: grid; place-items: center; color: var(--sub); font-size: 14px; margin-bottom: 12px; background: repeating-linear-gradient(135deg, var(--soft), var(--soft) 10px, transparent 10px, transparent 20px); border: 1px dashed var(--line); }
+.video { position: relative; padding-top: 56.25%; margin: 10px 0; border-radius: 12px; overflow: hidden; background: #000; }
+.video iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+.facts { display: grid; grid-template-columns: 76px 1fr; gap: 8px 12px; margin: 14px 0; font-size: 15px; }
+.facts dt { color: var(--sub); font-size: 13px; font-weight: 600; padding-top: 2px; }
+.facts dd { margin: 0; }
+.sec { font: 700 17px var(--display); margin: 22px 0 8px; }
+.prow { display: grid; grid-template-columns: 22px 78px 1fr; gap: 8px; align-items: center; width: 100%; text-align: left; border: 1px solid var(--line); background: var(--card); border-radius: 10px; padding: 9px 12px; margin-bottom: 6px; min-height: 50px; }
+.prow .pn { font-weight: 600; }
+.prow .pt { font-size: 12px; color: var(--sub); display: block; font-weight: 400; }
+.prow .ps { font-size: 14px; }
+.prow .box { width: 20px; height: 20px; border: 2px solid var(--free); border-radius: 5px; display: grid; place-items: center; font-size: 14px; line-height: 1; color: var(--brand-ink); }
+.prow.free .ps { color: var(--free); }
+.prow.sel { border-color: var(--brand); background: var(--brand-soft); }
+.prow.sel .box { background: var(--brand); border-color: var(--brand); }
+.prow.busy, .prow.wait { background: var(--soft); cursor: default; }
+.prow.busy .box, .prow.wait .box { border-color: var(--line); background: var(--line); }
+.prow.busy .ps { color: var(--busy); } .prow.wait .ps { color: var(--wait); }
+.switch { display: flex; align-items: center; gap: 10px; margin-top: 16px; font-weight: 600; }
+.switch input { width: 22px; height: 22px; accent-color: var(--brand); }
+.repeat { border: 1px solid var(--line); border-radius: 12px; padding: 4px 14px 14px; margin-top: 10px; }
+.days .chip { min-width: 44px; padding: 7px 0; text-align: center; }
+.sticky-go { position: sticky; bottom: 0; background: var(--card); border-top: 1px solid var(--line); padding: 12px 18px max(14px, env(safe-area-inset-bottom)); margin: 16px -18px 0; }
+.clist { margin: 8px 0; padding-left: 20px; font-size: 14px; }
+
+/* ----- 추천 ----- */
+.findgrid { display: grid; gap: 14px; }
+.pad { padding: 18px; }
+.rec { padding: 16px; margin-bottom: 12px; display: grid; grid-template-columns: 40px 1fr; gap: 12px; }
+.rank { width: 40px; height: 40px; border-radius: 50%; background: var(--brand); color: var(--brand-ink); display: grid; place-items: center; font: 700 17px var(--display); }
+.rec.miss .rank { background: var(--soft); color: var(--sub); }
+.rec h3 { font-size: 17px; font-weight: 600; }
+.why { list-style: none; padding: 0; margin: 8px 0; font-size: 14px; }
+.why li { padding-left: 22px; position: relative; margin-bottom: 3px; }
+.why li::before { position: absolute; left: 0; font-weight: 700; }
+.why li.y::before { content: '✓'; color: var(--free); }
+.why li.n::before { content: '!'; color: var(--wait); left: 4px; }
+
+/* ----- 목록 (내 예약·관리) ----- */
+.item { padding: 14px 16px; margin-bottom: 10px; }
+.item h3 { font-size: 16px; font-weight: 600; }
+.item .meta { font-size: 14px; color: var(--sub); margin-top: 2px; }
+.item .acts { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+.drow { display: flex; align-items: center; gap: 8px; padding: 8px 0; border-top: 1px solid var(--line); font-size: 14px; flex-wrap: wrap; }
+.drow .grow { flex: 1; min-width: 120px; }
+.drow.dim { opacity: .6; }
+.tabs { display: flex; gap: 6px; margin-bottom: 14px; flex-wrap: wrap; }
+.hrow { padding: 10px 0; border-top: 1px solid var(--line); font-size: 14px; }
+.hrow:first-child { border-top: 0; }
+.hrow .when { color: var(--sub); font-size: 13px; }
+.hrow details { margin-top: 4px; font-size: 13px; color: var(--sub); }
+.hrow pre { white-space: pre-wrap; margin: 4px 0; font: 12px/1.5 ui-monospace, monospace; background: var(--soft); padding: 8px; border-radius: 8px; }
+details.more > summary { cursor: pointer; color: var(--sub); padding: 10px 0; font-weight: 600; }
+
+#toast { position: fixed; z-index: 60; left: 50%; bottom: 96px; transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 10px 18px; border-radius: 99px; font-size: 14px; font-weight: 500; opacity: 0; pointer-events: none; transition: opacity .2s; max-width: 90vw; text-align: center; }
+#toast.on { opacity: 1; }
+
+@media (min-width: 900px) {
+  .nav.bottom { display: none; }
+  .nav.inline { display: flex; }
+  .nav.inline button { flex-direction: row; gap: 8px; padding: 8px 14px; font-size: 15px; color: inherit; opacity: .8; flex: none; }
+  .nav.inline button.on { background: rgba(255, 255, 255, .16); opacity: 1; }
+  .nav.inline .n { position: static; }
+  main { padding: 24px 24px 60px; }
+  .mapgrid { grid-template-columns: 340px 1fr; align-items: start; }
+  .bldg-card { position: sticky; top: 84px; }
+  .findgrid { grid-template-columns: 380px 1fr; align-items: start; }
+  .sheet { left: auto; top: 0; width: 540px; max-height: none; border-radius: 0; }
+  .sheet.small { top: 50%; left: 50%; right: auto; bottom: auto; transform: translate(-50%, -50%); width: 440px; border-radius: 18px; max-height: 86vh; }
+  #toast { bottom: 32px; }
+  .chips.scroll { flex-wrap: wrap; overflow: visible; margin: 0; padding: 0; }
+}
+</style>
+</head>
+<body>
+<div id="app"><div class="spin" role="status" aria-label="불러오는 중"></div></div>
+<div id="sheet-root"></div>
+<div id="toast" role="status" aria-live="polite"></div>
+<script>
+/**
+ * 학교 공간 대여 — 순수 계산 (시트·로그인과 무관)
+ * 날짜 계산, 예약 겹침 판단, 반복 날짜 펼치기, 공간 추천
+ */
+
+var ACTIVE_STATUS_ = ['확정', '승인대기'];
+var WEEKDAY_NAMES_ = ['일', '월', '화', '수', '목', '금', '토'];
+
+function splitList_(s) {
+  return String(s == null ? '' : s).split(/[,\n;、]+/)
+    .map(function (x) { return x.trim(); })
+    .filter(Boolean);
+}
+
+function pad2_(n) { return (n < 10 ? '0' : '') + n; }
+
+function toUtc_(s) {
+  var p = String(s).split('-');
+  return Date.UTC(+p[0], +p[1] - 1, +p[2]);
+}
+
+function fromUtc_(t) {
+  var d = new Date(t);
+  return d.getUTCFullYear() + '-' + pad2_(d.getUTCMonth() + 1) + '-' + pad2_(d.getUTCDate());
+}
+
+function isDate_(s) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(String(s)) && fromUtc_(toUtc_(s)) === s;
+}
+
+function addDays_(s, n) { return fromUtc_(toUtc_(s) + n * 86400000); }
+
+/** 0=일 … 6=토 */
+function weekday_(s) { return new Date(toUtc_(s)).getUTCDay(); }
+
+/** start~until 사이에서 weekdays(0~6)에 해당하는 날짜들 */
+function expandDates_(start, until, weekdays) {
+  var out = [];
+  for (var d = start; d <= until; d = addDays_(d, 1)) {
+    if (weekdays.indexOf(weekday_(d)) >= 0) out.push(d);
+  }
+  return out;
+}
+
+function isActive_(b) { return ACTIVE_STATUS_.indexOf(b.status) >= 0; }
+
+/** want = {roomId, date, periods[]} 와 겹치는 살아 있는 예약들 */
+function findConflicts_(bookings, want, excludeId) {
+  return bookings.filter(function (b) {
+    return isActive_(b) && b.id !== excludeId &&
+      b.roomId === want.roomId && b.date === want.date &&
+      b.periods.some(function (p) { return want.periods.indexOf(p) >= 0; });
+  });
+}
+
+function looseMatch_(list, word) {
+  var w = String(word).toLowerCase().replace(/\s+/g, '');
+  if (!w) return false;
+  return list.some(function (x) {
+    var v = String(x).toLowerCase().replace(/\s+/g, '');
+    return v && (v.indexOf(w) >= 0 || w.indexOf(v) >= 0);
+  });
+}
+
+/**
+ * 공간 추천.
+ * q = {periods[], people, purpose, facilities[], keyword}
+ * dayBookings = 해당 날짜의 예약들, periods = [{id,name}]
+ * 반환: [{roomId, ok, score, reasons[], warnings[]}] — 조건에 맞는 것부터, 점수 높은 순
+ */
+function recommend_(rooms, dayBookings, periods, q) {
+  var nameOf = {};
+  periods.forEach(function (p) { nameOf[p.id] = p.name; });
+  var want = (q.periods || []).filter(function (p) { return nameOf[p]; });
+  var people = Math.max(0, parseInt(q.people, 10) || 0);
+  var purpose = String(q.purpose || '').trim();
+  var needs = (q.facilities || []).filter(Boolean);
+  var words = String(q.keyword || '').split(/[\s,]+/).filter(Boolean);
+
+  var out = [];
+  rooms.forEach(function (r) {
+    if (!r.bookable) return;
+    var x = { roomId: r.id, ok: true, score: 0, reasons: [], warnings: [] };
+
+    if (want.length) {
+      var busy = {};
+      dayBookings.forEach(function (b) {
+        if (isActive_(b) && b.roomId === r.id) b.periods.forEach(function (p) { busy[p] = true; });
+      });
+      var taken = want.filter(function (p) { return busy[p]; });
+      if (taken.length) {
+        x.ok = false;
+        x.warnings.push(taken.map(function (p) { return nameOf[p]; }).join(', ') + '에 이미 예약이 있어요');
+      } else {
+        x.score += 40;
+        x.reasons.push(want.map(function (p) { return nameOf[p]; }).join(', ') + ' 비어 있음');
+      }
+    }
+
+    if (people) {
+      if (!r.capacity) {
+        x.warnings.push('수용 인원 정보가 없어요');
+      } else if (r.capacity < people) {
+        x.ok = false;
+        x.warnings.push('정원 ' + r.capacity + '명으로 ' + people + '명이 쓰기에는 좁아요');
+      } else {
+        var ratio = people / r.capacity;
+        if (ratio >= 0.5) {
+          x.score += 25;
+          x.reasons.push(people + '명에게 알맞은 크기 (정원 ' + r.capacity + '명)');
+        } else if (ratio >= 0.25) {
+          x.score += 12;
+          x.reasons.push(people + '명이 여유 있게 사용 (정원 ' + r.capacity + '명)');
+        } else {
+          x.score += 3;
+          x.reasons.push('수용은 되지만 인원에 비해 큰 공간 (정원 ' + r.capacity + '명)');
+        }
+      }
+    }
+
+    if (purpose) {
+      if (looseMatch_(r.uses, purpose)) {
+        x.score += 30;
+        x.reasons.push("'" + purpose + "' 용도로 쓰는 공간");
+      } else {
+        x.score -= 5;
+        x.warnings.push("'" + purpose + "' 용도로 등록된 공간은 아니에요");
+      }
+    }
+
+    needs.forEach(function (f) {
+      if (looseMatch_(r.facilities, f)) {
+        x.score += 15;
+        x.reasons.push(f + ' 있음');
+      } else {
+        x.ok = false;
+        x.score -= 15;
+        x.warnings.push(f + ' 없음');
+      }
+    });
+
+    words.forEach(function (w) {
+      var where = looseMatch_([r.name], w) ? '이름'
+        : looseMatch_(r.uses, w) ? '용도'
+        : looseMatch_(r.facilities, w) ? '시설'
+        : (r.note + ' ' + r.desc).toLowerCase().indexOf(w.toLowerCase()) >= 0 ? '소개' : '';
+      if (where) {
+        x.score += 10;
+        x.reasons.push("검색어 '" + w + "'가 " + where + '에 있음');
+      }
+    });
+
+    if (r.note && x.ok) x.warnings.push('특이사항: ' + r.note);
+    x.capacity = r.capacity;
+    x.name = r.name;
+    out.push(x);
+  });
+
+  out.sort(function (a, b) {
+    if (a.ok !== b.ok) return a.ok ? -1 : 1;
+    if (a.score !== b.score) return b.score - a.score;
+    if (a.capacity !== b.capacity) return (a.capacity || 1e9) - (b.capacity || 1e9);
+    return a.name < b.name ? -1 : 1;
+  });
+  out.forEach(function (x) { delete x.capacity; delete x.name; });
+  return out;
+}
+
+if (typeof module !== 'undefined') {
+  module.exports = {
+    splitList_: splitList_, isDate_: isDate_, addDays_: addDays_, weekday_: weekday_,
+    expandDates_: expandDates_, findConflicts_: findConflicts_, recommend_: recommend_
+  };
+}
+
+;
+/**
+ * 학교 공간 대여 — 탭 머리글, 예시 데이터, 처음 설정
+ * 시트 메뉴 [공간대여 → 처음 설정]을 한 번 실행하면 필요한 탭이 만들어집니다.
+ */
+
+var TABS_ = {
+  '공간': ['ID', '건물', '층', '순서', '이름', '수용인원', '용도', '시설', '특이사항', '소개', '사진', '영상', '신청가능'],
+  '사용자': ['이메일', '이름', '역할', '소속'],
+  '교시': ['ID', '이름', '시작', '종료'],
+  '예약': ['ID', '묶음ID', '공간ID', '날짜', '교시', '이메일', '이름', '역할', '소속', '목적', '인원', '상태', '신청일시', '수정일시', '처리자', '비고'],
+  '기록': ['일시', '이메일', '이름', '동작', '예약ID', '공간', '날짜', '내용', '변경전', '변경후'],
+  '설정': ['항목', '값', '설명']
+};
+
+/** 예시 데이터 — 학교 실정에 맞게 시트에서 고쳐 쓰세요. */
+var SAMPLE_ = {
+  '공간': [
+    ['A101', '본관', '1', '1', '교무실', '', '', '', '교직원 업무 공간', '', '', '', 'N'],
+    ['A102', '본관', '1', '2', '시청각실', '120', '강연, 발표, 영상 시청, 설명회', '빔프로젝터, 음향, 마이크, 냉난방, 무대', '음식물 반입 금지. 사용 후 음향 장비 전원을 꺼 주세요.', '계단식 좌석 120석을 갖춘 강연·발표 공간입니다.', '', '', 'Y'],
+    ['A103', '본관', '1', '3', '도서관', '60', '독서, 자습, 토론, 모둠 활동', '모둠 책상, 와이파이, 냉난방, 전자칠판', '점심시간에는 대출·반납 이용자와 함께 씁니다.', '장서 2만 권과 모둠 책상 10개가 있는 열린 학습 공간입니다.', '', '', 'Y'],
+    ['A104', '본관', '1', '4', '보건실', '', '', '', '', '', '', '', 'N'],
+    ['A201', '본관', '2', '1', '진로상담실', '8', '상담, 면접 연습, 소모임', '원탁, 냉난방, 와이파이', '상담 일정이 우선입니다.', '소규모 상담과 면접 연습에 알맞은 조용한 방입니다.', '', '', 'Y'],
+    ['A202', '본관', '2', '2', '세미나실 1', '20', '회의, 토론, 발표, 동아리', '빔프로젝터, 화이트보드, 와이파이, 냉난방', '', '이동식 책상으로 배치를 자유롭게 바꿀 수 있습니다.', '', '', 'Y'],
+    ['A203', '본관', '2', '3', '세미나실 2', '16', '회의, 토론, 동아리, 소모임', '전자칠판, 화이트보드, 와이파이, 냉난방', '', '전자칠판이 있는 소규모 회의 공간입니다.', '', '', 'Y'],
+    ['A204', '본관', '2', '4', '컴퓨터실', '32', '정보 수업, 코딩, 온라인 평가, 영상 편집', '컴퓨터 32대, 빔프로젝터, 프린터, 냉난방', '개인 저장 장치 사용 전 담당 교사에게 알려 주세요.', '컴퓨터 32대가 있는 정보 교육 공간입니다.', '', '', 'Y'],
+    ['A301', '본관', '3', '1', '과학실 1', '28', '실험, 과학 수업, 탐구 활동', '실험대, 개수대, 빔프로젝터, 환기 장치', '실험은 반드시 지도 교사와 함께 합니다.', '화학·물리 실험을 위한 실험대 7개가 있습니다.', '', '', 'Y'],
+    ['A302', '본관', '3', '2', '과학실 2', '28', '실험, 과학 수업, 탐구 활동', '실험대, 개수대, 현미경, 빔프로젝터', '실험은 반드시 지도 교사와 함께 합니다.', '생명과학·지구과학 탐구용 실험실입니다.', '', '', 'Y'],
+    ['A303', '본관', '3', '3', '수학교과교실', '30', '수업, 자습, 보충 학습', '전자칠판, 화이트보드, 냉난방', '', '벽면 전체가 화이트보드인 교과교실입니다.', '', '', 'Y'],
+    ['A304', '본관', '3', '4', '영어교과교실', '30', '수업, 토론, 발표', '전자칠판, 음향, 냉난방', '', '모둠 배치가 쉬운 교과교실입니다.', '', '', 'Y'],
+    ['A401', '본관', '4', '1', '음악실', '35', '음악 수업, 합창, 합주, 공연 연습', '피아노, 음향, 방음, 보면대', '악기는 제자리에 정리해 주세요.', '그랜드 피아노와 방음 시설을 갖춘 음악 공간입니다.', '', '', 'Y'],
+    ['A402', '본관', '4', '2', '미술실', '30', '미술 수업, 전시 준비, 만들기', '작업대, 개수대, 이젤, 건조대', '물감 사용 후 개수대를 정리해 주세요.', '넓은 작업대가 있는 미술 공간입니다.', '', '', 'Y'],
+    ['A403', '본관', '4', '3', '다목적실', '50', '댄스, 연극, 공연 연습, 체조, 행사', '전면 거울, 음향, 마루 바닥, 냉난방', '실내화를 신어 주세요.', '전면 거울과 마루 바닥이 있는 활동 공간입니다.', '', '', 'Y'],
+    ['A404', '본관', '4', '4', '스터디카페', '24', '자습, 모둠 학습, 멘토링', '칸막이 책상, 와이파이, 냉난방', '대화는 모둠 구역에서만 해 주세요.', '개인 좌석과 모둠 좌석이 나뉜 자기주도학습 공간입니다.', '', '', 'Y'],
+    ['A501', '본관', '5', '1', '대강당', '400', '행사, 공연, 입학식, 학년 모임, 강연', '무대, 조명, 음향, 마이크, 빔프로젝터', '무대 조명은 담당 교사만 조작합니다.', '전교생 행사와 공연을 여는 강당입니다.', '', '', 'Y'],
+    ['B101', '창의관', '1', '1', '메이커실', '20', '만들기, 발명, 공학 동아리', '3D 프린터, 레이저 커터, 공구, 작업대', '장비는 사용 교육을 받은 사람만 다룹니다.', '3D 프린터 4대와 공구가 있는 제작 공간입니다.', '', '', 'Y'],
+    ['B102', '창의관', '1', '2', '가사실', '24', '조리 실습, 가정 수업', '조리대, 인덕션, 냉장고, 개수대', '사용 후 가스·전기를 꼭 확인해 주세요.', '조리대 6개가 있는 실습 공간입니다.', '', '', 'Y'],
+    ['B201', '창의관', '2', '1', '온라인 스튜디오', '6', '영상 촬영, 방송, 녹음, 온라인 수업', '카메라, 조명, 크로마키, 마이크, 방음', '장비 대여는 방송부 담당 교사에게 문의하세요.', '촬영과 녹음을 할 수 있는 작은 스튜디오입니다.', '', '', 'Y'],
+    ['B202', '창의관', '2', '2', '토론실', '12', '토론, 회의, 모의 면접', '원탁, 전자칠판, 와이파이, 냉난방', '', '원탁 배치의 토론 전용 공간입니다.', '', '', 'Y'],
+    ['C101', '체육관', '1', '1', '체육관', '300', '체육 수업, 경기, 행사, 체육 동아리', '농구 골대, 배구 네트, 음향, 탈의실', '실내 운동화를 신어 주세요.', '농구·배구·배드민턴을 할 수 있는 실내 체육관입니다.', '', '', 'Y'],
+    ['C201', '체육관', '2', '1', '탁구장', '16', '탁구, 체육 동아리', '탁구대 4대, 냉난방', '', '탁구대 4대가 있는 소규모 체육 공간입니다.', '', '', 'Y']
+  ],
+  '교시': [
+    ['P0', '아침', '07:50', '08:30'],
+    ['P1', '1교시', '08:40', '09:30'],
+    ['P2', '2교시', '09:40', '10:30'],
+    ['P3', '3교시', '10:40', '11:30'],
+    ['P4', '4교시', '11:40', '12:30'],
+    ['PL', '점심', '12:30', '13:30'],
+    ['P5', '5교시', '13:30', '14:20'],
+    ['P6', '6교시', '14:30', '15:20'],
+    ['P7', '7교시', '15:30', '16:20'],
+    ['PA', '방과후', '16:30', '18:00'],
+    ['PN', '야간', '18:50', '21:00']
+  ],
+  '설정': [
+    ['학교이름', '우리고등학교', '화면 맨 위에 보이는 이름'],
+    ['안내문', '사용 후에는 정리 정돈과 전원 확인을 부탁드립니다.', '첫 화면에 보이는 한 줄 안내 (비워도 됨)'],
+    ['예약가능일수', '60', '오늘부터 며칠 뒤까지 신청할 수 있는지'],
+    ['반복예약최대일수', '200', '반복 예약의 종료일을 오늘부터 며칠 뒤까지 허용할지']
+  ]
+};
+
+function onOpen() {
+  SpreadsheetApp.getUi().createMenu('공간대여')
+    .addItem('처음 설정 (탭 만들기)', 'setup')
+    .addToUi();
+}
+
+/** 필요한 탭을 만들고, 비어 있으면 예시 데이터를 채웁니다. 여러 번 실행해도 기존 내용은 지우지 않습니다. */
+function setup() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  Object.keys(TABS_).forEach(function (name) {
+    var head = TABS_[name];
+    var sh = ss.getSheetByName(name) || ss.insertSheet(name);
+    sh.getRange(1, 1, sh.getMaxRows(), sh.getMaxColumns()).setNumberFormat('@');
+    if (sh.getLastRow() === 0) {
+      sh.getRange(1, 1, 1, head.length).setValues([head]);
+    }
+    sh.getRange(1, 1, 1, head.length).setFontWeight('bold').setBackground('#1f3a5f').setFontColor('#ffffff');
+    sh.setFrozenRows(1);
+    if (sh.getLastRow() === 1 && SAMPLE_[name]) {
+      sh.getRange(2, 1, SAMPLE_[name].length, head.length).setValues(SAMPLE_[name]);
+    }
+  });
+
+  var users = ss.getSheetByName('사용자');
+  if (users.getLastRow() === 1) {
+    users.getRange(2, 1, 1, 4).setValues([[Session.getEffectiveUser().getEmail(), '관리자', '관리자', '']]);
+  }
+  users.getRange('C2:C').setDataValidation(
+    SpreadsheetApp.newDataValidation().requireValueInList(['교직원', '학생', '관리자'], true).build());
+  ss.getSheetByName('공간').getRange('M2:M').setDataValidation(
+    SpreadsheetApp.newDataValidation().requireValueInList(['Y', 'N'], true).build());
+
+  ['예약', '기록'].forEach(function (name) {
+    var sh = ss.getSheetByName(name);
+    if (!sh.getProtections(SpreadsheetApp.ProtectionType.SHEET).length) {
+      sh.protect().setDescription('웹앱이 자동으로 쓰는 탭입니다').setWarningOnly(true);
+    }
+  });
+
+  var first = ss.getSheetByName('시트1') || ss.getSheetByName('Sheet1');
+  if (first && first.getLastRow() === 0 && ss.getSheets().length > 1) ss.deleteSheet(first);
+
+  SpreadsheetApp.getUi().alert('설정이 끝났습니다.\n\n1) [사용자] 탭에 교직원·학생 계정을 등록하세요.\n2) [공간] 탭을 학교에 맞게 고치세요.\n3) 오른쪽 위 [배포 → 새 배포]로 웹앱을 배포하세요.');
+}
+
+;
+/**
+ * 학교 공간 대여 — 웹앱 서버 (구글시트에 묶인 앱스크립트)
+ *
+ * 화면에서 부르는 함수:
+ *   getInit, getDay, recommend, createBooking, updateBooking, cancelBooking,
+ *   myBookings, adminBookings, decide, getHistory
+ *
+ * 데이터는 Store.gs 의 readTab_/appendRows_/updateRows_ 로만 읽고 씁니다.
+ * 모든 쓰기는 withLock_ 안에서 처리하고 [기록] 탭에 남깁니다.
+ */
+
+var MAX_REPEAT_COUNT = 80;   // 반복 예약 한 번에 만들 수 있는 최대 횟수
+var HISTORY_LIMIT = 500;     // 관리 화면에 보여 주는 최근 기록 수
+
+function doGet() {
+  return HtmlService.createHtmlOutputFromFile('index')
+    .setTitle('학교 공간 대여')
+    .addMetaTag('viewport', 'width=device-width, initial-scale=1, viewport-fit=cover');
+}
+
+/* ---------- 읽어서 다듬기 ---------- */
+
+function settings_() {
+  var s = {};
+  readTab_('설정').forEach(function (r) { s[r['항목']] = r['값']; });
+  return {
+    school: s['학교이름'] || '우리 학교',
+    notice: s['안내문'] || '',
+    maxDays: Math.max(1, parseInt(s['예약가능일수'], 10) || 60),
+    repeatMaxDays: Math.max(1, parseInt(s['반복예약최대일수'], 10) || 200)
+  };
+}
+
+function me_() {
+  var email = currentEmail_();
+  var me = { email: email, name: '', role: '', dept: '', registered: false, admin: false };
+  if (!email) return me;
+  var row = readTab_('사용자').filter(function (u) {
+    return String(u['이메일']).toLowerCase() === email;
+  })[0];
+  if (!row) return me;
+  var role = String(row['역할'] || '');
+  me.role = role.indexOf('관리') >= 0 ? '관리자' : role.indexOf('학생') >= 0 ? '학생' : '교직원';
+  me.name = row['이름'] || email.split('@')[0];
+  me.dept = row['소속'] || '';
+  me.registered = true;
+  me.admin = me.role === '관리자';
+  return me;
+}
+
+function rooms_() {
+  return readTab_('공간').filter(function (r) { return r['ID'] && r['이름']; }).map(function (r) {
+    return {
+      id: r['ID'],
+      building: r['건물'] || '본관',
+      floor: r['층'] || '1',
+      order: parseFloat(r['순서']) || 0,
+      name: r['이름'],
+      capacity: parseInt(r['수용인원'], 10) || 0,
+      uses: splitList_(r['용도']),
+      facilities: splitList_(r['시설']),
+      note: r['특이사항'] || '',
+      desc: r['소개'] || '',
+      photos: splitList_(r['사진']),
+      video: r['영상'] || '',
+      bookable: !/^(n|no|x|아니오|불가)$/i.test(String(r['신청가능'] || 'Y').trim())
+    };
+  });
+}
+
+function periods_() {
+  return readTab_('교시').filter(function (r) { return r['ID'] && r['이름']; }).map(function (r) {
+    return { id: r['ID'], name: r['이름'], start: hhmm_(r['시작']), end: hhmm_(r['종료']) };
+  });
+}
+
+function hhmm_(s) {
+  var m = /(\d{1,2}):(\d{2})/.exec(String(s || ''));
+  return m ? pad2_(+m[1]) + ':' + m[2] : '';
+}
+
+function bookings_() {
+  return readTab_('예약').filter(function (r) { return r['ID']; }).map(function (r) {
+    return {
+      _row: r._row,
+      id: r['ID'], groupId: r['묶음ID'] || '', roomId: r['공간ID'], date: r['날짜'],
+      periods: splitList_(r['교시']),
+      email: String(r['이메일'] || '').toLowerCase(), name: r['이름'] || '', role: r['역할'] || '', dept: r['소속'] || '',
+      purpose: r['목적'] || '', people: parseInt(r['인원'], 10) || 0, status: r['상태'] || '',
+      createdAt: r['신청일시'] || '', updatedAt: r['수정일시'] || '', handler: r['처리자'] || '', memo: r['비고'] || ''
+    };
+  });
+}
+
+function bookingRow_(b) {
+  var row = {
+    'ID': b.id, '묶음ID': b.groupId, '공간ID': b.roomId, '날짜': b.date, '교시': b.periods.join(','),
+    '이메일': b.email, '이름': b.name, '역할': b.role, '소속': b.dept,
+    '목적': b.purpose, '인원': b.people, '상태': b.status,
+    '신청일시': b.createdAt, '수정일시': b.updatedAt, '처리자': b.handler, '비고': b.memo
+  };
+  if (b._row) row._row = b._row;
+  return row;
+}
+
+/** 화면으로 내보내는 예약. 등록되지 않은 계정에는 이름과 목적을 가립니다. */
+function publicBooking_(b, me) {
+  var open = me.registered;
+  return {
+    id: b.id, groupId: b.groupId, roomId: b.roomId, date: b.date, periods: b.periods, status: b.status,
+    name: open ? b.name : '', dept: open ? b.dept : '', role: open ? b.role : '',
+    purpose: open ? b.purpose : '', people: open ? b.people : 0,
+    memo: open ? b.memo : '', createdAt: open ? b.createdAt : '',
+    mine: !!me.email && b.email === me.email
+  };
+}
+
+function byDateThenPeriod_(order) {
+  return function (a, b) {
+    if (a.date !== b.date) return a.date < b.date ? -1 : 1;
+    return (order[a.periods[0]] || 0) - (order[b.periods[0]] || 0);
+  };
+}
+
+function periodOrder_(periods) {
+  var o = {};
+  periods.forEach(function (p, i) { o[p.id] = i + 1; });
+  return o;
+}
+
+function periodNames_(ids, periods) {
+  var n = {};
+  periods.forEach(function (p) { n[p.id] = p.name; });
+  return ids.map(function (id) { return n[id] || id; }).join(', ');
+}
+
+function roomLabel_(room) {
+  return room ? room.building + ' ' + floorLabel_(room.floor) + ' ' + room.name : '(삭제된 공간)';
+}
+
+function floorLabel_(f) {
+  var m = /^[Bb](\d+)$/.exec(f);
+  if (m) return '지하 ' + m[1] + '층';
+  return /^\d+$/.test(f) ? f + '층' : f;
+}
+
+/* ---------- 기록 ---------- */
+
+function snapshot_(b) {
+  return JSON.stringify({
+    공간ID: b.roomId, 날짜: b.date, 교시: b.periods.join(','), 목적: b.purpose, 인원: b.people,
+    상태: b.status, 신청자: b.name, 비고: b.memo
+  });
+}
+
+function logRow_(me, action, before, after, ctx) {
+  var b = after || before;
+  var room = ctx.rooms.filter(function (r) { return r.id === b.roomId; })[0];
+  return {
+    '일시': nowStr_(), '이메일': me.email, '이름': me.name, '동작': action,
+    '예약ID': b.id, '공간': roomLabel_(room), '날짜': b.date,
+    '내용': periodNames_(b.periods, ctx.periods) + ' · ' + b.purpose + ' · ' + b.people + '명 · 신청자 ' + b.name + ' · ' + b.status,
+    '변경전': before ? snapshot_(before) : '', '변경후': after ? snapshot_(after) : ''
+  };
+}
+
+/* ---------- 읽기 API ---------- */
+
+function getInit() {
+  var me = me_();
+  var now = nowStr_();
+  var out = {
+    me: me, settings: settings_(), rooms: rooms_(), periods: periods_(),
+    today: today_(), now: now.slice(11, 16)
+  };
+  if (me.admin) out.sheetUrl = sheetUrl_();
+  return out;
+}
+
+/** 하루치 살아 있는 예약 (확정·승인대기) */
+function getDay(date) {
+  if (!isDate_(date)) throw new Error('날짜가 올바르지 않아요.');
+  var me = me_();
+  return bookings_().filter(function (b) { return b.date === date && isActive_(b); })
+    .map(function (b) { return publicBooking_(b, me); });
+}
+
+/** 조건에 맞는 공간을 이유와 함께 추천합니다. */
+function recommend(q) {
+  q = q || {};
+  if (!isDate_(q.date)) throw new Error('날짜를 골라 주세요.');
+  var day = bookings_().filter(function (b) { return b.date === q.date; });
+  return recommend_(rooms_(), day, periods_(), q);
+}
+
+function myBookings() {
+  var me = me_();
+  if (!me.registered) return [];
+  var from = addDays_(today_(), -30);
+  var order = periodOrder_(periods_());
+  return bookings_().filter(function (b) { return b.email === me.email && b.date >= from; })
+    .sort(byDateThenPeriod_(order))
+    .map(function (b) { return publicBooking_(b, me); });
+}
+
+/* ---------- 쓰기 API ---------- */
+
+function requireUser_() {
+  var me = me_();
+  if (!me.email) throw new Error('로그인한 계정을 확인할 수 없어요. 학교 구글 계정으로 로그인했는지 확인해 주세요.');
+  if (!me.registered) throw new Error('등록되지 않은 계정(' + me.email + ')이에요. 관리자에게 등록을 요청해 주세요.');
+  return me;
+}
+
+function requireAdmin_() {
+  var me = requireUser_();
+  if (!me.admin) throw new Error('관리자만 할 수 있어요.');
+  return me;
+}
+
+/** 교시·목적·인원을 확인하고 정리해서 돌려줍니다. */
+function cleanInput_(data, room, periods) {
+  var order = periodOrder_(periods);
+  var seen = {};
+  var list = (data.periods || []).map(String).filter(function (p) {
+    if (!order[p] || seen[p]) return false;
+    seen[p] = true;
+    return true;
+  }).sort(function (a, b) { return order[a] - order[b]; });
+  if (!list.length) throw new Error('사용할 교시를 한 개 이상 골라 주세요.');
+
+  var purpose = String(data.purpose || '').trim().slice(0, 100);
+  if (!purpose) throw new Error('사용 목적을 적어 주세요.');
+
+  var people = parseInt(data.people, 10);
+  if (!(people >= 1)) throw new Error('사용 인원을 숫자로 적어 주세요.');
+  if (room.capacity && people > room.capacity) {
+    throw new Error(room.name + '의 정원은 ' + room.capacity + '명이에요. 인원을 줄이거나 더 큰 공간을 골라 주세요.');
+  }
+  return { periods: list, purpose: purpose, people: people };
+}
+
+function conflictText_(list, want, periods) {
+  var taken = {};
+  list.forEach(function (b) {
+    b.periods.forEach(function (p) { if (want.indexOf(p) >= 0) taken[p] = true; });
+  });
+  return periodNames_(want.filter(function (p) { return taken[p]; }), periods);
+}
+
+/**
+ * 예약 신청.
+ * data = {roomId, date, periods[], purpose, people, repeat: {until, weekdays[]} | null, skipConflicts}
+ * 반복 예약에서 겹치는 날이 있으면 {needConfirm, conflicts, okCount} 를 돌려주고 아무것도 만들지 않습니다.
+ * skipConflicts 를 true 로 다시 부르면 겹치는 날을 빼고 만듭니다.
+ */
+function createBooking(data) {
+  data = data || {};
+  return withLock_(function () {
+    var me = requireUser_();
+    var conf = settings_();
+    var periods = periods_();
+    var rooms = rooms_();
+    var today = today_();
+
+    var room = rooms.filter(function (r) { return r.id === data.roomId; })[0];
+    if (!room) throw new Error('공간을 찾을 수 없어요.');
+    if (!room.bookable) throw new Error(room.name + '은(는) 신청을 받지 않는 공간이에요.');
+    if (!isDate_(data.date)) throw new Error('날짜가 올바르지 않아요.');
+    if (data.date < today) throw new Error('지난 날짜는 신청할 수 없어요.');
+    if (data.date > addDays_(today, conf.maxDays)) {
+      throw new Error('오늘부터 ' + conf.maxDays + '일 뒤까지만 신청할 수 있어요.');
+    }
+    var input = cleanInput_(data, room, periods);
+
+    var dates = [data.date];
+    var groupId = '';
+    if (data.repeat) {
+      var until = data.repeat.until;
+      var days = (data.repeat.weekdays || []).map(Number).filter(function (d) { return d >= 0 && d <= 6; });
+      if (!isDate_(until) || until < data.date) throw new Error('반복 종료일은 시작일과 같거나 그 뒤여야 해요.');
+      if (until > addDays_(today, conf.repeatMaxDays)) {
+        throw new Error('반복 종료일은 오늘부터 ' + conf.repeatMaxDays + '일 뒤까지만 정할 수 있어요.');
+      }
+      if (!days.length) throw new Error('반복할 요일을 한 개 이상 골라 주세요.');
+      dates = expandDates_(data.date, until, days);
+      if (!dates.length) throw new Error('고른 기간 안에 해당 요일이 없어요.');
+      if (dates.length > MAX_REPEAT_COUNT) {
+        throw new Error('한 번에 ' + MAX_REPEAT_COUNT + '회까지만 반복할 수 있어요. (지금 ' + dates.length + '회) 기간을 줄여 주세요.');
+      }
+      if (dates.length > 1) groupId = 'G' + newId_();
+    }
+
+    var all = bookings_();
+    var okDates = [];
+    var conflicts = [];
+    dates.forEach(function (d) {
+      var hit = findConflicts_(all, { roomId: room.id, date: d, periods: input.periods });
+      if (hit.length) conflicts.push({ date: d, periods: conflictText_(hit, input.periods, periods) });
+      else okDates.push(d);
+    });
+
+    if (conflicts.length && !data.repeat) {
+      throw new Error(conflicts[0].periods + '에 이미 예약이 있어요. 다른 교시나 공간을 골라 주세요.');
+    }
+    if (!okDates.length) throw new Error('고른 날짜 모두 이미 예약이 있어요.');
+    if (conflicts.length && !data.skipConflicts) {
+      return { needConfirm: true, conflicts: conflicts, okCount: okDates.length };
+    }
+
+    var status = me.role === '학생' ? '승인대기' : '확정';
+    var now = nowStr_();
+    var ctx = { rooms: rooms, periods: periods };
+    var made = okDates.map(function (d) {
+      return {
+        id: 'R' + newId_(), groupId: groupId, roomId: room.id, date: d, periods: input.periods,
+        email: me.email, name: me.name, role: me.role, dept: me.dept,
+        purpose: input.purpose, people: input.people, status: status,
+        createdAt: now, updatedAt: '', handler: '', memo: ''
+      };
+    });
+    appendRows_('예약', made.map(bookingRow_));
+    appendRows_('기록', made.map(function (b) { return logRow_(me, groupId ? '반복신청' : '신청', null, b, ctx); }));
+    return { created: made.length, status: status, skipped: conflicts };
+  });
+}
+
+function findBooking_(all, id) {
+  var b = all.filter(function (x) { return x.id === id; })[0];
+  if (!b) throw new Error('예약을 찾을 수 없어요. 화면을 새로 고쳐 주세요.');
+  return b;
+}
+
+function requireOwner_(b, me, today) {
+  if (me.admin) return;
+  if (b.email !== me.email) throw new Error('본인이 신청한 예약만 바꿀 수 있어요.');
+  if (b.date < today) throw new Error('지난 예약은 바꿀 수 없어요.');
+}
+
+/** 예약 수정: 교시·목적·인원. 학생이 교시를 바꾸면 다시 승인 대기가 됩니다. */
+function updateBooking(id, data) {
+  data = data || {};
+  return withLock_(function () {
+    var me = requireUser_();
+    var periods = periods_();
+    var rooms = rooms_();
+    var all = bookings_();
+    var b = findBooking_(all, id);
+    requireOwner_(b, me, today_());
+    if (!isActive_(b)) throw new Error('이미 ' + b.status + '된 예약은 고칠 수 없어요.');
+
+    var room = rooms.filter(function (r) { return r.id === b.roomId; })[0];
+    if (!room) throw new Error('공간을 찾을 수 없어요.');
+    var input = cleanInput_(data, room, periods);
+    var hit = findConflicts_(all, { roomId: b.roomId, date: b.date, periods: input.periods }, b.id);
+    if (hit.length) throw new Error(conflictText_(hit, input.periods, periods) + '에 이미 다른 예약이 있어요.');
+
+    var before = JSON.parse(JSON.stringify(b));
+    var moved = input.periods.join(',') !== b.periods.join(',');
+    b.periods = input.periods;
+    b.purpose = input.purpose;
+    b.people = input.people;
+    b.updatedAt = nowStr_();
+    if (moved && b.role === '학생' && !me.admin) {
+      b.status = '승인대기';
+      b.handler = '';
+    }
+    updateRows_('예약', [bookingRow_(b)]);
+    appendRows_('기록', [logRow_(me, '수정', before, b, { rooms: rooms, periods: periods })]);
+    return { status: b.status };
+  });
+}
+
+/** 예약 취소. scope = 'one' (이 날만) | 'following' (반복 예약에서 이 날부터 남은 일정 모두) */
+function cancelBooking(id, scope) {
+  return withLock_(function () {
+    var me = requireUser_();
+    var all = bookings_();
+    var b = findBooking_(all, id);
+    requireOwner_(b, me, today_());
+    if (!isActive_(b)) throw new Error('이미 ' + b.status + '된 예약이에요.');
+
+    var targets = [b];
+    if (scope === 'following' && b.groupId) {
+      targets = all.filter(function (x) {
+        return x.groupId === b.groupId && x.date >= b.date && isActive_(x);
+      });
+    }
+    var ctx = { rooms: rooms_(), periods: periods_() };
+    var now = nowStr_();
+    var logs = targets.map(function (x) {
+      var before = JSON.parse(JSON.stringify(x));
+      x.status = '취소';
+      x.updatedAt = now;
+      x.handler = me.email === x.email ? '' : me.name;
+      return logRow_(me, '취소', before, x, ctx);
+    });
+    updateRows_('예약', targets.map(bookingRow_));
+    appendRows_('기록', logs);
+    return { cancelled: targets.length };
+  });
+}
+
+/* ---------- 관리자 API ---------- */
+
+/** 승인 대기 전체와, 기간 안의 모든 예약 */
+function adminBookings(q) {
+  var me = requireAdmin_();
+  q = q || {};
+  var today = today_();
+  var from = isDate_(q.from) ? q.from : today;
+  var to = isDate_(q.to) ? q.to : addDays_(today, 30);
+  var order = periodOrder_(periods_());
+  var all = bookings_().sort(byDateThenPeriod_(order));
+  var withEmail = function (b) {
+    var p = publicBooking_(b, me);
+    p.email = b.email;
+    p.handler = b.handler;
+    return p;
+  };
+  return {
+    from: from, to: to,
+    pending: all.filter(function (b) { return b.status === '승인대기'; }).map(withEmail),
+    list: all.filter(function (b) { return b.date >= from && b.date <= to; }).map(withEmail)
+  };
+}
+
+/** 승인·반려. scope = 'one' | 'group' (같은 반복 예약의 승인 대기 전체) */
+function decide(id, approve, reason, scope) {
+  return withLock_(function () {
+    var me = requireAdmin_();
+    var all = bookings_();
+    var b = findBooking_(all, id);
+    if (b.status !== '승인대기') throw new Error('승인 대기 중인 예약이 아니에요. (현재: ' + b.status + ')');
+    var targets = [b];
+    if (scope === 'group' && b.groupId) {
+      targets = all.filter(function (x) { return x.groupId === b.groupId && x.status === '승인대기'; });
+    }
+    var ctx = { rooms: rooms_(), periods: periods_() };
+    var now = nowStr_();
+    var memo = String(reason || '').trim().slice(0, 100);
+    var logs = targets.map(function (x) {
+      var before = JSON.parse(JSON.stringify(x));
+      x.status = approve ? '확정' : '반려';
+      x.updatedAt = now;
+      x.handler = me.name;
+      if (memo) x.memo = memo;
+      return logRow_(me, approve ? '승인' : '반려', before, x, ctx);
+    });
+    updateRows_('예약', targets.map(bookingRow_));
+    appendRows_('기록', logs);
+    return { done: targets.length };
+  });
+}
+
+/** 최근 기록 (새것부터). q = 검색어 */
+function getHistory(q) {
+  requireAdmin_();
+  var word = String(q || '').trim().toLowerCase();
+  var rows = readTab_('기록').slice().reverse();
+  if (word) {
+    rows = rows.filter(function (r) {
+      return [r['일시'], r['이메일'], r['이름'], r['동작'], r['공간'], r['날짜'], r['내용']]
+        .join(' ').toLowerCase().indexOf(word) >= 0;
+    });
+  }
+  return rows.slice(0, HISTORY_LIMIT).map(function (r) {
+    return {
+      at: r['일시'], email: r['이메일'], name: r['이름'], action: r['동작'], bookingId: r['예약ID'],
+      room: r['공간'], date: r['날짜'], text: r['내용'], before: r['변경전'], after: r['변경후']
+    };
+  });
+}
+
+;
+/**
+ * Store.gs 대신 쓰는 가짜 저장소 (메모리). 테스트와 미리보기 전용 — 앱스크립트에는 올리지 않습니다.
+ * Setup.gs 의 TABS_, SAMPLE_ 뒤에 불러야 합니다.
+ */
+
+var MOCK = { db: null, user: 'admin@school.example', now: null, seq: 0, onSave: null };
+
+var MOCK_USERS_ = [
+  ['admin@school.example', '김관리', '관리자', '교육과정부'],
+  ['teacher@school.example', '이선생', '교직원', '수학과'],
+  ['student@school.example', '박학생', '학생', '2학년 3반'],
+  ['student2@school.example', '최학생', '학생', '1학년 5반']
+];
+
+function mockReset_() {
+  MOCK.db = {};
+  Object.keys(TABS_).forEach(function (name) {
+    var rows = name === '사용자' ? MOCK_USERS_ : (SAMPLE_[name] || []);
+    MOCK.db[name] = rows.map(function (arr) {
+      var o = {};
+      TABS_[name].forEach(function (h, i) { o[h] = String(arr[i] == null ? '' : arr[i]); });
+      return o;
+    });
+  });
+}
+
+function readTab_(name) {
+  if (!MOCK.db) mockReset_();
+  return MOCK.db[name].map(function (r, i) {
+    var o = { _row: i + 2 };
+    Object.keys(r).forEach(function (k) { o[k] = r[k]; });
+    return o;
+  });
+}
+
+function appendRows_(name, objs) {
+  if (!MOCK.db) mockReset_();
+  objs.forEach(function (o) {
+    var r = {};
+    TABS_[name].forEach(function (h) { r[h] = o[h] == null ? '' : String(o[h]); });
+    MOCK.db[name].push(r);
+  });
+  if (MOCK.onSave) MOCK.onSave();
+}
+
+function updateRows_(name, list) {
+  list.forEach(function (o) {
+    var r = MOCK.db[name][o._row - 2];
+    TABS_[name].forEach(function (h) { if (h in o) r[h] = String(o[h] == null ? '' : o[h]); });
+  });
+  if (MOCK.onSave) MOCK.onSave();
+}
+
+function currentEmail_() { return MOCK.user; }
+function withLock_(fn) { return fn(); }
+
+function mockNow_() { return MOCK.now ? new Date(MOCK.now) : new Date(); }
+function today_() {
+  var d = mockNow_();
+  return d.getFullYear() + '-' + pad2_(d.getMonth() + 1) + '-' + pad2_(d.getDate());
+}
+function nowStr_() {
+  var d = mockNow_();
+  return today_() + ' ' + pad2_(d.getHours()) + ':' + pad2_(d.getMinutes()) + ':' + pad2_(d.getSeconds());
+}
+function newId_() { return ('000000' + (++MOCK.seq)).slice(-6) + Math.random().toString(36).slice(2, 6).toUpperCase(); }
+function sheetUrl_() { return '#'; }
+
+;
+/**
+ * 미리보기 전용: 브라우저 안에서 실제 서버 코드(Code.gs)를 가짜 저장소로 돌리고
+ * google.script.run 을 흉내 냅니다. 데이터는 이 브라우저(localStorage)에만 저장됩니다.
+ */
+(function () {
+  var KEY = 'space-rental-preview-v1';
+  var saved = null;
+  try { saved = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) {}
+  if (saved && saved.db) { MOCK.db = saved.db; MOCK.user = saved.user || MOCK.user; MOCK.seq = saved.seq || 0; }
+  function save() {
+    try { localStorage.setItem(KEY, JSON.stringify({ db: MOCK.db, user: MOCK.user, seq: MOCK.seq })); } catch (e) {}
+  }
+  MOCK.onSave = save;
+
+  if (!saved) {
+    mockReset_();
+    var t = today_();
+    var seed = [
+      ['teacher@school.example', { roomId: 'A102', date: t, periods: ['P3', 'P4'], purpose: '(예시) 진로 특강', people: 90 }],
+      ['teacher@school.example', { roomId: 'A103', date: t, periods: ['PL'], purpose: '(예시) 독서 토론', people: 12 }],
+      ['teacher@school.example', { roomId: 'A202', date: t, periods: ['P6', 'P7'], purpose: '(예시) 교과 협의회', people: 8 }],
+      ['student@school.example', { roomId: 'A203', date: t, periods: ['PA'], purpose: '(예시) 동아리 발표 준비', people: 6 }],
+      ['student2@school.example', { roomId: 'A403', date: addDays_(t, 1), periods: ['PA'], purpose: '(예시) 댄스 동아리 연습', people: 15,
+        repeat: { until: addDays_(t, 21), weekdays: [weekday_(addDays_(t, 1))] } }],
+      ['teacher@school.example', { roomId: 'A401', date: t, periods: ['P1', 'P2', 'P3', 'P4', 'P5'], purpose: '(예시) 합창 연습', people: 30 }]
+    ];
+    var me = MOCK.user;
+    seed.forEach(function (s) { MOCK.user = s[0]; try { createBooking(s[1]); } catch (e) {} });
+    MOCK.user = me;
+    save();
+  }
+
+  var server = { getInit: getInit, getDay: getDay, recommend: recommend, createBooking: createBooking,
+    updateBooking: updateBooking, cancelBooking: cancelBooking, myBookings: myBookings,
+    adminBookings: adminBookings, decide: decide, getHistory: getHistory };
+
+  function runner(ok, bad) {
+    var r = {
+      withSuccessHandler: function (f) { return runner(f, bad); },
+      withFailureHandler: function (f) { return runner(ok, f); }
+    };
+    Object.keys(server).forEach(function (name) {
+      r[name] = function () {
+        var args = JSON.parse(JSON.stringify(Array.prototype.slice.call(arguments)));
+        setTimeout(function () {
+          var out;
+          try { out = server[name].apply(null, args); } catch (e) { if (bad) bad(e); return; }
+          if (ok) ok(out === undefined ? null : JSON.parse(JSON.stringify(out)));
+        }, 120);
+      };
+    });
+    return r;
+  }
+  window.google = { script: { run: runner(null, null) } };
+
+  window.addEventListener('DOMContentLoaded', function () {
+    var bar = document.createElement('div');
+    bar.style.cssText = 'background:#111;color:#fff;font:12px/1.4 sans-serif;padding:6px 12px;display:flex;gap:8px;align-items:center;justify-content:center';
+    var users = MOCK.db['사용자'].map(function (u) { return [u['이메일'], u['이름'] + ' · ' + u['역할']]; });
+    users.push(['nobody@school.example', '미등록 계정']);
+    bar.innerHTML = '<span>미리보기</span><select aria-label="미리보기 계정" style="font:inherit;border-radius:6px;padding:2px">' + users.map(function (u) {
+      return '<option value="' + u[0] + '"' + (u[0] === MOCK.user ? ' selected' : '') + '>' + u[1] + '</option>';
+    }).join('') + '</select><button type="button" style="font:inherit;border-radius:6px;border:0;padding:2px 6px">초기화</button>';
+    bar.querySelector('select').onchange = function () { MOCK.user = this.value; save(); location.reload(); };
+    bar.querySelector('button').onclick = function () { localStorage.removeItem(KEY); location.reload(); };
+    document.body.insertBefore(bar, document.body.firstChild);
+  });
+})();
+
+</script>
+<script>
+'use strict';
+
+/* ---------- 상태 ---------- */
+var S = {
+  init: null, view: 'map', date: '', period: 'all', building: '', floor: '',
+  days: {}, sheet: null,
+  find: { date: '', periods: [], people: '', purpose: '', facilities: [], keyword: '', results: null, busy: false, err: '' },
+  mine: null,
+  admin: { tab: 'pending', data: null, hist: null, q: '', from: '', to: '' },
+  pendingCount: 0
+};
+var WD = ['일', '월', '화', '수', '목', '금', '토'];
+
+/* ---------- 도구 ---------- */
+function $(sel, el) { return (el || document).querySelector(sel); }
+function esc(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+  });
+}
+function call(name) {
+  var args = Array.prototype.slice.call(arguments, 1);
+  return new Promise(function (resolve, reject) {
+    if (!(window.google && google.script && google.script.run)) {
+      reject(new Error('서버에 연결할 수 없어요. 웹앱 주소로 열었는지 확인해 주세요.'));
+      return;
+    }
+    var run = google.script.run
+      .withSuccessHandler(resolve)
+      .withFailureHandler(function (e) {
+        reject(new Error(String((e && e.message) || e).replace(/^(Error|Exception):\s*/, '')));
+      });
+    if (typeof run[name] !== 'function') {
+      reject(new Error("서버에 '" + name + "' 함수가 없어요. Code.gs 를 최신으로 올리고 새 버전으로 배포해 주세요."));
+      return;
+    }
+    run[name].apply(run, args);
+  });
+}
+function toast(msg) {
+  var t = $('#toast');
+  t.textContent = msg;
+  t.classList.add('on');
+  clearTimeout(toast.t);
+  toast.t = setTimeout(function () { t.classList.remove('on'); }, 3200);
+}
+function pad(n) { return (n < 10 ? '0' : '') + n; }
+function toDate(s) { var p = s.split('-'); return new Date(+p[0], +p[1] - 1, +p[2]); }
+function fromDate(d) { return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }
+function addDays(s, n) { var d = toDate(s); d.setDate(d.getDate() + n); return fromDate(d); }
+function wd(s) { return toDate(s).getDay(); }
+function fmt(s) { var d = toDate(s); return (d.getMonth() + 1) + '월 ' + d.getDate() + '일 (' + WD[d.getDay()] + ')'; }
+function fmtShort(s) { var d = toDate(s); return (d.getMonth() + 1) + '/' + d.getDate() + '(' + WD[d.getDay()] + ')'; }
+function floorNum(f) { var m = /^[Bb](\d+)$/.exec(f); return m ? -m[1] : (parseFloat(f) || 0); }
+function floorLabel(f) { var m = /^[Bb](\d+)$/.exec(f); return m ? '지하 ' + m[1] + '층' : (/^\d+$/.test(f) ? f + '층' : f); }
+function room(id) { return S.init.rooms.filter(function (r) { return r.id === id; })[0]; }
+function roomLabel(r) { return r ? r.building + ' ' + floorLabel(r.floor) : ''; }
+function pname(id) { var p = S.init.periods.filter(function (x) { return x.id === id; })[0]; return p ? p.name : id; }
+function pnames(ids) { return ids.map(pname).join(', '); }
+function buildings() {
+  var out = [];
+  S.init.rooms.forEach(function (r) { if (out.indexOf(r.building) < 0) out.push(r.building); });
+  return out;
+}
+function floorsOf(b) {
+  var out = [];
+  S.init.rooms.forEach(function (r) { if (r.building === b && out.indexOf(r.floor) < 0) out.push(r.floor); });
+  return out.sort(function (x, y) { return floorNum(y) - floorNum(x); });
+}
+function roomsOf(b, f) {
+  return S.init.rooms.filter(function (r) { return r.building === b && r.floor === f; })
+    .sort(function (x, y) { return x.order - y.order; });
+}
+function uniq(key) {
+  var out = [];
+  S.init.rooms.forEach(function (r) {
+    if (r.bookable) r[key].forEach(function (v) { if (out.indexOf(v) < 0) out.push(v); });
+  });
+  return out;
+}
+function mediaImg(url) {
+  var m = /drive\.google\.com\/.*(?:\/d\/|[?&]id=)([\w-]{20,})/.exec(url);
+  return m ? 'https://drive.google.com/thumbnail?id=' + m[1] + '&sz=w1200' : url;
+}
+function mediaVideo(url) {
+  var y = /(?:youtu\.be\/|youtube\.com\/(?:watch\?(?:.*&)?v=|embed\/|shorts\/))([\w-]{11})/.exec(url);
+  if (y) return 'https://www.youtube.com/embed/' + y[1];
+  var d = /drive\.google\.com\/.*(?:\/d\/|[?&]id=)([\w-]{20,})/.exec(url);
+  if (d) return 'https://drive.google.com/file/d/' + d[1] + '/preview';
+  return /^https:\/\//.test(url) ? url : '';
+}
+function statusBadge(st) {
+  var cls = st === '확정' ? 'ok' : st === '승인대기' ? 'wait' : st === '반려' ? 'no' : 'dim';
+  return '<span class="badge ' + cls + '">' + esc(st === '승인대기' ? '승인 대기' : st) + '</span>';
+}
+function canBook() { return S.init.me.registered; }
+
+/* ---------- 데이터 ---------- */
+function loadDay(date, force) {
+  if (S.days[date] && !force) return Promise.resolve(S.days[date]);
+  return call('getDay', date).then(function (list) { S.days[date] = list; return list; });
+}
+function bookingAt(roomId, date, pid) {
+  var list = S.days[date] || [];
+  for (var i = 0; i < list.length; i++) {
+    if (list[i].roomId === roomId && list[i].periods.indexOf(pid) >= 0) return list[i];
+  }
+  return null;
+}
+function slotClass(b) { return !b ? 'free' : b.mine ? 'mine' : b.status === '확정' ? 'busy' : 'wait'; }
+function roomState(r) {
+  if (!r.bookable) return { k: 'off', t: '신청 불가' };
+  var ps = S.init.periods;
+  if (S.period !== 'all') {
+    var b = bookingAt(r.id, S.date, S.period);
+    if (!b) return { k: 'free', t: '비어 있음' };
+    if (b.mine) return { k: 'mine', t: b.status === '확정' ? '내 예약' : '내 신청 (승인 대기)' };
+    return b.status === '확정' ? { k: 'busy', t: '사용 중' + (b.name ? ' · ' + b.name : '') } : { k: 'wait', t: '승인 대기' };
+  }
+  var n = ps.filter(function (p) { return bookingAt(r.id, S.date, p.id); }).length;
+  if (!n) return { k: 'free', t: '종일 비어 있음' };
+  if (n === ps.length) return { k: 'busy', t: '종일 예약' };
+  return { k: 'part', t: n + '개 교시 예약' };
+}
+function refreshAfterWrite() {
+  S.days = {};
+  S.mine = null;
+  S.admin.data = null;
+  S.admin.hist = null;
+  S.find.results = null;
+  var jobs = [loadDay(S.date)];
+  if (S.sheet && S.sheet.date && S.sheet.date !== S.date) jobs.push(loadDay(S.sheet.date));
+  if (S.view === 'mine') jobs.push(loadMine());
+  if (S.view === 'admin') jobs.push(loadAdmin());
+  else if (S.init.me.admin) jobs.push(loadAdmin());
+  return Promise.all(jobs);
+}
+function loadMine() { return call('myBookings').then(function (l) { S.mine = l; }); }
+function loadAdmin() {
+  return call('adminBookings', { from: S.admin.from, to: S.admin.to }).then(function (d) {
+    S.admin.data = d;
+    S.admin.from = d.from;
+    S.admin.to = d.to;
+    S.pendingCount = groupUp(d.pending).length;
+  });
+}
+function loadHist() { return call('getHistory', S.admin.q).then(function (h) { S.admin.hist = h; }); }
+function groupUp(list) {
+  var map = {}, out = [];
+  list.forEach(function (b) {
+    var k = b.groupId || b.id;
+    if (!map[k]) { map[k] = { key: k, items: [] }; out.push(map[k]); }
+    map[k].items.push(b);
+  });
+  return out;
+}
+
+/* ---------- 그리기: 뼈대 ---------- */
+var ICON = {
+  map: '<svg viewBox="0 0 24 24"><path d="M4 21V5l8-3 8 3v16M9 21v-5h6v5M8 8h2M14 8h2M8 12h2M14 12h2"/></svg>',
+  find: '<svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>',
+  mine: '<svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="16" rx="2"/><path d="M8 3v4M16 3v4M4 10h16M9 15l2 2 4-4"/></svg>',
+  admin: '<svg viewBox="0 0 24 24"><path d="M12 3 4 6v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V6z"/><path d="m9 12 2 2 4-4"/></svg>'
+};
+function navHtml(cls) {
+  var items = [['map', '공간'], ['find', '추천'], ['mine', '내 예약']];
+  if (S.init.me.admin) items.push(['admin', '관리']);
+  return '<nav class="nav ' + cls + '" aria-label="메뉴">' + items.map(function (it) {
+    var n = it[0] === 'admin' && S.pendingCount ? '<span class="n" aria-label="승인 대기 ' + S.pendingCount + '건">' + S.pendingCount + '</span>' : '';
+    return '<button type="button" data-a="view" data-v="' + it[0] + '" class="' + (S.view === it[0] ? 'on' : '') + '"' +
+      (S.view === it[0] ? ' aria-current="page"' : '') + '>' + ICON[it[0]] + '<span>' + it[1] + '</span>' + n + '</button>';
+  }).join('') + '</nav>';
+}
+function render() {
+  var keep = {};
+  ['periodchips'].forEach(function (id) { var el = document.getElementById(id); if (el) keep[id] = el.scrollLeft; });
+  var me = S.init.me;
+  var who = me.registered ? '<b>' + esc(me.name) + '</b>' + esc(me.role) + (me.dept ? ' · ' + esc(me.dept) : '')
+    : '<b>미등록 계정</b>조회만 가능';
+  var body = S.view === 'map' ? viewMap() : S.view === 'find' ? viewFind() : S.view === 'mine' ? viewMine() : viewAdmin();
+  $('#app').innerHTML =
+    '<header class="top"><div class="top-in"><div class="brand"><small>공간 대여</small><h1>' + esc(S.init.settings.school) + '</h1></div>' +
+    navHtml('inline') + '<div class="who">' + who + '</div></div></header>' +
+    '<main>' + body + '</main>' + navHtml('bottom');
+  Object.keys(keep).forEach(function (id) { var el = document.getElementById(id); if (el) el.scrollLeft = keep[id]; });
+  renderSheet();
+}
+
+/* ---------- 그리기: 공간 (건물·층·배치도) ---------- */
+function viewMap() {
+  var me = S.init.me, st = S.init.settings;
+  var h = '';
+  if (!me.registered) {
+    h += '<div class="notice warn">' + (me.email ? esc(me.email) + ' 계정은 등록되어 있지 않아요. ' : '로그인한 계정을 확인할 수 없어요. 학교 구글 계정으로 로그인해 주세요. ') +
+      '공간 소개와 예약 현황은 볼 수 있지만, 신청하려면 관리자에게 계정 등록을 요청해 주세요.</div>';
+  } else if (st.notice) {
+    h += '<div class="notice">' + esc(st.notice) + '</div>';
+  }
+  h += '<section class="ctl">' + dateBar('date', S.date) +
+    '<div class="chips scroll" id="periodchips" role="group" aria-label="교시 고르기">' +
+    '<button type="button" class="chip ' + (S.period === 'all' ? 'on' : '') + '" data-a="period" data-p="all" aria-pressed="' + (S.period === 'all') + '">하루 전체</button>' +
+    S.init.periods.map(function (p) {
+      return '<button type="button" class="chip ' + (S.period === p.id ? 'on' : '') + '" data-a="period" data-p="' + esc(p.id) + '" aria-pressed="' + (S.period === p.id) + '">' + esc(p.name) + '</button>';
+    }).join('') + '</div></section>';
+
+  var bs = buildings();
+  h += '<div class="mapgrid"><section class="card bldg-card"><p class="eyebrow">건물</p>' +
+    '<div class="btabs">' + bs.map(function (b) {
+      return '<button type="button" class="chip ' + (b === S.building ? 'on' : '') + '" data-a="building" data-b="' + esc(b) + '" aria-pressed="' + (b === S.building) + '">' + esc(b) + '</button>';
+    }).join('') + '</div><div class="bldg">' +
+    floorsOf(S.building).map(function (f) {
+      var rs = roomsOf(S.building, f);
+      var free = 0;
+      var dots = rs.map(function (r) {
+        var k = roomState(r).k;
+        if (k === 'free' || k === 'part') free++;
+        return '<span class="dot ' + (k === 'mine' ? 'busy' : k) + '"></span>';
+      }).join('');
+      return '<button type="button" class="fl ' + (f === S.floor ? 'on' : '') + '" data-a="floor" data-f="' + esc(f) + '" aria-pressed="' + (f === S.floor) + '">' +
+        '<b>' + esc(floorLabel(f)) + '</b><span class="dots" aria-hidden="true">' + dots + '</span><em>쓸 수 있는 곳 ' + free + '</em></button>';
+    }).join('') + '</div></section>';
+
+  var list = roomsOf(S.building, S.floor);
+  h += '<section class="card plan-card"><p class="eyebrow">' + esc(fmt(S.date)) + ' · ' + esc(S.period === 'all' ? '하루 전체' : pname(S.period)) + '</p>' +
+    '<h2 class="title">' + esc(S.building + ' ' + floorLabel(S.floor)) + '</h2>' +
+    '<p class="sub">공간을 누르면 소개를 보고 신청할 수 있어요.</p>' +
+    '<div class="plan"><div class="rooms">' + list.map(roomCell).join('') + '</div><div class="corridor">복 도</div></div>' +
+    '<div class="legend"><span><i class="dot free"></i>비어 있음</span><span><i class="dot busy"></i>사용 중</span>' +
+    '<span><i class="dot wait"></i>승인 대기</span><span><i class="dot part"></i>일부 교시 예약</span><span><i class="dot off"></i>신청 불가</span></div>' +
+    '</section></div>';
+  return h;
+}
+function dateBar(kind, date) {
+  var t = S.init.today;
+  return '<div class="datebar"><button type="button" class="btn" data-a="shift" data-k="' + kind + '" data-d="-1" aria-label="이전 날"' + (date <= t ? ' disabled' : '') + '>‹</button>' +
+    '<input class="in" type="date" data-date="' + kind + '" value="' + date + '" min="' + t + '" aria-label="날짜">' +
+    '<button type="button" class="btn" data-a="shift" data-k="' + kind + '" data-d="1" aria-label="다음 날">›</button>' +
+    (date !== t ? '<button type="button" class="btn" data-a="shift" data-k="' + kind + '" data-d="0">오늘</button>' : '') +
+    '<span class="dlabel">' + esc(fmt(date)) + '</span></div>';
+}
+function roomCell(r) {
+  var s = roomState(r);
+  var strip = r.bookable ? '<span class="strip" aria-hidden="true">' + S.init.periods.map(function (p) {
+    return '<i class="' + slotClass(bookingAt(r.id, S.date, p.id)) + '"></i>';
+  }).join('') + '</span>' : '';
+  return '<button type="button" class="room ' + s.k + '" data-a="room" data-id="' + esc(r.id) + '">' +
+    '<span class="rn">' + esc(r.name) + '</span>' +
+    (r.capacity ? '<span class="rc">정원 ' + r.capacity + '명</span>' : '') + strip +
+    '<span class="st">' + esc(s.t) + '</span></button>';
+}
+
+/* ---------- 그리기: 시트 ---------- */
+function renderSheet() {
+  var root = $('#sheet-root');
+  var old = $('.sheet-body', root);
+  var top = old ? old.scrollTop : 0;
+  if (!S.sheet) { root.innerHTML = ''; document.body.style.overflow = ''; return; }
+  var sh = S.sheet;
+  var inner = sh.type === 'room' ? sheetRoom(sh) : sh.type === 'edit' ? sheetEdit(sh) : sh.type === 'cancel' ? sheetCancel(sh) : sheetReject(sh);
+  root.innerHTML = '<div class="scrim" data-a="close"></div><div class="sheet ' + (sh.type === 'cancel' || sh.type === 'reject' ? 'small' : '') +
+    '" role="dialog" aria-modal="true" aria-labelledby="sheet-title">' + inner + '</div>';
+  document.body.style.overflow = 'hidden';
+  var body = $('.sheet-body', root);
+  if (body && sh.keepScroll) body.scrollTop = top;
+  sh.keepScroll = true;
+}
+function sheetHead(eyebrow, title) {
+  return '<div class="sheet-head"><div class="grow"><p class="eyebrow">' + esc(eyebrow) + '</p><h2 class="title" id="sheet-title">' + esc(title) + '</h2></div>' +
+    '<button type="button" class="x" data-a="close" aria-label="닫기">×</button></div>';
+}
+function periodRows(roomId, date, sel, ownId) {
+  return S.init.periods.map(function (p) {
+    var b = bookingAt(roomId, date, p.id);
+    if (b && b.id === ownId) b = null;
+    var on = sel.indexOf(p.id) >= 0;
+    var k = b ? (b.status === '확정' ? 'busy' : 'wait') : (on ? 'sel' : 'free');
+    var txt = b ? (b.status === '확정' ? '사용 중' : '승인 대기') + (b.mine ? ' · 내 예약' : b.name ? ' · ' + b.name : '') + (b.purpose ? ' · ' + b.purpose : '')
+      : (on ? '선택함' : '비어 있음');
+    return '<button type="button" class="prow ' + k + '" ' + (b ? 'disabled' : 'data-a="pick" data-p="' + esc(p.id) + '" aria-pressed="' + on + '"') + '>' +
+      '<span class="box" aria-hidden="true">' + (on && !b ? '✓' : '') + '</span>' +
+      '<span class="pn">' + esc(p.name) + '<span class="pt">' + esc(p.start) + (p.end ? '~' + esc(p.end) : '') + '</span></span>' +
+      '<span class="ps">' + esc(txt) + '</span></button>';
+  }).join('');
+}
+function repeatDates(sh) {
+  if (!sh.f.repeat || !sh.f.until || sh.f.until < sh.date) return [];
+  var out = [];
+  for (var d = sh.date, i = 0; d <= sh.f.until && i < 400; d = addDays(d, 1), i++) {
+    if (sh.f.days.indexOf(wd(d)) >= 0) out.push(d);
+  }
+  return out;
+}
+function sheetRoom(sh) {
+  var r = room(sh.id);
+  var h = sheetHead(roomLabel(r), r.name) + '<div class="sheet-body">';
+  if (r.photos.length) {
+    h += '<div class="gallery">' + r.photos.map(function (u, i) {
+      return '<img src="' + esc(mediaImg(u)) + '" alt="' + esc(r.name) + ' 사진 ' + (i + 1) + '" loading="lazy" referrerpolicy="no-referrer">';
+    }).join('') + '</div>';
+  } else {
+    h += '<div class="nophoto">사진 준비 중</div>';
+  }
+  if (r.desc) h += '<p>' + esc(r.desc) + '</p>';
+  var v = r.video ? mediaVideo(r.video) : '';
+  if (v) {
+    h += sh.video ? '<div class="video"><iframe src="' + esc(v) + '" title="' + esc(r.name) + ' 소개 영상" allow="autoplay; encrypted-media; fullscreen" allowfullscreen></iframe></div>'
+      : '<button type="button" class="btn wide" data-a="video" style="margin-top:10px">▶ 소개 영상 보기</button>';
+  }
+  h += '<dl class="facts">' +
+    '<dt>수용 인원</dt><dd>' + (r.capacity ? r.capacity + '명' : '정보 없음') + '</dd>' +
+    (r.uses.length ? '<dt>용도</dt><dd>' + r.uses.map(function (x) { return '<span class="tag">' + esc(x) + '</span>'; }).join('') + '</dd>' : '') +
+    (r.facilities.length ? '<dt>시설</dt><dd>' + r.facilities.map(function (x) { return '<span class="tag">' + esc(x) + '</span>'; }).join('') + '</dd>' : '') +
+    '</dl>';
+  if (r.note) h += '<div class="notice warn"><b>특이사항</b> ' + esc(r.note) + '</div>';
+
+  if (!r.bookable) return h + '<div class="notice">이 공간은 신청을 받지 않아요.</div></div>';
+
+  h += '<h3 class="sec">예약 현황</h3>' + dateBar('sheet', sh.date);
+  if (!S.days[sh.date]) return h + '<div class="spin"></div></div>';
+  if (sh.confirm) return h + confirmHtml(sh) + '</div>';
+
+  var book = canBook();
+  h += '<p class="sub" style="margin-bottom:8px">' + (book ? '비어 있는 교시를 눌러 고른 뒤 아래에서 신청하세요.' : '등록된 계정만 신청할 수 있어요.') + '</p>';
+  h += book ? periodRows(r.id, sh.date, sh.sel, null) : periodRows(r.id, sh.date, [], null).replace(/data-a="pick"/g, 'disabled');
+  if (!book) return h + '</div>';
+
+  if (sh.sel.length) {
+    var f = sh.f;
+    h += '<h3 class="sec">신청 내용</h3>' +
+      '<p class="sub">' + esc(fmt(sh.date)) + ' · ' + esc(pnames(sh.sel)) + '</p>' +
+      '<label class="f" for="f-purpose">사용 목적</label><input class="in" id="f-purpose" data-f="purpose" maxlength="100" placeholder="예: 과학 동아리 발표 준비" value="' + esc(f.purpose) + '">' +
+      '<label class="f" for="f-people">사용 인원' + (r.capacity ? ' (정원 ' + r.capacity + '명)' : '') + '</label><input class="in" id="f-people" data-f="people" type="number" inputmode="numeric" min="1" ' + (r.capacity ? 'max="' + r.capacity + '"' : '') + ' value="' + esc(f.people) + '">' +
+      '<label class="switch"><input type="checkbox" data-a="repeat" ' + (f.repeat ? 'checked' : '') + '> 일정 기간 동안 반복해서 신청</label>';
+    if (f.repeat) {
+      var ds = repeatDates(sh);
+      h += '<div class="repeat"><label class="f">반복할 요일</label><div class="chips days" role="group" aria-label="반복할 요일">' +
+        [1, 2, 3, 4, 5, 6, 0].map(function (d) {
+          var on = f.days.indexOf(d) >= 0;
+          return '<button type="button" class="chip ' + (on ? 'on' : '') + '" data-a="wday" data-d="' + d + '" aria-pressed="' + on + '">' + WD[d] + '</button>';
+        }).join('') + '</div>' +
+        '<div class="row"><div class="grow"><label class="f">시작일</label><input class="in" type="date" value="' + sh.date + '" disabled></div>' +
+        '<div class="grow"><label class="f" for="f-until">종료일</label><input class="in" id="f-until" type="date" data-f="until" data-rerender="1" min="' + sh.date + '" value="' + esc(f.until) + '"></div></div>' +
+        '<p class="sub" style="margin-top:10px">' + (ds.length ? '모두 <b>' + ds.length + '회</b> · ' + esc(fmtShort(ds[0])) + ' ~ ' + esc(fmtShort(ds[ds.length - 1])) : '요일과 종료일을 골라 주세요.') + '</p></div>';
+    }
+    if (S.init.me.role === '학생') h += '<p class="sub" style="margin-top:12px">학생 신청은 관리자 승인 뒤에 확정돼요.</p>';
+    if (sh.err) h += '<div class="err" role="alert">' + esc(sh.err) + '</div>';
+    h += '<div class="sticky-go"><button type="button" class="btn primary wide" data-a="submit" ' + (sh.busy ? 'disabled' : '') + '>' +
+      (sh.busy ? '신청하는 중…' : pnames(sh.sel) + ' 신청하기') + '</button></div>';
+  }
+  return h + '</div>';
+}
+function confirmHtml(sh) {
+  var c = sh.confirm;
+  return '<div class="notice warn" style="margin-top:12px"><b>이미 예약이 있는 날이 ' + c.conflicts.length + '일 있어요.</b>' +
+    '<ul class="clist">' + c.conflicts.map(function (x) { return '<li>' + esc(fmt(x.date)) + ' · ' + esc(x.periods) + '</li>'; }).join('') + '</ul>' +
+    '이 날들을 빼고 나머지 ' + c.okCount + '회만 신청할까요?</div>' +
+    (sh.err ? '<div class="err" role="alert">' + esc(sh.err) + '</div>' : '') +
+    '<div class="row"><button type="button" class="btn grow" data-a="unconfirm">돌아가기</button>' +
+    '<button type="button" class="btn primary grow" data-a="submit" data-skip="1" ' + (sh.busy ? 'disabled' : '') + '>' + c.okCount + '회만 신청</button></div>';
+}
+function sheetEdit(sh) {
+  var b = sh.b, r = room(b.roomId);
+  var h = sheetHead('예약 수정 · ' + fmt(b.date), r ? r.name : '') + '<div class="sheet-body">';
+  if (!S.days[b.date]) return h + '<div class="spin"></div></div>';
+  h += '<h3 class="sec" style="margin-top:6px">교시</h3>' + periodRows(b.roomId, b.date, sh.sel, b.id) +
+    '<label class="f" for="f-purpose">사용 목적</label><input class="in" id="f-purpose" data-f="purpose" maxlength="100" value="' + esc(sh.f.purpose) + '">' +
+    '<label class="f" for="f-people">사용 인원' + (r && r.capacity ? ' (정원 ' + r.capacity + '명)' : '') + '</label><input class="in" id="f-people" data-f="people" type="number" inputmode="numeric" min="1" value="' + esc(sh.f.people) + '">';
+  if (b.role === '학생' && !S.init.me.admin) h += '<p class="sub" style="margin-top:12px">교시를 바꾸면 다시 관리자 승인을 받아야 해요.</p>';
+  if (sh.err) h += '<div class="err" role="alert">' + esc(sh.err) + '</div>';
+  h += '<div class="sticky-go"><button type="button" class="btn primary wide" data-a="save" ' + (sh.busy ? 'disabled' : '') + '>' + (sh.busy ? '저장하는 중…' : '수정 저장') + '</button></div>';
+  return h + '</div>';
+}
+function sheetCancel(sh) {
+  var b = sh.b, r = room(b.roomId);
+  var h = sheetHead('예약 취소', (r ? r.name : '') + ' · ' + fmtShort(b.date)) + '<div class="sheet-body">' +
+    '<p>' + esc(pnames(b.periods)) + ' · ' + esc(b.purpose) + (b.name && !b.mine ? ' · 신청자 ' + esc(b.name) : '') + '</p>' +
+    '<p class="sub" style="margin:8px 0 14px">취소한 내용은 기록에 남아요.</p>';
+  if (sh.err) h += '<div class="err" role="alert">' + esc(sh.err) + '</div>';
+  h += '<button type="button" class="btn danger wide" data-a="cancel-go" data-scope="one" ' + (sh.busy ? 'disabled' : '') + '>' + (b.groupId ? '이 날만 취소' : '예약 취소') + '</button>';
+  if (b.groupId) h += '<button type="button" class="btn danger wide" style="margin-top:8px" data-a="cancel-go" data-scope="following" ' + (sh.busy ? 'disabled' : '') + '>이 날부터 남은 반복 일정 모두 취소</button>';
+  return h + '<button type="button" class="btn wide" style="margin-top:8px" data-a="close">그만두기</button></div>';
+}
+function sheetReject(sh) {
+  var g = sh.items, b = g[0], r = room(b.roomId);
+  var h = sheetHead('신청 반려', (r ? r.name : '') + (g.length > 1 ? ' · ' + g.length + '회' : ' · ' + fmtShort(b.date))) + '<div class="sheet-body">' +
+    '<p>' + esc(b.name) + ' · ' + esc(b.purpose) + '</p>' +
+    '<label class="f" for="f-reason">반려 사유 (신청자에게 보여요)</label><input class="in" id="f-reason" data-f="reason" maxlength="100" value="' + esc(sh.f.reason) + '" placeholder="예: 정규 수업과 겹침">';
+  if (sh.err) h += '<div class="err" role="alert">' + esc(sh.err) + '</div>';
+  return h + '<div class="row" style="margin-top:14px"><button type="button" class="btn grow" data-a="close">그만두기</button>' +
+    '<button type="button" class="btn danger grow" data-a="reject-go" ' + (sh.busy ? 'disabled' : '') + '>반려</button></div></div>';
+}
+
+/* ---------- 그리기: 추천 ---------- */
+function viewFind() {
+  var f = S.find;
+  var chipSet = function (key, list) {
+    return '<div class="chips">' + list.map(function (x) {
+      var on = key === 'purpose' ? f.purpose === x : f[key].indexOf(x) >= 0;
+      return '<button type="button" class="chip ' + (on ? 'on' : '') + '" data-a="fchip" data-k="' + key + '" data-v="' + esc(x) + '" aria-pressed="' + on + '">' + esc(key === 'periods' ? pname(x) : x) + '</button>';
+    }).join('') + '</div>';
+  };
+  var h = '<div class="findgrid"><form class="card pad" data-form="find">' +
+    '<p class="eyebrow">공간 추천</p><h2 class="title">어떤 공간이 필요하세요?</h2>' +
+    '<p class="sub">아는 것만 채워도 돼요. 조건에 맞는 공간을 이유와 함께 보여 드려요.</p>' +
+    '<label class="f" for="q-date">날짜</label><input class="in" id="q-date" type="date" data-find="date" min="' + S.init.today + '" value="' + esc(f.date) + '">' +
+    '<label class="f">교시 (여러 개 선택)</label>' + chipSet('periods', S.init.periods.map(function (p) { return p.id; })) +
+    '<label class="f" for="q-people">인원</label><input class="in" id="q-people" type="number" inputmode="numeric" min="1" data-find="people" placeholder="예: 24" value="' + esc(f.people) + '">' +
+    '<label class="f">용도</label>' + chipSet('purpose', uniq('uses').slice(0, 24)) +
+    '<label class="f">꼭 필요한 시설</label>' + chipSet('facilities', uniq('facilities').slice(0, 24)) +
+    '<label class="f" for="q-key">검색어</label><input class="in" id="q-key" data-find="keyword" placeholder="예: 피아노, 촬영, 거울" value="' + esc(f.keyword) + '">' +
+    (f.err ? '<div class="err" role="alert">' + esc(f.err) + '</div>' : '') +
+    '<button class="btn primary wide" style="margin-top:18px" ' + (f.busy ? 'disabled' : '') + '>' + (f.busy ? '찾는 중…' : '추천 받기') + '</button></form><section>';
+
+  if (!f.results) {
+    h += '<div class="card empty">조건을 넣고 <b>추천 받기</b>를 눌러 주세요.</div>';
+  } else {
+    var ok = f.results.filter(function (x) { return x.ok; });
+    var miss = f.results.filter(function (x) { return !x.ok; });
+    h += '<p class="eyebrow" style="margin-bottom:10px">' + esc(fmt(f.date)) + (f.periods.length ? ' · ' + esc(pnames(f.periods)) : '') + ' · 조건에 맞는 공간 ' + ok.length + '곳</p>';
+    if (!ok.length) h += '<div class="card empty">조건에 모두 맞는 공간이 없어요. 교시나 조건을 바꿔 보세요.</div>';
+    h += ok.slice(0, 12).map(function (x, i) { return recCard(x, i + 1); }).join('');
+    if (miss.length) {
+      h += '<details class="more"><summary>조건에 일부 맞지 않는 공간 ' + miss.length + '곳 보기</summary>' +
+        miss.slice(0, 20).map(function (x) { return recCard(x, 0); }).join('') + '</details>';
+    }
+  }
+  return h + '</section></div>';
+}
+function recCard(x, rank) {
+  var r = room(x.roomId);
+  if (!r) return '';
+  return '<article class="card rec ' + (rank ? '' : 'miss') + '"><div class="rank" aria-hidden="true">' + (rank || '–') + '</div><div>' +
+    '<p class="eyebrow">' + esc(roomLabel(r)) + (r.capacity ? ' · 정원 ' + r.capacity + '명' : '') + '</p><h3>' + esc(r.name) + '</h3>' +
+    '<ul class="why">' + x.reasons.map(function (t) { return '<li class="y">' + esc(t) + '</li>'; }).join('') +
+    x.warnings.map(function (t) { return '<li class="n">' + esc(t) + '</li>'; }).join('') +
+    (!x.reasons.length && !x.warnings.length ? '<li class="y">신청할 수 있는 공간</li>' : '') + '</ul>' +
+    '<button type="button" class="btn small ' + (rank ? 'primary' : '') + '" data-a="rec-open" data-id="' + esc(r.id) + '">' + (rank ? '살펴보고 신청' : '살펴보기') + '</button></div></article>';
+}
+
+/* ---------- 그리기: 내 예약 ---------- */
+function bookingActs(b, admin) {
+  var live = b.status === '확정' || b.status === '승인대기';
+  if (!live || (!admin && b.date < S.init.today)) return '';
+  return '<button type="button" class="btn small" data-a="edit" data-id="' + esc(b.id) + '">수정</button>' +
+    '<button type="button" class="btn small danger" data-a="cancel" data-id="' + esc(b.id) + '">취소</button>';
+}
+function groupCard(g, admin) {
+  var b = g.items[0], r = room(b.roomId);
+  var head = '<p class="eyebrow">' + esc(r ? roomLabel(r) : '') + (g.items.length > 1 ? ' · 반복 ' + g.items.length + '회' : '') + '</p>' +
+    '<h3>' + esc(r ? r.name : '(삭제된 공간)') + '</h3>' +
+    '<p class="meta">' + esc(b.purpose) + ' · ' + b.people + '명' + (admin ? ' · ' + esc(b.name) + (b.dept ? ' (' + esc(b.dept) + ')' : '') : '') + '</p>';
+  if (g.items.length === 1) {
+    return '<article class="card item">' + head + '<p class="meta"><b style="color:var(--ink)">' + esc(fmt(b.date)) + '</b> · ' + esc(pnames(b.periods)) + ' ' + statusBadge(b.status) + '</p>' +
+      (b.memo ? '<p class="meta">사유: ' + esc(b.memo) + '</p>' : '') +
+      '<div class="acts">' + bookingActs(b, admin) + '</div></article>';
+  }
+  var rows = g.items.map(function (x) {
+    var live = x.status === '확정' || x.status === '승인대기';
+    return '<div class="drow ' + (live ? '' : 'dim') + '"><span class="grow"><b>' + esc(fmtShort(x.date)) + '</b> ' + esc(pnames(x.periods)) +
+      (x.memo ? ' · ' + esc(x.memo) : '') + '</span>' + statusBadge(x.status) + bookingActs(x, admin) + '</div>';
+  });
+  var SHOW = 5;
+  return '<article class="card item">' + head + '<div style="margin-top:8px">' + rows.slice(0, SHOW).join('') +
+    (rows.length > SHOW ? '<details class="more"><summary>나머지 ' + (rows.length - SHOW) + '회 더 보기</summary>' + rows.slice(SHOW).join('') + '</details>' : '') +
+    '</div></article>';
+}
+function viewMine() {
+  if (!S.init.me.registered) return '<div class="card empty">등록된 계정만 예약할 수 있어요.</div>';
+  if (!S.mine) return '<div class="spin"></div>';
+  var today = S.init.today;
+  var isLive = function (b) { return b.date >= today && (b.status === '확정' || b.status === '승인대기'); };
+  var groups = groupUp(S.mine);
+  var now = groups.filter(function (g) { return g.items.some(isLive); });
+  var past = groups.filter(function (g) { return !g.items.some(isLive); }).reverse();
+  var h = '<p class="eyebrow">내 예약</p><h2 class="title" style="margin-bottom:14px">다가오는 예약 ' + now.length + '건</h2>';
+  h += now.length ? now.map(function (g) { return groupCard(g, false); }).join('')
+    : '<div class="card empty">다가오는 예약이 없어요.<br><button type="button" class="btn primary" style="margin-top:14px" data-a="view" data-v="map">공간 둘러보기</button></div>';
+  if (past.length) {
+    h += '<details class="more"><summary>지난 예약·취소·반려 ' + past.length + '건 (최근 30일)</summary>' + past.map(function (g) { return groupCard(g, false); }).join('') + '</details>';
+  }
+  return h;
+}
+
+/* ---------- 그리기: 관리 ---------- */
+function viewAdmin() {
+  var a = S.admin;
+  var tabs = [['pending', '승인 대기' + (S.pendingCount ? ' ' + S.pendingCount : '')], ['list', '전체 예약'], ['hist', '기록']];
+  var h = '<p class="eyebrow">관리</p><h2 class="title" style="margin-bottom:12px">예약 관리</h2><div class="tabs">' + tabs.map(function (t) {
+    return '<button type="button" class="chip ' + (a.tab === t[0] ? 'on' : '') + '" data-a="atab" data-t="' + t[0] + '" aria-pressed="' + (a.tab === t[0]) + '">' + esc(t[1]) + '</button>';
+  }).join('') + (S.init.sheetUrl ? '<a class="chip" href="' + esc(S.init.sheetUrl) + '" target="_blank" rel="noopener" style="text-decoration:none;color:inherit;display:inline-flex;align-items:center">구글시트 열기 ↗</a>' : '') + '</div>';
+
+  if (a.tab === 'hist') {
+    h += '<form class="row" data-form="hist" style="margin-bottom:12px"><input class="in grow" data-admin="q" placeholder="이름, 공간, 날짜, 동작으로 찾기" value="' + esc(a.q) + '" aria-label="기록 검색"><button class="btn">찾기</button></form>';
+    if (!a.hist) return h + '<div class="spin"></div>';
+    if (!a.hist.length) return h + '<div class="card empty">기록이 없어요.</div>';
+    return h + '<div class="card pad">' + a.hist.map(function (x) {
+      var cls = x.action === '취소' || x.action === '반려' ? 'no' : x.action === '수정' ? 'wait' : 'ok';
+      return '<div class="hrow"><div><span class="badge ' + cls + '">' + esc(x.action) + '</span> <b>' + esc(x.name) + '</b> <span class="when">' + esc(x.at) + ' · ' + esc(x.email) + '</span></div>' +
+        '<div>' + esc(x.room) + ' · ' + esc(x.date) + ' · ' + esc(x.text) + '</div>' +
+        (x.before || x.after ? '<details><summary>변경 전·후 보기</summary>' + (x.before ? '<pre>전: ' + esc(x.before) + '</pre>' : '') + (x.after ? '<pre>후: ' + esc(x.after) + '</pre>' : '') + '</details>' : '') + '</div>';
+    }).join('') + '</div><p class="sub" style="margin-top:10px">최근 기록부터 보여요. 전체 기록은 구글시트의 [기록] 탭에 있어요.</p>';
+  }
+  if (!a.data) return h + '<div class="spin"></div>';
+  if (a.tab === 'pending') {
+    var gs = groupUp(a.data.pending);
+    if (!gs.length) return h + '<div class="card empty">승인을 기다리는 신청이 없어요.</div>';
+    return h + gs.map(function (g) {
+      var b = g.items[0], r = room(b.roomId);
+      return '<article class="card item"><p class="eyebrow">' + esc(r ? roomLabel(r) : '') + ' · 신청 ' + esc(b.createdAt) + '</p>' +
+        '<h3>' + esc(r ? r.name : '(삭제된 공간)') + ' · ' + esc(pnames(b.periods)) + '</h3>' +
+        '<p class="meta"><b style="color:var(--ink)">' + esc(b.name) + '</b>' + (b.dept ? ' (' + esc(b.dept) + ')' : '') + ' · ' + esc(b.email) + '</p>' +
+        '<p class="meta">' + esc(b.purpose) + ' · ' + b.people + '명</p>' +
+        '<p class="meta">' + (g.items.length > 1 ? '반복 ' + g.items.length + '회: ' : '') + g.items.map(function (x) { return esc(fmtShort(x.date)); }).join(', ') + '</p>' +
+        '<div class="acts"><button type="button" class="btn small primary" data-a="approve" data-id="' + esc(b.id) + '">' + (g.items.length > 1 ? g.items.length + '회 모두 승인' : '승인') + '</button>' +
+        '<button type="button" class="btn small danger" data-a="reject" data-id="' + esc(b.id) + '">반려</button></div></article>';
+    }).join('');
+  }
+  h += '<form class="row" data-form="range" style="margin-bottom:12px;flex-wrap:wrap"><input class="in grow" type="date" data-admin="from" value="' + esc(a.from) + '" aria-label="시작일">' +
+    '<span>~</span><input class="in grow" type="date" data-admin="to" value="' + esc(a.to) + '" aria-label="종료일"><button class="btn">보기</button></form>';
+  if (!a.data.list.length) return h + '<div class="card empty">이 기간에는 예약이 없어요.</div>';
+  return h + '<div class="card pad">' + a.data.list.map(function (b) {
+    var r = room(b.roomId);
+    var live = b.status === '확정' || b.status === '승인대기';
+    return '<div class="drow ' + (live ? '' : 'dim') + '" style="' + (b === a.data.list[0] ? 'border-top:0' : '') + '"><span class="grow"><b>' + esc(fmtShort(b.date)) + '</b> ' + esc(pnames(b.periods)) +
+      '<br>' + esc(r ? r.name : '(삭제된 공간)') + ' · ' + esc(b.name) + ' · ' + esc(b.purpose) + ' · ' + b.people + '명' + (b.groupId ? ' · 반복' : '') + '</span>' +
+      statusBadge(b.status) + bookingActs(b, true) + '</div>';
+  }).join('') + '</div>';
+}
+
+/* ---------- 동작 ---------- */
+function findBooking(id) {
+  var pools = [S.mine || [], S.admin.data ? S.admin.data.list : [], S.admin.data ? S.admin.data.pending : []];
+  for (var i = 0; i < pools.length; i++) {
+    for (var j = 0; j < pools[i].length; j++) if (pools[i][j].id === id) return pools[i][j];
+  }
+  return null;
+}
+function fail(e) {
+  if (S.sheet) { S.sheet.busy = false; S.sheet.err = e.message; renderSheet(); }
+  else toast(e.message);
+}
+function setDate(kind, date) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return;
+  if (date < S.init.today) date = S.init.today;
+  if (kind === 'sheet' && S.sheet) {
+    S.sheet.date = date; S.sheet.sel = []; S.sheet.err = ''; S.sheet.confirm = null;
+    if (S.sheet.f.repeat) { S.sheet.f.days = [wd(date)]; if (S.sheet.f.until < date) S.sheet.f.until = addDays(date, 28); }
+    renderSheet();
+    loadDay(date).then(renderSheet, fail);
+  } else {
+    S.date = date;
+    render();
+    loadDay(date).then(render, fail);
+  }
+}
+function openRoom(id, opt) {
+  opt = opt || {};
+  var date = opt.date || S.date;
+  S.sheet = {
+    type: 'room', id: id, date: date, sel: (opt.periods || []).slice(), video: false, err: '', busy: false, confirm: null,
+    f: { purpose: opt.purpose || '', people: opt.people || '', repeat: false, days: [wd(date)], until: addDays(date, 28) }
+  };
+  if (S.period !== 'all' && !opt.periods && !bookingAt(id, date, S.period)) S.sheet.sel = [S.period];
+  renderSheet();
+  loadDay(date).then(function () {
+    if (!S.sheet || S.sheet.id !== id) return;
+    S.sheet.sel = S.sheet.sel.filter(function (p) { return !bookingAt(id, date, p); });
+    renderSheet();
+  }, fail);
+}
+
+var A = {
+  view: function (el) {
+    S.view = el.dataset.v;
+    S.sheet = null;
+    render();
+    window.scrollTo(0, 0);
+    if (S.view === 'mine' && !S.mine && S.init.me.registered) loadMine().then(render, fail);
+    if (S.view === 'admin') {
+      if (!S.admin.data) loadAdmin().then(render, fail);
+      if (S.admin.tab === 'hist' && !S.admin.hist) loadHist().then(render, fail);
+    }
+    if (S.view === 'find' && !S.find.date) { S.find.date = S.date; render(); }
+  },
+  shift: function (el) {
+    var k = el.dataset.k, d = +el.dataset.d;
+    var cur = k === 'sheet' ? S.sheet.date : S.date;
+    setDate(k, d === 0 ? S.init.today : addDays(cur, d));
+  },
+  period: function (el) { S.period = el.dataset.p; render(); },
+  building: function (el) {
+    S.building = el.dataset.b;
+    var fs = floorsOf(S.building);
+    S.floor = fs.indexOf('1') >= 0 ? '1' : fs[fs.length - 1];
+    render();
+  },
+  floor: function (el) {
+    S.floor = el.dataset.f;
+    render();
+    if (window.innerWidth < 900) { var p = $('.plan-card'); if (p) p.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+  },
+  room: function (el) { openRoom(el.dataset.id); },
+  close: function () { S.sheet = null; renderSheet(); },
+  video: function () { S.sheet.video = true; renderSheet(); },
+  pick: function (el) {
+    var sel = S.sheet.sel, p = el.dataset.p, i = sel.indexOf(p);
+    if (i >= 0) sel.splice(i, 1); else sel.push(p);
+    var order = S.init.periods.map(function (x) { return x.id; });
+    sel.sort(function (a, b) { return order.indexOf(a) - order.indexOf(b); });
+    S.sheet.err = '';
+    renderSheet();
+  },
+  repeat: function (el) { S.sheet.f.repeat = el.checked; renderSheet(); },
+  wday: function (el) {
+    var d = +el.dataset.d, days = S.sheet.f.days, i = days.indexOf(d);
+    if (i >= 0) days.splice(i, 1); else days.push(d);
+    renderSheet();
+  },
+  unconfirm: function () { S.sheet.confirm = null; S.sheet.err = ''; renderSheet(); },
+  submit: function (el) {
+    var sh = S.sheet, f = sh.f;
+    if (!String(f.purpose).trim()) { sh.err = '사용 목적을 적어 주세요.'; renderSheet(); return; }
+    if (!(parseInt(f.people, 10) >= 1)) { sh.err = '사용 인원을 숫자로 적어 주세요.'; renderSheet(); return; }
+    sh.busy = true; sh.err = '';
+    renderSheet();
+    call('createBooking', {
+      roomId: sh.id, date: sh.date, periods: sh.sel, purpose: f.purpose, people: f.people,
+      repeat: f.repeat ? { until: f.until, weekdays: f.days } : null,
+      skipConflicts: !!el.dataset.skip
+    }).then(function (r) {
+      sh.busy = false;
+      if (r.needConfirm) { sh.confirm = r; renderSheet(); return; }
+      var n = r.created > 1 ? r.created + '회 ' : '';
+      toast(r.status === '확정' ? n + '예약이 확정됐어요.' : n + '신청했어요. 관리자 승인을 기다려 주세요.');
+      S.date = sh.date;
+      S.sheet = null;
+      return refreshAfterWrite().then(render);
+    }).catch(fail);
+  },
+  edit: function (el) {
+    var b = findBooking(el.dataset.id);
+    if (!b) return;
+    S.sheet = { type: 'edit', b: b, date: b.date, sel: b.periods.slice(), err: '', busy: false, f: { purpose: b.purpose, people: b.people } };
+    renderSheet();
+    loadDay(b.date).then(renderSheet, fail);
+  },
+  save: function () {
+    var sh = S.sheet;
+    sh.busy = true; sh.err = '';
+    renderSheet();
+    call('updateBooking', sh.b.id, { periods: sh.sel, purpose: sh.f.purpose, people: sh.f.people }).then(function (r) {
+      toast(r.status === '승인대기' && sh.b.status === '확정' ? '수정했어요. 교시가 바뀌어 다시 승인을 기다려요.' : '수정했어요.');
+      S.sheet = null;
+      return refreshAfterWrite().then(render);
+    }).catch(fail);
+  },
+  cancel: function (el) {
+    var b = findBooking(el.dataset.id);
+    if (b) { S.sheet = { type: 'cancel', b: b, err: '', busy: false, f: {} }; renderSheet(); }
+  },
+  'cancel-go': function (el) {
+    var sh = S.sheet;
+    sh.busy = true;
+    renderSheet();
+    call('cancelBooking', sh.b.id, el.dataset.scope).then(function (r) {
+      toast(r.cancelled > 1 ? r.cancelled + '건을 취소했어요.' : '예약을 취소했어요.');
+      S.sheet = null;
+      return refreshAfterWrite().then(render);
+    }).catch(fail);
+  },
+  approve: function (el) {
+    el.disabled = true;
+    call('decide', el.dataset.id, true, '', 'group').then(function (r) {
+      toast(r.done > 1 ? r.done + '건을 승인했어요.' : '승인했어요.');
+      return refreshAfterWrite().then(render);
+    }).catch(function (e) { toast(e.message); el.disabled = false; });
+  },
+  reject: function (el) {
+    var b = findBooking(el.dataset.id);
+    if (!b) return;
+    var items = S.admin.data.pending.filter(function (x) { return (x.groupId || x.id) === (b.groupId || b.id); });
+    S.sheet = { type: 'reject', items: items, err: '', busy: false, f: { reason: '' } };
+    renderSheet();
+  },
+  'reject-go': function () {
+    var sh = S.sheet;
+    sh.busy = true;
+    renderSheet();
+    call('decide', sh.items[0].id, false, sh.f.reason, 'group').then(function () {
+      toast('반려했어요.');
+      S.sheet = null;
+      return refreshAfterWrite().then(render);
+    }).catch(fail);
+  },
+  atab: function (el) {
+    S.admin.tab = el.dataset.t;
+    render();
+    if (S.admin.tab === 'hist' && !S.admin.hist) loadHist().then(render, fail);
+    else if (!S.admin.data) loadAdmin().then(render, fail);
+  },
+  fchip: function (el) {
+    var f = S.find, k = el.dataset.k, v = el.dataset.v;
+    if (k === 'purpose') f.purpose = f.purpose === v ? '' : v;
+    else { var i = f[k].indexOf(v); if (i >= 0) f[k].splice(i, 1); else f[k].push(v); }
+    render();
+  },
+  'rec-open': function (el) {
+    var f = S.find;
+    openRoom(el.dataset.id, { date: f.date, periods: f.periods, people: f.people, purpose: f.purpose });
+  }
+};
+
+var FORMS = {
+  find: function () {
+    var f = S.find;
+    if (!f.date) { f.err = '날짜를 골라 주세요.'; render(); return; }
+    f.busy = true; f.err = '';
+    render();
+    call('recommend', { date: f.date, periods: f.periods, people: f.people, purpose: f.purpose, facilities: f.facilities, keyword: f.keyword })
+      .then(function (list) {
+        f.busy = false; f.results = list;
+        render();
+        if (window.innerWidth < 900) { var s = $('.findgrid > section'); if (s) s.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+        else window.scrollTo(0, 0);
+      })
+      .catch(function (e) { f.busy = false; f.err = e.message; render(); });
+  },
+  hist: function () { S.admin.hist = null; render(); loadHist().then(render, fail); },
+  range: function () { S.admin.data = null; render(); loadAdmin().then(render, fail); }
+};
+
+document.addEventListener('click', function (e) {
+  var el = e.target.closest('[data-a]');
+  if (!el || el.disabled || (el.tagName === 'INPUT' && el.type === 'checkbox')) return;
+  var fn = A[el.dataset.a];
+  if (fn) fn(el);
+});
+document.addEventListener('change', function (e) {
+  var el = e.target;
+  if (el.dataset.a === 'repeat') A.repeat(el);
+  if (el.dataset.date) setDate(el.dataset.date, el.value);
+  if (el.dataset.rerender) renderSheet();
+});
+document.addEventListener('input', function (e) {
+  var el = e.target;
+  if (el.dataset.f && S.sheet) S.sheet.f[el.dataset.f] = el.value;
+  if (el.dataset.find) S.find[el.dataset.find] = el.value;
+  if (el.dataset.admin) S.admin[el.dataset.admin] = el.value;
+});
+document.addEventListener('submit', function (e) {
+  e.preventDefault();
+  var fn = FORMS[e.target.dataset.form];
+  if (fn) fn();
+});
+document.addEventListener('keydown', function (e) {
+  if (e.key === 'Escape' && S.sheet) A.close();
+});
+
+/* 다른 사람의 신청이 보이도록 1분마다, 그리고 화면으로 돌아올 때 새로 읽습니다. */
+function quietRefresh() {
+  if (!S.init || document.hidden || S.view !== 'map' || (S.sheet && S.sheet.busy)) return;
+  var before = JSON.stringify(S.days[S.date] || null);
+  call('getDay', S.date).then(function (list) {
+    S.days[S.date] = list;
+    if (JSON.stringify(list) === before) return;
+    var tag = document.activeElement && document.activeElement.tagName;
+    if (tag === 'INPUT' || tag === 'SELECT') return;
+    render();
+  }).catch(function () {});
+}
+setInterval(quietRefresh, 60000);
+document.addEventListener('visibilitychange', quietRefresh);
+
+/* ---------- 시작 ---------- */
+call('getInit').then(function (init) {
+  S.init = init;
+  S.date = init.today;
+  var bs = buildings();
+  S.building = bs[0] || '';
+  var fs = floorsOf(S.building);
+  S.floor = fs.indexOf('1') >= 0 ? '1' : (fs[fs.length - 1] || '');
+  var cur = init.periods.filter(function (p) { return p.start && p.end && p.start <= init.now && init.now < p.end; })[0];
+  S.period = cur ? cur.id : 'all';
+  document.title = init.settings.school + ' 공간 대여';
+  var jobs = [loadDay(S.date)];
+  if (init.me.admin) jobs.push(loadAdmin());
+  return Promise.all(jobs).then(render);
+}).catch(function (e) {
+  $('#app').innerHTML = '<main><div class="err" role="alert" style="margin-top:40px"><b>화면을 불러오지 못했어요.</b><br>' + esc(e.message) + '</div></main>';
+});
+</script>
+</body>
+</html>
