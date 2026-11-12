@@ -366,3 +366,14 @@ test('체육관: 반복 신청은 자리가 없는 날과 함께 쓰는 날을 �
   const r = plain(s.createBooking(gym({ date: '2026-11-13', unit: '새 팀', repeat, skipConflicts: true, ackExisting: true })));
   assert.equal(r.created, 2);
 });
+
+test('대장 가져오기: 이름이 다른 곳은 정해 둔 짝으로 찾는다 (스쿨캠핑 → 작은정원)', () => {
+  const s = server();
+  const rooms = [{ id: 'R1', name: '작은정원' }, { id: 'R2', name: '체육관' }, { id: 'R3', name: '세미나실' }];
+  const m = plain(s.ledgerMatchRooms_(['스쿨캠핑', '체육관', '동진실'], rooms, s.SYNC_ALIASES_));
+  assert.deepEqual(m.map((x) => x.room && x.room.id), ['R1', 'R2', null]);
+  assert.equal(m[0].how, '정해 둔 짝');
+  // [설정] 탭에서 더한 짝, 그리고 정해 둔 공간이 없으면 원래 이름으로 찾기
+  const m2 = plain(s.ledgerMatchRooms_(['동진실', '스쿨캠핑'], [{ id: 'R3', name: '세미나실' }, { id: 'R9', name: '스쿨캠핑' }], { '동진실': '세미나실', '스쿨캠핑': '작은정원' }));
+  assert.deepEqual(m2.map((x) => x.room && x.room.id), ['R3', 'R9']);
+});

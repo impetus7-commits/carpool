@@ -194,11 +194,15 @@ function ledgerNames_(name) {
   return keys.filter(function (k, i) { return k.length >= 2 && keys.indexOf(k) === i; });
 }
 
+// 대장의 시트 이름과 [공간] 탭의 이름이 다른 곳: 대장 시트 이름 → 공간 이름
+// ([설정] 탭에 '대장짝:시트이름' 줄을 넣어 더하거나 바꿀 수 있습니다.)
+var SYNC_ALIASES_ = { '스쿨캠핑': '작은정원' };
+
 /**
  * 대장의 시트 이름마다 [공간] 탭의 줄을 찾습니다.
- * rooms = [{id, name}] → [{title, room | null, how}]
+ * rooms = [{id, name}], aliases = {대장 시트 이름: 공간 이름} → [{title, room | null, how}]
  */
-function ledgerMatchRooms_(titles, rooms) {
+function ledgerMatchRooms_(titles, rooms, aliases) {
   var rs = rooms.map(function (r) { return { id: r.id, name: r.name, keys: ledgerNames_(r.name) }; });
   var out = titles.map(function (t) { return { title: t, keys: ledgerNames_(t), room: null, how: '' }; });
   var used = {};
@@ -206,8 +210,18 @@ function ledgerMatchRooms_(titles, rooms) {
     if (hit.length === 1) { m.room = { id: hit[0].id, name: hit[0].name }; m.how = how; used[hit[0].id] = true; }
     else if (hit.length > 1) m.how = '이름이 비슷한 공간이 ' + hit.length + '개';
   };
+  // 0) 따로 정해 둔 짝 (대장 시트 이름과 공간 이름이 다른 곳). 정해 둔 공간이 없으면 아래 규칙으로 찾습니다.
+  var alias = {};
+  Object.keys(aliases || {}).forEach(function (k) { alias[ledgerKey_(k)] = ledgerKey_(aliases[k]); });
+  out.forEach(function (m) {
+    var want = alias[m.keys[0]];
+    if (!want) return;
+    var hit = rs.filter(function (r) { return !used[r.id] && r.keys.indexOf(want) >= 0; });
+    if (hit.length === 1) take(m, hit, '정해 둔 짝');
+  });
   // 1) 전체 이름이 같은 것
   out.forEach(function (m) {
+    if (m.room) return;
     take(m, rs.filter(function (r) { return !used[r.id] && r.keys[0] === m.keys[0]; }), '이름 일치');
   });
   // 2) 괄호 안팎·'실'을 뗀 이름이 같은 것

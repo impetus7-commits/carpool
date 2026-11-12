@@ -10,6 +10,8 @@
  *
  * - 오늘 이후 날짜만 맞춥니다. 지난 날짜의 예약은 그대로 둡니다.
  * - 대장의 시트 이름과 [공간] 탭의 이름이 같은 곳만 가져옵니다. [공간] 탭은 바꾸지 않습니다.
+ *   이름이 다른 곳은 짝을 정해 둡니다: 대장의 '스쿨캠핑' → 공간 '작은정원' (기본값).
+ *   더 필요하면 [설정] 탭에 줄을 추가합니다 —  항목: 대장짝:대장시트이름   값: 공간 이름
  * - 같은 날짜 줄이 두 번 있으면 아래쪽 줄만 씁니다.
  * - 바뀐 내용은 [기록] 탭에 "대장추가 / 대장변경 / 대장삭제"로 남습니다.
  * - 대장 내용이 웹 예약과 겹치면 관리 화면의 [겹침]에 나옵니다.
@@ -28,6 +30,17 @@ function syncSources_() {
     if (!m) throw new Error("[설정] 탭의 '" + r['항목'] + "' 값이 구글시트 주소가 아니에요.");
     return m[0];
   });
+}
+
+/** 대장 시트 이름 → 공간 이름. 기본값에 [설정] 탭의 '대장짝:시트이름' 줄을 더합니다. */
+function syncAliases_() {
+  var out = {};
+  Object.keys(SYNC_ALIASES_).forEach(function (k) { out[k] = SYNC_ALIASES_[k]; });
+  readTab_('설정').forEach(function (r) {
+    var m = /^대장짝\s*[:：]\s*(.+)$/.exec(String(r['항목']).trim());
+    if (m && String(r['값']).trim()) out[m[1].trim()] = String(r['값']).trim();
+  });
+  return out;
 }
 
 /** 대장 한 시트를 [[날짜, 칸0 … 칸9], …] 로 읽습니다. 병합된 칸은 왼쪽 위 값을 범위 전체에 채웁니다. */
@@ -82,7 +95,7 @@ function syncRun_() {
     ss.getSheets().forEach(function (sh) { tabs.push({ title: sh.getName(), grid: syncReadSheet_(sh, tz) }); });
   });
   var rooms = rooms_();
-  var match = ledgerMatchRooms_(tabs.map(function (t) { return t.title; }), rooms);
+  var match = ledgerMatchRooms_(tabs.map(function (t) { return t.title; }), rooms, syncAliases_());
   var desired = [];
   var unmatched = [];
   tabs.forEach(function (t, i) {
@@ -182,7 +195,7 @@ function checkLedgerSync() {
   syncSources_().forEach(function (id) {
     SpreadsheetApp.openById(id).getSheets().forEach(function (sh) { titles.push(sh.getName()); });
   });
-  var match = ledgerMatchRooms_(titles, rooms_());
+  var match = ledgerMatchRooms_(titles, rooms_(), syncAliases_());
   console.log(match.map(function (m) {
     return m.room ? m.title + '  →  [' + m.room.id + '] ' + m.room.name + '  (' + m.how + ')'
       : m.title + '  →  짝 없음 (' + (m.how || '[공간] 탭에 같은 이름이 없음') + ')';
