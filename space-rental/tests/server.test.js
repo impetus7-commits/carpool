@@ -236,7 +236,8 @@ test('일정 요약: 한 공간의 기간 안 살아 있는 예약만 날짜순�
   assert.deepEqual(list.map((b) => b.date), ['2026-11-13']);
   assert.deepEqual(list[0].periods, ['P5', 'P6']);
   assert.throws(() => s.getRoomRange('A202', '2026-11-30', '2026-11-01'), /기간이 올바르지/);
-  assert.throws(() => s.getRoomRange('A202', '2026-01-01', '2026-12-31'), /100일까지만/);
+  assert.equal(plain(s.getRoomRange('A202', '2026-01-01', '2026-12-31')).length, 2, '연간 요약: 1년 치를 한 번에');
+  assert.throws(() => s.getRoomRange('A202', '2026-01-01', '2027-12-31'), /1년까지만/);
 });
 
 test('대장 가져오기: 시트 이름을 [공간] 탭 이름과 짝짓는다', () => {

@@ -218,8 +218,29 @@ input.in, select.in { width: 100%; border: 1px solid var(--line); background: va
 .qgrid h4 { margin: 0 0 6px; font: 700 15px var(--display); }
 .heatkey { display: flex; align-items: center; gap: 4px; font-size: 12px; color: var(--sub); margin-top: 10px; }
 .heatkey i { width: 16px; height: 16px; border-radius: 4px; display: inline-block; }
+.heatkey i.h1 { background: color-mix(in srgb, var(--busy) 16%, var(--card)); }
+.heatkey i.h2 { background: color-mix(in srgb, var(--busy) 32%, var(--card)); }
+.heatkey i.h3 { background: color-mix(in srgb, var(--busy) 50%, var(--card)); }
+.heatkey i.h4 { background: var(--busy); }
 .bars { list-style: none; padding: 0; margin: 6px 0 0; font-size: 14px; }
-.bars li { display: grid; grid-template-columns: minmax(0, 1fr) 44px; gap: 8px; align-items: center; margin-bottom: 6px; }
+.bars li { margin-bottom: 6px; }
+.barbtn { display: grid; grid-template-columns: minmax(0, 1fr) 44px; gap: 8px; align-items: center; width: 100%; border: 0; background: none; padding: 0; text-align: left; min-height: 36px; }
+.barbtn.on .bar { outline: 2px solid var(--brand); }
+.barbtn.on .bar i { background: var(--brand); opacity: .35; }
+.barbtn:hover .bar { filter: brightness(.97); }
+.dlist { border-left: 3px solid var(--brand); margin: 6px 0 12px 4px; padding-left: 10px; }
+.dlist .drow { width: 100%; border: 0; border-top: 1px solid var(--line); background: none; text-align: left; }
+.dlist .drow:first-of-type { border-top: 0; }
+.yheat { display: grid; gap: 2px; }
+.yrow { display: grid; grid-template-columns: 30px repeat(31, 1fr); gap: 1px; align-items: center; }
+.yrow b { font-size: 12px; font-weight: 600; color: var(--sub); }
+.yrow button, .yrow i { aspect-ratio: 1; border: 0; padding: 0; border-radius: 2px; background: var(--soft); min-width: 0; }
+.yrow i { background: none; }
+.yrow button.h1 { background: color-mix(in srgb, var(--busy) 16%, var(--card)); }
+.yrow button.h2 { background: color-mix(in srgb, var(--busy) 32%, var(--card)); }
+.yrow button.h3 { background: color-mix(in srgb, var(--busy) 50%, var(--card)); }
+.yrow button.h4 { background: var(--busy); }
+.yrow button.today { outline: 2px solid var(--brand); }
 .bars .bar { background: var(--soft); border-radius: 6px; overflow: hidden; position: relative; min-height: 28px; display: flex; align-items: center; }
 .bars .bar i { position: absolute; left: 0; top: 0; bottom: 0; background: var(--brand-soft); }
 .bars .bar span { position: relative; padding: 2px 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -946,10 +967,10 @@ function getDay(date) {
     .map(function (b) { return publicBooking_(b, me); });
 }
 
-/** 한 공간의 기간(최대 100일) 안 살아 있는 예약 — 주간·월간·분기 일정 요약용 */
+/** 한 공간의 기간(최대 1년) 안 살아 있는 예약 — 주간·월간·분기·연간 일정 요약용 */
 function getRoomRange(roomId, from, to) {
   if (!isDate_(from) || !isDate_(to) || to < from) throw new Error('기간이 올바르지 않아요.');
-  if (toUtc_(to) - toUtc_(from) > 100 * 86400000) throw new Error('한 번에 100일까지만 볼 수 있어요.');
+  if (toUtc_(to) - toUtc_(from) > 370 * 86400000) throw new Error('한 번에 1년까지만 볼 수 있어요.');
   var me = me_();
   var order = periodOrder_(periods_());
   return bookings_().filter(function (b) {
@@ -1844,7 +1865,7 @@ function sheetRoom(sh) {
 
   if (!r.bookable) return h + '<div class="notice">이 공간은 신청을 받지 않아요.</div></div>';
 
-  h += '<button type="button" class="btn wide" data-a="sched">주간 · 월간 · 분기 일정 요약 보기</button>' +
+  h += '<button type="button" class="btn wide" data-a="sched">주간 · 월간 · 분기 · 연도 일정 요약 보기</button>' +
     '<h3 class="sec">예약 현황</h3>' + dateBar('sheet', sh.date);
   if (!S.days[sh.date]) return h + '<div class="spin"></div></div>';
   if (sh.confirm) return h + confirmHtml(sh) + '</div>';
@@ -1913,6 +1934,7 @@ function schedRange(mode, anchor) {
   }
   var y = d.getFullYear(), m = d.getMonth();
   if (mode === 'month') return { from: fromDate(new Date(y, m, 1)), to: fromDate(new Date(y, m + 1, 0)), label: y + '년 ' + (m + 1) + '월' };
+  if (mode === 'year') return { from: y + '-01-01', to: y + '-12-31', label: y + '년' };
   var q = Math.floor(m / 3);
   return { from: fromDate(new Date(y, q * 3, 1)), to: fromDate(new Date(y, q * 3 + 3, 0)), label: y + '년 ' + (q + 1) + '분기 (' + (q * 3 + 1) + '~' + (q * 3 + 3) + '월)' };
 }
@@ -1951,7 +1973,7 @@ function sheetSched(sh) {
   var r = room(sh.id), range = schedRange(sh.mode, sh.anchor), list = sh.cache[range.from + '~' + range.to];
   var h = sheetHead(roomLabel(r) + ' · 일정 요약', r.name) + '<div class="sheet-body">' +
     '<button type="button" class="btn small" data-a="sched-back">‹ 공간 정보·신청으로</button>' +
-    '<div class="chips" style="margin-top:12px" role="group" aria-label="요약 단위">' + [['week', '주간'], ['month', '월간'], ['quarter', '분기']].map(function (m) {
+    '<div class="chips" style="margin-top:12px" role="group" aria-label="요약 단위">' + [['week', '주간'], ['month', '월간'], ['quarter', '분기'], ['year', '연도']].map(function (m) {
       return '<button type="button" class="chip ' + (sh.mode === m[0] ? 'on' : '') + '" data-a="sched-mode" data-m="' + m[0] + '" aria-pressed="' + (sh.mode === m[0]) + '">' + m[1] + '</button>';
     }).join('') + '</div>' +
     '<div class="rangebar"><button type="button" class="btn" data-a="sched-shift" data-d="-1" aria-label="이전">‹</button><span class="lab">' + esc(range.label) + '</span>' +
@@ -1991,6 +2013,27 @@ function sheetSched(sh) {
   } else if (sh.mode === 'month') {
     var a = toDate(range.from);
     h += calHtml(a.getFullYear(), a.getMonth(), idx, false);
+  } else if (sh.mode === 'year') {
+    var yy = toDate(range.from).getFullYear(), total = ps.length || 1, byMonth = [];
+    h += '<div class="yheat" role="group" aria-label="' + yy + '년 날짜별 사용 정도">';
+    for (var mo = 0; mo < 12; mo++) {
+      var dim = new Date(yy, mo + 1, 0).getDate(), sum = 0, cells = '';
+      for (var dd = 1; dd <= 31; dd++) {
+        if (dd > dim) { cells += '<i></i>'; continue; }
+        var ds = fromDate(new Date(yy, mo, dd)), cnt = idx[ds] ? Object.keys(idx[ds]).length : 0;
+        sum += cnt;
+        cells += '<button type="button" class="h' + (!cnt ? 0 : Math.min(4, Math.ceil(cnt / total * 4))) + (ds === S.init.today ? ' today' : '') +
+          '" data-a="sched-day" data-d="' + ds + '" title="' + fmt(ds) + (cnt ? ' · ' + cnt + '교시' : '') + '" aria-label="' + fmt(ds) + ', 예약된 교시 ' + cnt + '개"></button>';
+      }
+      byMonth.push(sum);
+      h += '<div class="yrow"><b>' + (mo + 1) + '월</b>' + cells + '</div>';
+    }
+    h += '</div>';
+    var mmax = Math.max.apply(null, byMonth) || 1;
+    sh.monthBars = '<h3 class="sec">월별 사용 교시</h3><ul class="bars">' + byMonth.map(function (v, mo) {
+      return '<li><button type="button" class="barbtn" data-a="sched-month" data-d="' + fromDate(new Date(yy, mo, 1)) + '" aria-label="' + (mo + 1) + '월 달력 보기">' +
+        '<span class="bar"><i style="width:' + Math.round(v / mmax * 100) + '%"></i><span>' + (mo + 1) + '월</span></span><em>' + v + '</em></button></li>';
+    }).join('') + '</ul><p class="sub">월을 누르면 그 달의 달력으로 가요.</p>';
   } else {
     var q = toDate(range.from);
     h += '<div class="qgrid">' + [0, 1, 2].map(function (k) {
@@ -1998,18 +2041,37 @@ function sheetSched(sh) {
       return '<div><h4>' + (m.getMonth() + 1) + '월</h4>' + calHtml(m.getFullYear(), m.getMonth(), idx, true) + '</div>';
     }).join('') + '</div>';
   }
+  var detail = function (k, v, title, pick) {
+    if (!sh.detail || sh.detail.k !== k || sh.detail.v !== String(v)) return '';
+    var hits = list.filter(pick), MAX = 80;
+    return '<div class="dlist" role="region" aria-label="' + esc(title) + ' 내역"><p class="eyebrow">' + esc(title) + ' · ' + hits.length + '건</p>' +
+      hits.slice(0, MAX).map(function (b) {
+        var who = whoText(b) || b.name;
+        return '<button type="button" class="drow" data-a="sched-day" data-d="' + b.date + '"><span class="grow"><b>' + esc(fmtShort(b.date)) + '</b> ' + esc(pnames(b.periods)) +
+          '<br>' + esc([who, b.purpose].filter(Boolean).join(' · ') || (b.status === '확정' ? '사용 중' : '승인 대기')) + '</span>' + statusBadge(b.status) + '</button>';
+      }).join('') + (hits.length > MAX ? '<p class="sub">이 밖에 ' + (hits.length - MAX) + '건이 더 있어요. 기간을 좁혀 보세요.</p>' : '') + '</div>';
+  };
+  var barBtn = function (k, v, label, n, max) {
+    var on = sh.detail && sh.detail.k === k && sh.detail.v === String(v);
+    return '<button type="button" class="barbtn ' + (on ? 'on' : '') + '" data-a="sched-detail" data-k="' + k + '" data-v="' + esc(v) + '" aria-expanded="' + !!on + '">' +
+      '<span class="bar"><i style="width:' + Math.round(n / max * 100) + '%"></i><span>' + esc(label) + '</span></span><em>' + n + '</em></button>';
+  };
   if (sh.mode !== 'week') {
     h += '<div class="heatkey">적음 <i style="background:var(--soft)"></i><i class="h1"></i><i class="h2"></i><i class="h3"></i><i class="h4"></i> 많음 · 날짜를 누르면 그날로 가요</div>';
+    if (sh.mode === 'year') h += sh.monthBars;
     var max = Math.max.apply(null, byWd) || 1;
-    h += '<h3 class="sec">요일별 사용 교시</h3><ul class="bars">' + [1, 2, 3, 4, 5, 6, 0].filter(function (w) { return w >= 1 && w <= 5 || byWd[w]; }).map(function (w) {
-      return '<li><div class="bar"><i style="width:' + Math.round(byWd[w] / max * 100) + '%"></i><span>' + WD[w] + '요일</span></div><em>' + byWd[w] + '</em></li>';
+    h += '<h3 class="sec">요일별 사용 교시</h3><p class="sub">요일을 누르면 그 요일의 내역이 펼쳐져요.</p><ul class="bars">' + [1, 2, 3, 4, 5, 6, 0].filter(function (w) { return w >= 1 && w <= 5 || byWd[w]; }).map(function (w) {
+      return '<li>' + barBtn('wd', w, WD[w] + '요일', byWd[w], max) +
+        detail('wd', w, WD[w] + '요일', function (b) { return wd(b.date) === w; }) + '</li>';
     }).join('') + '</ul>';
   }
-  var top = Object.keys(purpose).sort(function (x, y) { return purpose[y] - purpose[x]; }).slice(0, 6);
+  var keyOf = function (b) { return b.purpose || (b.mine ? '내 예약' : '예약'); };
+  var top = Object.keys(purpose).sort(function (x, y) { return purpose[y] - purpose[x]; }).slice(0, sh.mode === 'year' ? 10 : 6);
   if (top.length) {
     var pm = purpose[top[0]];
-    h += '<h3 class="sec">많이 쓴 내용 (교시 수)</h3><ul class="bars">' + top.map(function (k) {
-      return '<li><div class="bar"><i style="width:' + Math.round(purpose[k] / pm * 100) + '%"></i><span>' + esc(k) + '</span></div><em>' + purpose[k] + '</em></li>';
+    h += '<h3 class="sec">많이 쓴 내용 (교시 수)</h3><p class="sub">내용을 누르면 해당 내역이 펼쳐져요.</p><ul class="bars">' + top.map(function (k) {
+      return '<li>' + barBtn('purpose', k, k, purpose[k], pm) +
+        detail('purpose', k, k, function (b) { return keyOf(b) === k; }) + '</li>';
     }).join('') + '</ul>';
   } else {
     h += '<p class="empty">이 기간에는 예약이 없어요.</p>';
@@ -2289,15 +2351,23 @@ var A = {
   close: function () { S.sheet = null; renderSheet(); },
   video: function () { S.sheet.video = true; renderSheet(); },
   sched: function () {
-    S.sheet = { type: 'sched', id: S.sheet.id, mode: 'week', anchor: S.sheet.date, cache: {} };
+    S.sheet = { type: 'sched', id: S.sheet.id, mode: 'week', anchor: S.sheet.date, cache: {}, detail: null };
     renderSheet();
     schedLoad();
   },
-  'sched-mode': function (el) { S.sheet.mode = el.dataset.m; S.sheet.keepScroll = false; renderSheet(); schedLoad(); },
+  'sched-mode': function (el) { S.sheet.mode = el.dataset.m; S.sheet.detail = null; S.sheet.keepScroll = false; renderSheet(); schedLoad(); },
+  'sched-detail': function (el) {
+    var sh = S.sheet, same = sh.detail && sh.detail.k === el.dataset.k && sh.detail.v === el.dataset.v;
+    sh.detail = same ? null : { k: el.dataset.k, v: el.dataset.v };
+    renderSheet();
+  },
+  'sched-month': function (el) { var sh = S.sheet; sh.mode = 'month'; sh.anchor = el.dataset.d; sh.detail = null; sh.keepScroll = false; renderSheet(); schedLoad(); },
   'sched-shift': function (el) {
     var sh = S.sheet, n = +el.dataset.d, d = toDate(sh.anchor);
+    sh.detail = null;
     if (!n) sh.anchor = S.init.today;
     else if (sh.mode === 'week') sh.anchor = addDays(sh.anchor, 7 * n);
+    else if (sh.mode === 'year') sh.anchor = fromDate(new Date(d.getFullYear() + n, 0, 1));
     else sh.anchor = fromDate(new Date(d.getFullYear(), d.getMonth() + (sh.mode === 'month' ? n : 3 * n), 1));
     renderSheet();
     schedLoad();

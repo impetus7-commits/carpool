@@ -190,10 +190,10 @@ function getDay(date) {
     .map(function (b) { return publicBooking_(b, me); });
 }
 
-/** 한 공간의 기간(최대 100일) 안 살아 있는 예약 — 주간·월간·분기 일정 요약용 */
+/** 한 공간의 기간(최대 1년) 안 살아 있는 예약 — 주간·월간·분기·연간 일정 요약용 */
 function getRoomRange(roomId, from, to) {
   if (!isDate_(from) || !isDate_(to) || to < from) throw new Error('기간이 올바르지 않아요.');
-  if (toUtc_(to) - toUtc_(from) > 100 * 86400000) throw new Error('한 번에 100일까지만 볼 수 있어요.');
+  if (toUtc_(to) - toUtc_(from) > 370 * 86400000) throw new Error('한 번에 1년까지만 볼 수 있어요.');
   var me = me_();
   var order = periodOrder_(periods_());
   return bookings_().filter(function (b) {
