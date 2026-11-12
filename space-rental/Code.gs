@@ -63,7 +63,8 @@ function rooms_() {
       desc: r['소개'] || '',
       photos: splitList_(r['사진']),
       video: r['영상'] || '',
-      bookable: !/^(n|no|x|아니오|불가)$/i.test(String(r['신청가능'] || 'Y').trim())
+      bookable: !/^(n|no|x|아니오|불가)$/i.test(String(r['신청가능'] || 'Y').trim()),
+      multi: Math.max(1, parseInt(r['동시예약수'], 10) || 1)   // 일과 중 체육수업으로 함께 쓸 수 있는 팀 수
     };
   });
 }
@@ -87,7 +88,8 @@ function bookings_() {
       periods: splitList_(r['교시']),
       email: String(r['이메일'] || '').toLowerCase(), name: r['이름'] || '', role: r['역할'] || '', dept: r['소속'] || '',
       purpose: r['목적'] || '', people: parseInt(r['인원'], 10) || 0, status: r['상태'] || '',
-      createdAt: r['신청일시'] || '', updatedAt: r['수정일시'] || '', handler: r['처리자'] || '', memo: r['비고'] || ''
+      createdAt: r['신청일시'] || '', updatedAt: r['수정일시'] || '', handler: r['처리자'] || '', memo: r['비고'] || '',
+      school: r['사용학교'] || '', unit: r['사용부서'] || '', shared: r['공동사용'] === 'Y'
     };
   });
 }
@@ -97,7 +99,8 @@ function bookingRow_(b) {
     'ID': b.id, '묶음ID': b.groupId, '공간ID': b.roomId, '날짜': b.date, '교시': b.periods.join(','),
     '이메일': b.email, '이름': b.name, '역할': b.role, '소속': b.dept,
     '목적': b.purpose, '인원': b.people, '상태': b.status,
-    '신청일시': b.createdAt, '수정일시': b.updatedAt, '처리자': b.handler, '비고': b.memo
+    '신청일시': b.createdAt, '수정일시': b.updatedAt, '처리자': b.handler, '비고': b.memo,
+    '사용학교': b.school || '', '사용부서': b.unit || '', '공동사용': b.shared ? 'Y' : ''
   };
   if (b._row) row._row = b._row;
   return row;
@@ -111,6 +114,7 @@ function publicBooking_(b, me) {
     name: open ? b.name : '', dept: open ? b.dept : '', role: open ? b.role : '',
     purpose: open ? b.purpose : '', people: open ? b.people : 0,
     memo: open ? b.memo : '', createdAt: open ? b.createdAt : '', ledger: isLedger_(b),
+    school: open ? b.school : '', unit: open ? b.unit : '', shared: !!b.shared,
     mine: !!me.email && b.email === me.email
   };
 }
@@ -148,8 +152,8 @@ function floorLabel_(f) {
 
 function snapshot_(b) {
   return JSON.stringify({
-    공간ID: b.roomId, 날짜: b.date, 교시: b.periods.join(','), 목적: b.purpose, 인원: b.people,
-    상태: b.status, 신청자: b.name, 비고: b.memo
+    공간ID: b.roomId, 날짜: b.date, 교시: b.periods.join(','), 사용학교: b.school || '', 사용부서: b.unit || '',
+    목적: b.purpose, 인원: b.people, 함께사용: b.shared ? 'Y' : '', 상태: b.status, 신청자: b.name, 비고: b.memo
   });
 }
 
@@ -159,7 +163,7 @@ function logRow_(me, action, before, after, ctx) {
   return {
     '일시': nowStr_(), '이메일': me.email, '이름': me.name, '동작': action,
     '예약ID': b.id, '공간': roomLabel_(room), '날짜': b.date,
-    '내용': periodNames_(b.periods, ctx.periods) + ' · ' + b.purpose + (b.people ? ' · ' + b.people + '명' : '') + ' · 신청자 ' + b.name + ' · ' + b.status,
+    '내용': periodNames_(b.periods, ctx.periods) + ' · ' + (b.school ? '[' + b.school + '] ' : '') + (b.unit ? b.unit + ' · ' : '') + b.purpose + (b.shared ? ' (함께 사용)' : '') + (b.people ? ' · ' + b.people + '명' : '') + ' · 신청자 ' + b.name + ' · ' + b.status,
     '변경전': before ? snapshot_(before) : '', '변경후': after ? snapshot_(after) : ''
   };
 }
@@ -244,7 +248,35 @@ function requireAdmin_() {
   return me;
 }
 
-/** 교시·목적·인원을 확인하고 정리해서 돌려줍니다. */
+var SCHOOLS_ = ['중', '고', '법인'];
+
+/** 교시 ID → 일과 중 교시인지 */
+function regularMap_(periods) {
+  var m = {};
+  periods.forEach(function (p) { m[p.id] = isRegularPeriod_(p.name); });
+  return m;
+}
+
+/**
+ * 한 칸(공간·날짜·교시)에 함께 들어갈 수 있는 예약 수.
+ * [공간] 탭의 '동시예약수'가 2 이상인 공간(체육관·동진실)은 일과 중 교시에 체육수업으로 함께 쓰는 예약이 그 수까지 들어갑니다.
+ */
+function slotCap_(room, shared, regular, pid) {
+  return room && room.multi > 1 && shared && regular[pid] ? room.multi : 1;
+}
+
+/** 같은 공간·날짜에서 want 교시 중 이미 꽉 찬 교시와, 겹치는 기존 예약들 */
+function slotCheck_(all, room, date, want, shared, regular, excludeId) {
+  var same = all.filter(function (b) { return isActive_(b) && b.id !== excludeId && b.roomId === room.id && b.date === date; });
+  return {
+    full: want.filter(function (p) {
+      return same.filter(function (b) { return b.periods.indexOf(p) >= 0; }).length >= slotCap_(room, shared, regular, p);
+    }),
+    over: same.filter(function (b) { return b.periods.some(function (p) { return want.indexOf(p) >= 0; }); })
+  };
+}
+
+/** 교시·사용학교·부서·목적·인원을 확인하고 정리해서 돌려줍니다. */
 function cleanInput_(data, room, periods) {
   var order = periodOrder_(periods);
   var seen = {};
@@ -255,6 +287,12 @@ function cleanInput_(data, room, periods) {
   }).sort(function (a, b) { return order[a] - order[b]; });
   if (!list.length) throw new Error('사용할 교시를 한 개 이상 골라 주세요.');
 
+  var asked = Array.isArray(data.school) ? data.school : splitList_(data.school);
+  var school = SCHOOLS_.filter(function (x) { return asked.indexOf(x) >= 0; });
+  if (!school.length) throw new Error('사용 학교(중·고·법인)를 한 개 이상 골라 주세요.');
+  var unit = String(data.unit || '').trim().slice(0, 40);
+  if (!unit) throw new Error('사용 부서를 적어 주세요. 개인이면 선생님 성함을 적어 주세요.');
+
   var purpose = String(data.purpose || '').trim().slice(0, 100);
   if (!purpose) throw new Error('사용 목적을 적어 주세요.');
 
@@ -263,22 +301,15 @@ function cleanInput_(data, room, periods) {
   if (room.capacity && people > room.capacity) {
     throw new Error(room.name + '의 정원은 ' + room.capacity + '명이에요. 인원을 줄이거나 더 큰 공간을 골라 주세요.');
   }
-  return { periods: list, purpose: purpose, people: people };
-}
-
-function conflictText_(list, want, periods) {
-  var taken = {};
-  list.forEach(function (b) {
-    b.periods.forEach(function (p) { if (want.indexOf(p) >= 0) taken[p] = true; });
-  });
-  return periodNames_(want.filter(function (p) { return taken[p]; }), periods);
+  return { periods: list, purpose: purpose, people: people, school: school.join(','), unit: unit };
 }
 
 /**
  * 예약 신청.
- * data = {roomId, date, periods[], purpose, people, repeat: {until, weekdays[]} | null, skipConflicts}
- * 반복 예약에서 겹치는 날이 있으면 {needConfirm, conflicts, okCount} 를 돌려주고 아무것도 만들지 않습니다.
- * skipConflicts 를 true 로 다시 부르면 겹치는 날을 빼고 만듭니다.
+ * data = {roomId, date, periods[], school[], unit, purpose, people, shared, repeat: {until, weekdays[]} | null, skipConflicts, ackExisting}
+ * 반복 예약에서 자리가 없는 날(conflicts)이 있거나, 함께 사용으로 이미 다른 예약이 있는 시간(existing)에 신청하면
+ * {needConfirm, conflicts, existing, okCount} 를 돌려주고 아무것도 만들지 않습니다.
+ * skipConflicts·ackExisting 을 true 로 다시 부르면 자리가 없는 날을 빼고 만듭니다.
  */
 function createBooking(data) {
   data = data || {};
@@ -298,6 +329,12 @@ function createBooking(data) {
       throw new Error('오늘부터 ' + conf.maxDays + '일 뒤까지만 신청할 수 있어요.');
     }
     var input = cleanInput_(data, room, periods);
+    var shared = !!data.shared && room.multi > 1;
+    var regular = regularMap_(periods);
+    var heads = tabHeaders_('예약');
+    if (heads.indexOf('사용학교') < 0 || heads.indexOf('사용부서') < 0 || heads.indexOf('공동사용') < 0) {
+      throw new Error("[예약] 탭에 '사용학교'·'사용부서'·'공동사용' 열이 없어요. 관리자가 앱스크립트 편집기에서 setup 을 한 번 더 실행해야 해요.");
+    }
 
     var dates = [data.date];
     var groupId = '';
@@ -319,19 +356,36 @@ function createBooking(data) {
 
     var all = bookings_();
     var okDates = [];
-    var conflicts = [];
+    var conflicts = [];   // 자리가 없어 신청할 수 없는 날
+    var existing = [];    // 신청은 되지만 같은 시간에 이미 다른 예약이 있는 날 (함께 사용)
+    var canShare = false;
     dates.forEach(function (d) {
-      var hit = findConflicts_(all, { roomId: room.id, date: d, periods: input.periods });
-      if (hit.length) conflicts.push({ date: d, periods: conflictText_(hit, input.periods, periods) });
-      else okDates.push(d);
+      var c = slotCheck_(all, room, d, input.periods, shared, regular);
+      if (c.full.length) {
+        conflicts.push({ date: d, periods: periodNames_(c.full, periods) });
+        if (!shared && room.multi > 1 && c.full.every(function (p) { return regular[p]; }) &&
+            !slotCheck_(all, room, d, input.periods, true, regular).full.length) canShare = true;
+        return;
+      }
+      okDates.push(d);
+      if (c.over.length) {
+        existing.push({
+          date: d,
+          list: c.over.map(function (b) {
+            return { periods: periodNames_(b.periods, periods), who: b.unit || b.name, school: b.school, purpose: b.purpose };
+          })
+        });
+      }
     });
 
     if (conflicts.length && !data.repeat) {
-      throw new Error(conflicts[0].periods + '에 이미 예약이 있어요. 다른 교시나 공간을 골라 주세요.');
+      throw new Error(conflicts[0].periods + '에 이미 예약이 있어요. ' + (canShare
+        ? "체육수업으로 함께 쓰는 경우라면 '체육수업으로 함께 사용'에 체크해 주세요. (최대 " + room.multi + '팀)'
+        : shared ? '이미 ' + room.multi + '팀이 예약해서 자리가 없어요.' : '다른 교시나 공간을 골라 주세요.'));
     }
     if (!okDates.length) throw new Error('고른 날짜 모두 이미 예약이 있어요.');
-    if (conflicts.length && !data.skipConflicts) {
-      return { needConfirm: true, conflicts: conflicts, okCount: okDates.length };
+    if ((conflicts.length && !data.skipConflicts) || (existing.length && !data.ackExisting)) {
+      return { needConfirm: true, conflicts: conflicts, existing: existing, okCount: okDates.length, max: room.multi };
     }
 
     var status = me.role === '학생' ? '승인대기' : '확정';
@@ -342,7 +396,8 @@ function createBooking(data) {
         id: 'R' + newId_(), groupId: groupId, roomId: room.id, date: d, periods: input.periods,
         email: me.email, name: me.name, role: me.role, dept: me.dept,
         purpose: input.purpose, people: input.people, status: status,
-        createdAt: now, updatedAt: '', handler: '', memo: ''
+        createdAt: now, updatedAt: '', handler: '', memo: '',
+        school: input.school, unit: input.unit, shared: shared
       };
     });
     appendRows_('예약', made.map(bookingRow_));
@@ -391,14 +446,16 @@ function updateBooking(id, data) {
     var room = rooms.filter(function (r) { return r.id === b.roomId; })[0];
     if (!room) throw new Error('공간을 찾을 수 없어요.');
     var input = cleanInput_(data, room, periods);
-    var hit = findConflicts_(all, { roomId: b.roomId, date: b.date, periods: input.periods }, b.id);
-    if (hit.length) throw new Error(conflictText_(hit, input.periods, periods) + '에 이미 다른 예약이 있어요.');
+    var full = slotCheck_(all, room, b.date, input.periods, b.shared, regularMap_(periods), b.id).full;
+    if (full.length) throw new Error(periodNames_(full, periods) + '에 이미 다른 예약이 있어요.');
 
     var before = JSON.parse(JSON.stringify(b));
     var moved = input.periods.join(',') !== b.periods.join(',');
     b.periods = input.periods;
     b.purpose = input.purpose;
     b.people = input.people;
+    b.school = input.school;
+    b.unit = input.unit;
     b.updatedAt = nowStr_();
     if (moved && b.role === '학생' && !me.admin) {
       b.status = '승인대기';
@@ -452,6 +509,10 @@ function adminBookings(q) {
   var to = isDate_(q.to) ? q.to : addDays_(today, 30);
   var order = periodOrder_(periods_());
   var all = bookings_().sort(byDateThenPeriod_(order));
+  var roomOf = {};
+  rooms_().forEach(function (r) { roomOf[r.id] = r; });
+  var regular = regularMap_(periods_());
+  var capOf = function (roomId, pid) { return slotCap_(roomOf[roomId], true, regular, pid); };
   var withEmail = function (b) {
     var p = publicBooking_(b, me);
     p.email = b.email;
@@ -461,7 +522,7 @@ function adminBookings(q) {
   return {
     from: from, to: to,
     ledgerOn: ledgerOn_(), sync: ledgerStatus_(),
-    clashes: findClashes_(all, today).map(function (c) {
+    clashes: findClashes_(all, today, capOf).map(function (c) {
       return { roomId: c.roomId, date: c.date, periods: c.periods, a: withEmail(c.a), b: withEmail(c.b) };
     }),
     pending: all.filter(function (b) { return b.status === '승인대기'; }).map(withEmail),

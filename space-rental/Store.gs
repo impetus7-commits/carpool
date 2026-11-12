@@ -31,6 +31,9 @@ function headers_(sh) {
     .map(function (h) { return String(h).trim(); });
 }
 
+/** 탭의 머리글 목록 */
+function tabHeaders_(name) { return headers_(sheet_(name)); }
+
 /** 탭의 모든 행을 [{_row, 머리글: 값, …}] 으로 읽습니다. 값은 모두 글자입니다. */
 function readTab_(name) {
   if (tabCache_[name]) return tabCache_[name];

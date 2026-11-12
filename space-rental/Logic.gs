@@ -286,8 +286,14 @@ function ledgerDiff_(existing, desired) {
   };
 }
 
-/** from 이후 날짜에서 같은 공간·날짜·교시에 겹쳐 있는 살아 있는 예약 쌍 */
-function findClashes_(bookings, from) {
+/** 일과 중 교시인지 (1교시, 2교시 … — 아침·점심·방과후·야간은 아님) */
+function isRegularPeriod_(name) { return /^\d+\s*교시$/.test(String(name || '').trim()); }
+
+/**
+ * from 이후 날짜에서 같은 공간·날짜·교시에 허용 수보다 많이 겹쳐 있는 살아 있는 예약 쌍.
+ * capOf(roomId, periodId) = 그 칸에 함께 들어갈 수 있는 예약 수 (없으면 1)
+ */
+function findClashes_(bookings, from, capOf) {
   var groups = {};
   bookings.forEach(function (b) {
     if (!isActive_(b) || b.date < from) return;
@@ -299,7 +305,11 @@ function findClashes_(bookings, from) {
     var g = groups[k];
     for (var i = 0; i < g.length; i++) {
       for (var j = i + 1; j < g.length; j++) {
-        var both = g[i].periods.filter(function (p) { return g[j].periods.indexOf(p) >= 0; });
+        var both = g[i].periods.filter(function (p) {
+          if (g[j].periods.indexOf(p) < 0) return false;
+          var n = g.filter(function (b) { return b.periods.indexOf(p) >= 0; }).length;
+          return n > (capOf ? capOf(g[i].roomId, p) : 1);
+        });
         if (both.length) out.push({ roomId: g[i].roomId, date: g[i].date, periods: both, a: g[i], b: g[j] });
       }
     }

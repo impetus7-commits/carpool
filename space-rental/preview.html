@@ -174,12 +174,14 @@ input.in, select.in { width: 100%; border: 1px solid var(--line); background: va
 .prow.busy, .prow.wait { background: var(--soft); cursor: default; }
 .prow.busy .box, .prow.wait .box { border-color: var(--line); background: var(--line); }
 .prow.busy .ps { color: var(--busy); } .prow.wait .ps { color: var(--wait); }
+.prow.shared { border-color: var(--wait); } .prow.shared .ps { color: var(--wait); } .prow.shared .box { border-color: var(--wait); }
 .switch { display: flex; align-items: center; gap: 10px; margin-top: 16px; font-weight: 600; }
 .switch input { width: 22px; height: 22px; accent-color: var(--brand); }
 .repeat { border: 1px solid var(--line); border-radius: 12px; padding: 4px 14px 14px; margin-top: 10px; }
 .days .chip { min-width: 44px; padding: 7px 0; text-align: center; }
 .sticky-go { position: sticky; bottom: 0; background: var(--card); border-top: 1px solid var(--line); padding: 12px 18px max(14px, env(safe-area-inset-bottom)); margin: 16px -18px 0; }
 .clist { margin: 8px 0; padding-left: 20px; font-size: 14px; }
+.clist ul { padding-left: 16px; margin: 2px 0 6px; }
 
 /* ----- 일정 요약 (주간·월간·분기) ----- */
 .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 12px 0; }
@@ -565,8 +567,14 @@ function ledgerDiff_(existing, desired) {
   };
 }
 
-/** from 이후 날짜에서 같은 공간·날짜·교시에 겹쳐 있는 살아 있는 예약 쌍 */
-function findClashes_(bookings, from) {
+/** 일과 중 교시인지 (1교시, 2교시 … — 아침·점심·방과후·야간은 아님) */
+function isRegularPeriod_(name) { return /^\d+\s*교시$/.test(String(name || '').trim()); }
+
+/**
+ * from 이후 날짜에서 같은 공간·날짜·교시에 허용 수보다 많이 겹쳐 있는 살아 있는 예약 쌍.
+ * capOf(roomId, periodId) = 그 칸에 함께 들어갈 수 있는 예약 수 (없으면 1)
+ */
+function findClashes_(bookings, from, capOf) {
   var groups = {};
   bookings.forEach(function (b) {
     if (!isActive_(b) || b.date < from) return;
@@ -578,7 +586,11 @@ function findClashes_(bookings, from) {
     var g = groups[k];
     for (var i = 0; i < g.length; i++) {
       for (var j = i + 1; j < g.length; j++) {
-        var both = g[i].periods.filter(function (p) { return g[j].periods.indexOf(p) >= 0; });
+        var both = g[i].periods.filter(function (p) {
+          if (g[j].periods.indexOf(p) < 0) return false;
+          var n = g.filter(function (b) { return b.periods.indexOf(p) >= 0; }).length;
+          return n > (capOf ? capOf(g[i].roomId, p) : 1);
+        });
         if (both.length) out.push({ roomId: g[i].roomId, date: g[i].date, periods: both, a: g[i], b: g[j] });
       }
     }
@@ -600,10 +612,10 @@ if (typeof module !== 'undefined') {
  */
 
 var TABS_ = {
-  '공간': ['ID', '건물', '층', '순서', '이름', '수용인원', '용도', '시설', '특이사항', '소개', '사진', '영상', '신청가능'],
+  '공간': ['ID', '건물', '층', '순서', '이름', '수용인원', '용도', '시설', '특이사항', '소개', '사진', '영상', '신청가능', '동시예약수'],
   '사용자': ['이메일', '이름', '역할', '소속'],
   '교시': ['ID', '이름', '시작', '종료'],
-  '예약': ['ID', '묶음ID', '공간ID', '날짜', '교시', '이메일', '이름', '역할', '소속', '목적', '인원', '상태', '신청일시', '수정일시', '처리자', '비고'],
+  '예약': ['ID', '묶음ID', '공간ID', '날짜', '교시', '이메일', '이름', '역할', '소속', '목적', '인원', '상태', '신청일시', '수정일시', '처리자', '비고', '사용학교', '사용부서', '공동사용'],
   '기록': ['일시', '이메일', '이름', '동작', '예약ID', '공간', '날짜', '내용', '변경전', '변경후'],
   '설정': ['항목', '값', '설명']
 };
@@ -611,29 +623,29 @@ var TABS_ = {
 /** 예시 데이터 — 학교 실정에 맞게 시트에서 고쳐 쓰세요. */
 var SAMPLE_ = {
   '공간': [
-    ['A101', '본관', '1', '1', '교무실', '', '', '', '교직원 업무 공간', '', '', '', 'N'],
-    ['A102', '본관', '1', '2', '시청각실', '120', '강연, 발표, 영상 시청, 설명회', '빔프로젝터, 음향, 마이크, 냉난방, 무대', '음식물 반입 금지. 사용 후 음향 장비 전원을 꺼 주세요.', '계단식 좌석 120석을 갖춘 강연·발표 공간입니다.', '', '', 'Y'],
-    ['A103', '본관', '1', '3', '도서관', '60', '독서, 자습, 토론, 모둠 활동', '모둠 책상, 와이파이, 냉난방, 전자칠판', '점심시간에는 대출·반납 이용자와 함께 씁니다.', '장서 2만 권과 모둠 책상 10개가 있는 열린 학습 공간입니다.', '', '', 'Y'],
-    ['A104', '본관', '1', '4', '보건실', '', '', '', '', '', '', '', 'N'],
-    ['A201', '본관', '2', '1', '진로상담실', '8', '상담, 면접 연습, 소모임', '원탁, 냉난방, 와이파이', '상담 일정이 우선입니다.', '소규모 상담과 면접 연습에 알맞은 조용한 방입니다.', '', '', 'Y'],
-    ['A202', '본관', '2', '2', '세미나실 1', '20', '회의, 토론, 발표, 동아리', '빔프로젝터, 화이트보드, 와이파이, 냉난방', '', '이동식 책상으로 배치를 자유롭게 바꿀 수 있습니다.', '', '', 'Y'],
-    ['A203', '본관', '2', '3', '세미나실 2', '16', '회의, 토론, 동아리, 소모임', '전자칠판, 화이트보드, 와이파이, 냉난방', '', '전자칠판이 있는 소규모 회의 공간입니다.', '', '', 'Y'],
-    ['A204', '본관', '2', '4', '컴퓨터실', '32', '정보 수업, 코딩, 온라인 평가, 영상 편집', '컴퓨터 32대, 빔프로젝터, 프린터, 냉난방', '개인 저장 장치 사용 전 담당 교사에게 알려 주세요.', '컴퓨터 32대가 있는 정보 교육 공간입니다.', '', '', 'Y'],
-    ['A301', '본관', '3', '1', '과학실 1', '28', '실험, 과학 수업, 탐구 활동', '실험대, 개수대, 빔프로젝터, 환기 장치', '실험은 반드시 지도 교사와 함께 합니다.', '화학·물리 실험을 위한 실험대 7개가 있습니다.', '', '', 'Y'],
-    ['A302', '본관', '3', '2', '과학실 2', '28', '실험, 과학 수업, 탐구 활동', '실험대, 개수대, 현미경, 빔프로젝터', '실험은 반드시 지도 교사와 함께 합니다.', '생명과학·지구과학 탐구용 실험실입니다.', '', '', 'Y'],
-    ['A303', '본관', '3', '3', '수학교과교실', '30', '수업, 자습, 보충 학습', '전자칠판, 화이트보드, 냉난방', '', '벽면 전체가 화이트보드인 교과교실입니다.', '', '', 'Y'],
-    ['A304', '본관', '3', '4', '영어교과교실', '30', '수업, 토론, 발표', '전자칠판, 음향, 냉난방', '', '모둠 배치가 쉬운 교과교실입니다.', '', '', 'Y'],
-    ['A401', '본관', '4', '1', '음악실', '35', '음악 수업, 합창, 합주, 공연 연습', '피아노, 음향, 방음, 보면대', '악기는 제자리에 정리해 주세요.', '그랜드 피아노와 방음 시설을 갖춘 음악 공간입니다.', '', '', 'Y'],
-    ['A402', '본관', '4', '2', '미술실', '30', '미술 수업, 전시 준비, 만들기', '작업대, 개수대, 이젤, 건조대', '물감 사용 후 개수대를 정리해 주세요.', '넓은 작업대가 있는 미술 공간입니다.', '', '', 'Y'],
-    ['A403', '본관', '4', '3', '다목적실', '50', '댄스, 연극, 공연 연습, 체조, 행사', '전면 거울, 음향, 마루 바닥, 냉난방', '실내화를 신어 주세요.', '전면 거울과 마루 바닥이 있는 활동 공간입니다.', '', '', 'Y'],
-    ['A404', '본관', '4', '4', '스터디카페', '24', '자습, 모둠 학습, 멘토링', '칸막이 책상, 와이파이, 냉난방', '대화는 모둠 구역에서만 해 주세요.', '개인 좌석과 모둠 좌석이 나뉜 자기주도학습 공간입니다.', '', '', 'Y'],
-    ['A501', '본관', '5', '1', '대강당', '400', '행사, 공연, 입학식, 학년 모임, 강연', '무대, 조명, 음향, 마이크, 빔프로젝터', '무대 조명은 담당 교사만 조작합니다.', '전교생 행사와 공연을 여는 강당입니다.', '', '', 'Y'],
-    ['B101', '창의관', '1', '1', '메이커실', '20', '만들기, 발명, 공학 동아리', '3D 프린터, 레이저 커터, 공구, 작업대', '장비는 사용 교육을 받은 사람만 다룹니다.', '3D 프린터 4대와 공구가 있는 제작 공간입니다.', '', '', 'Y'],
-    ['B102', '창의관', '1', '2', '가사실', '24', '조리 실습, 가정 수업', '조리대, 인덕션, 냉장고, 개수대', '사용 후 가스·전기를 꼭 확인해 주세요.', '조리대 6개가 있는 실습 공간입니다.', '', '', 'Y'],
-    ['B201', '창의관', '2', '1', '온라인 스튜디오', '6', '영상 촬영, 방송, 녹음, 온라인 수업', '카메라, 조명, 크로마키, 마이크, 방음', '장비 대여는 방송부 담당 교사에게 문의하세요.', '촬영과 녹음을 할 수 있는 작은 스튜디오입니다.', '', '', 'Y'],
-    ['B202', '창의관', '2', '2', '토론실', '12', '토론, 회의, 모의 면접', '원탁, 전자칠판, 와이파이, 냉난방', '', '원탁 배치의 토론 전용 공간입니다.', '', '', 'Y'],
-    ['C101', '체육관', '1', '1', '체육관', '300', '체육 수업, 경기, 행사, 체육 동아리', '농구 골대, 배구 네트, 음향, 탈의실', '실내 운동화를 신어 주세요.', '농구·배구·배드민턴을 할 수 있는 실내 체육관입니다.', '', '', 'Y'],
-    ['C201', '체육관', '2', '1', '탁구장', '16', '탁구, 체육 동아리', '탁구대 4대, 냉난방', '', '탁구대 4대가 있는 소규모 체육 공간입니다.', '', '', 'Y']
+    ['A101', '본관', '1', '1', '교무실', '', '', '', '교직원 업무 공간', '', '', '', 'N', ''],
+    ['A102', '본관', '1', '2', '시청각실', '120', '강연, 발표, 영상 시청, 설명회', '빔프로젝터, 음향, 마이크, 냉난방, 무대', '음식물 반입 금지. 사용 후 음향 장비 전원을 꺼 주세요.', '계단식 좌석 120석을 갖춘 강연·발표 공간입니다.', '', '', 'Y', ''],
+    ['A103', '본관', '1', '3', '도서관', '60', '독서, 자습, 토론, 모둠 활동', '모둠 책상, 와이파이, 냉난방, 전자칠판', '점심시간에는 대출·반납 이용자와 함께 씁니다.', '장서 2만 권과 모둠 책상 10개가 있는 열린 학습 공간입니다.', '', '', 'Y', ''],
+    ['A104', '본관', '1', '4', '보건실', '', '', '', '', '', '', '', 'N', ''],
+    ['A201', '본관', '2', '1', '진로상담실', '8', '상담, 면접 연습, 소모임', '원탁, 냉난방, 와이파이', '상담 일정이 우선입니다.', '소규모 상담과 면접 연습에 알맞은 조용한 방입니다.', '', '', 'Y', ''],
+    ['A202', '본관', '2', '2', '세미나실 1', '20', '회의, 토론, 발표, 동아리', '빔프로젝터, 화이트보드, 와이파이, 냉난방', '', '이동식 책상으로 배치를 자유롭게 바꿀 수 있습니다.', '', '', 'Y', ''],
+    ['A203', '본관', '2', '3', '세미나실 2', '16', '회의, 토론, 동아리, 소모임', '전자칠판, 화이트보드, 와이파이, 냉난방', '', '전자칠판이 있는 소규모 회의 공간입니다.', '', '', 'Y', ''],
+    ['A204', '본관', '2', '4', '컴퓨터실', '32', '정보 수업, 코딩, 온라인 평가, 영상 편집', '컴퓨터 32대, 빔프로젝터, 프린터, 냉난방', '개인 저장 장치 사용 전 담당 교사에게 알려 주세요.', '컴퓨터 32대가 있는 정보 교육 공간입니다.', '', '', 'Y', ''],
+    ['A301', '본관', '3', '1', '과학실 1', '28', '실험, 과학 수업, 탐구 활동', '실험대, 개수대, 빔프로젝터, 환기 장치', '실험은 반드시 지도 교사와 함께 합니다.', '화학·물리 실험을 위한 실험대 7개가 있습니다.', '', '', 'Y', ''],
+    ['A302', '본관', '3', '2', '과학실 2', '28', '실험, 과학 수업, 탐구 활동', '실험대, 개수대, 현미경, 빔프로젝터', '실험은 반드시 지도 교사와 함께 합니다.', '생명과학·지구과학 탐구용 실험실입니다.', '', '', 'Y', ''],
+    ['A303', '본관', '3', '3', '수학교과교실', '30', '수업, 자습, 보충 학습', '전자칠판, 화이트보드, 냉난방', '', '벽면 전체가 화이트보드인 교과교실입니다.', '', '', 'Y', ''],
+    ['A304', '본관', '3', '4', '영어교과교실', '30', '수업, 토론, 발표', '전자칠판, 음향, 냉난방', '', '모둠 배치가 쉬운 교과교실입니다.', '', '', 'Y', ''],
+    ['A401', '본관', '4', '1', '음악실', '35', '음악 수업, 합창, 합주, 공연 연습', '피아노, 음향, 방음, 보면대', '악기는 제자리에 정리해 주세요.', '그랜드 피아노와 방음 시설을 갖춘 음악 공간입니다.', '', '', 'Y', ''],
+    ['A402', '본관', '4', '2', '미술실', '30', '미술 수업, 전시 준비, 만들기', '작업대, 개수대, 이젤, 건조대', '물감 사용 후 개수대를 정리해 주세요.', '넓은 작업대가 있는 미술 공간입니다.', '', '', 'Y', ''],
+    ['A403', '본관', '4', '3', '다목적실', '50', '댄스, 연극, 공연 연습, 체조, 행사', '전면 거울, 음향, 마루 바닥, 냉난방', '실내화를 신어 주세요.', '전면 거울과 마루 바닥이 있는 활동 공간입니다.', '', '', 'Y', ''],
+    ['A404', '본관', '4', '4', '스터디카페', '24', '자습, 모둠 학습, 멘토링', '칸막이 책상, 와이파이, 냉난방', '대화는 모둠 구역에서만 해 주세요.', '개인 좌석과 모둠 좌석이 나뉜 자기주도학습 공간입니다.', '', '', 'Y', ''],
+    ['A501', '본관', '5', '1', '대강당', '400', '행사, 공연, 입학식, 학년 모임, 강연', '무대, 조명, 음향, 마이크, 빔프로젝터', '무대 조명은 담당 교사만 조작합니다.', '전교생 행사와 공연을 여는 강당입니다.', '', '', 'Y', ''],
+    ['B101', '창의관', '1', '1', '메이커실', '20', '만들기, 발명, 공학 동아리', '3D 프린터, 레이저 커터, 공구, 작업대', '장비는 사용 교육을 받은 사람만 다룹니다.', '3D 프린터 4대와 공구가 있는 제작 공간입니다.', '', '', 'Y', ''],
+    ['B102', '창의관', '1', '2', '가사실', '24', '조리 실습, 가정 수업', '조리대, 인덕션, 냉장고, 개수대', '사용 후 가스·전기를 꼭 확인해 주세요.', '조리대 6개가 있는 실습 공간입니다.', '', '', 'Y', ''],
+    ['B201', '창의관', '2', '1', '온라인 스튜디오', '6', '영상 촬영, 방송, 녹음, 온라인 수업', '카메라, 조명, 크로마키, 마이크, 방음', '장비 대여는 방송부 담당 교사에게 문의하세요.', '촬영과 녹음을 할 수 있는 작은 스튜디오입니다.', '', '', 'Y', ''],
+    ['B202', '창의관', '2', '2', '토론실', '12', '토론, 회의, 모의 면접', '원탁, 전자칠판, 와이파이, 냉난방', '', '원탁 배치의 토론 전용 공간입니다.', '', '', 'Y', ''],
+    ['C101', '체육관', '1', '1', '체육관', '300', '체육 수업, 경기, 행사, 체육 동아리', '농구 골대, 배구 네트, 음향, 탈의실', '실내 운동화를 신어 주세요.', '농구·배구·배드민턴을 할 수 있는 실내 체육관입니다.', '', '', 'Y', '3'],
+    ['C201', '체육관', '2', '1', '탁구장', '16', '탁구, 체육 동아리', '탁구대 4대, 냉난방', '', '탁구대 4대가 있는 소규모 체육 공간입니다.', '', '', 'Y', '']
   ],
   '교시': [
     ['P0', '아침', '07:50', '08:30'],
@@ -685,8 +697,26 @@ function setup() {
     sh.getRange(1, 1, sh.getMaxRows(), sh.getMaxColumns()).setNumberFormat('@');
     if (sh.getLastRow() === 0) {
       sh.getRange(1, 1, 1, head.length).setValues([head]);
+    } else {
+      // 이미 쓰던 탭이면, 새로 생긴 머리글만 오른쪽 끝에 덧붙입니다 (기존 내용은 그대로).
+      var have = sh.getRange(1, 1, 1, sh.getLastColumn()).getDisplayValues()[0].map(function (h) { return String(h).trim(); });
+      var missing = head.filter(function (h) { return have.indexOf(h) < 0; });
+      if (missing.length) {
+        var at = sh.getLastColumn() + 1;
+        if (sh.getMaxColumns() < at + missing.length - 1) sh.insertColumnsAfter(sh.getMaxColumns(), at + missing.length - 1 - sh.getMaxColumns());
+        sh.getRange(1, at, 1, missing.length).setNumberFormat('@').setValues([missing]);
+        if (name === '공간' && missing.indexOf('동시예약수') >= 0 && sh.getLastRow() > 1) {
+          // 체육관·동진실은 일과 중 체육수업 3팀까지 함께 쓸 수 있게 기본값을 넣습니다.
+          var iName = have.indexOf('이름'), col = at + missing.indexOf('동시예약수');
+          var names = iName < 0 ? [] : sh.getRange(2, iName + 1, sh.getLastRow() - 1, 1).getDisplayValues();
+          names.forEach(function (r, i) {
+            if (/^(체육관|동진실)$/.test(String(r[0]).trim())) sh.getRange(i + 2, col).setValue('3');
+          });
+        }
+      }
     }
-    sh.getRange(1, 1, 1, head.length).setFontWeight('bold').setBackground('#1c7c45').setFontColor('#ffffff');
+    var width = sh.getLastColumn();
+    sh.getRange(1, 1, 1, width).setFontWeight('bold').setBackground('#1c7c45').setFontColor('#ffffff');
     sh.setFrozenRows(1);
     if (sh.getLastRow() === 1 && SAMPLE_[name]) {
       sh.getRange(2, 1, SAMPLE_[name].length, head.length).setValues(SAMPLE_[name]);
@@ -789,7 +819,8 @@ function rooms_() {
       desc: r['소개'] || '',
       photos: splitList_(r['사진']),
       video: r['영상'] || '',
-      bookable: !/^(n|no|x|아니오|불가)$/i.test(String(r['신청가능'] || 'Y').trim())
+      bookable: !/^(n|no|x|아니오|불가)$/i.test(String(r['신청가능'] || 'Y').trim()),
+      multi: Math.max(1, parseInt(r['동시예약수'], 10) || 1)   // 일과 중 체육수업으로 함께 쓸 수 있는 팀 수
     };
   });
 }
@@ -813,7 +844,8 @@ function bookings_() {
       periods: splitList_(r['교시']),
       email: String(r['이메일'] || '').toLowerCase(), name: r['이름'] || '', role: r['역할'] || '', dept: r['소속'] || '',
       purpose: r['목적'] || '', people: parseInt(r['인원'], 10) || 0, status: r['상태'] || '',
-      createdAt: r['신청일시'] || '', updatedAt: r['수정일시'] || '', handler: r['처리자'] || '', memo: r['비고'] || ''
+      createdAt: r['신청일시'] || '', updatedAt: r['수정일시'] || '', handler: r['처리자'] || '', memo: r['비고'] || '',
+      school: r['사용학교'] || '', unit: r['사용부서'] || '', shared: r['공동사용'] === 'Y'
     };
   });
 }
@@ -823,7 +855,8 @@ function bookingRow_(b) {
     'ID': b.id, '묶음ID': b.groupId, '공간ID': b.roomId, '날짜': b.date, '교시': b.periods.join(','),
     '이메일': b.email, '이름': b.name, '역할': b.role, '소속': b.dept,
     '목적': b.purpose, '인원': b.people, '상태': b.status,
-    '신청일시': b.createdAt, '수정일시': b.updatedAt, '처리자': b.handler, '비고': b.memo
+    '신청일시': b.createdAt, '수정일시': b.updatedAt, '처리자': b.handler, '비고': b.memo,
+    '사용학교': b.school || '', '사용부서': b.unit || '', '공동사용': b.shared ? 'Y' : ''
   };
   if (b._row) row._row = b._row;
   return row;
@@ -837,6 +870,7 @@ function publicBooking_(b, me) {
     name: open ? b.name : '', dept: open ? b.dept : '', role: open ? b.role : '',
     purpose: open ? b.purpose : '', people: open ? b.people : 0,
     memo: open ? b.memo : '', createdAt: open ? b.createdAt : '', ledger: isLedger_(b),
+    school: open ? b.school : '', unit: open ? b.unit : '', shared: !!b.shared,
     mine: !!me.email && b.email === me.email
   };
 }
@@ -874,8 +908,8 @@ function floorLabel_(f) {
 
 function snapshot_(b) {
   return JSON.stringify({
-    공간ID: b.roomId, 날짜: b.date, 교시: b.periods.join(','), 목적: b.purpose, 인원: b.people,
-    상태: b.status, 신청자: b.name, 비고: b.memo
+    공간ID: b.roomId, 날짜: b.date, 교시: b.periods.join(','), 사용학교: b.school || '', 사용부서: b.unit || '',
+    목적: b.purpose, 인원: b.people, 함께사용: b.shared ? 'Y' : '', 상태: b.status, 신청자: b.name, 비고: b.memo
   });
 }
 
@@ -885,7 +919,7 @@ function logRow_(me, action, before, after, ctx) {
   return {
     '일시': nowStr_(), '이메일': me.email, '이름': me.name, '동작': action,
     '예약ID': b.id, '공간': roomLabel_(room), '날짜': b.date,
-    '내용': periodNames_(b.periods, ctx.periods) + ' · ' + b.purpose + (b.people ? ' · ' + b.people + '명' : '') + ' · 신청자 ' + b.name + ' · ' + b.status,
+    '내용': periodNames_(b.periods, ctx.periods) + ' · ' + (b.school ? '[' + b.school + '] ' : '') + (b.unit ? b.unit + ' · ' : '') + b.purpose + (b.shared ? ' (함께 사용)' : '') + (b.people ? ' · ' + b.people + '명' : '') + ' · 신청자 ' + b.name + ' · ' + b.status,
     '변경전': before ? snapshot_(before) : '', '변경후': after ? snapshot_(after) : ''
   };
 }
@@ -970,7 +1004,35 @@ function requireAdmin_() {
   return me;
 }
 
-/** 교시·목적·인원을 확인하고 정리해서 돌려줍니다. */
+var SCHOOLS_ = ['중', '고', '법인'];
+
+/** 교시 ID → 일과 중 교시인지 */
+function regularMap_(periods) {
+  var m = {};
+  periods.forEach(function (p) { m[p.id] = isRegularPeriod_(p.name); });
+  return m;
+}
+
+/**
+ * 한 칸(공간·날짜·교시)에 함께 들어갈 수 있는 예약 수.
+ * [공간] 탭의 '동시예약수'가 2 이상인 공간(체육관·동진실)은 일과 중 교시에 체육수업으로 함께 쓰는 예약이 그 수까지 들어갑니다.
+ */
+function slotCap_(room, shared, regular, pid) {
+  return room && room.multi > 1 && shared && regular[pid] ? room.multi : 1;
+}
+
+/** 같은 공간·날짜에서 want 교시 중 이미 꽉 찬 교시와, 겹치는 기존 예약들 */
+function slotCheck_(all, room, date, want, shared, regular, excludeId) {
+  var same = all.filter(function (b) { return isActive_(b) && b.id !== excludeId && b.roomId === room.id && b.date === date; });
+  return {
+    full: want.filter(function (p) {
+      return same.filter(function (b) { return b.periods.indexOf(p) >= 0; }).length >= slotCap_(room, shared, regular, p);
+    }),
+    over: same.filter(function (b) { return b.periods.some(function (p) { return want.indexOf(p) >= 0; }); })
+  };
+}
+
+/** 교시·사용학교·부서·목적·인원을 확인하고 정리해서 돌려줍니다. */
 function cleanInput_(data, room, periods) {
   var order = periodOrder_(periods);
   var seen = {};
@@ -981,6 +1043,12 @@ function cleanInput_(data, room, periods) {
   }).sort(function (a, b) { return order[a] - order[b]; });
   if (!list.length) throw new Error('사용할 교시를 한 개 이상 골라 주세요.');
 
+  var asked = Array.isArray(data.school) ? data.school : splitList_(data.school);
+  var school = SCHOOLS_.filter(function (x) { return asked.indexOf(x) >= 0; });
+  if (!school.length) throw new Error('사용 학교(중·고·법인)를 한 개 이상 골라 주세요.');
+  var unit = String(data.unit || '').trim().slice(0, 40);
+  if (!unit) throw new Error('사용 부서를 적어 주세요. 개인이면 선생님 성함을 적어 주세요.');
+
   var purpose = String(data.purpose || '').trim().slice(0, 100);
   if (!purpose) throw new Error('사용 목적을 적어 주세요.');
 
@@ -989,22 +1057,15 @@ function cleanInput_(data, room, periods) {
   if (room.capacity && people > room.capacity) {
     throw new Error(room.name + '의 정원은 ' + room.capacity + '명이에요. 인원을 줄이거나 더 큰 공간을 골라 주세요.');
   }
-  return { periods: list, purpose: purpose, people: people };
-}
-
-function conflictText_(list, want, periods) {
-  var taken = {};
-  list.forEach(function (b) {
-    b.periods.forEach(function (p) { if (want.indexOf(p) >= 0) taken[p] = true; });
-  });
-  return periodNames_(want.filter(function (p) { return taken[p]; }), periods);
+  return { periods: list, purpose: purpose, people: people, school: school.join(','), unit: unit };
 }
 
 /**
  * 예약 신청.
- * data = {roomId, date, periods[], purpose, people, repeat: {until, weekdays[]} | null, skipConflicts}
- * 반복 예약에서 겹치는 날이 있으면 {needConfirm, conflicts, okCount} 를 돌려주고 아무것도 만들지 않습니다.
- * skipConflicts 를 true 로 다시 부르면 겹치는 날을 빼고 만듭니다.
+ * data = {roomId, date, periods[], school[], unit, purpose, people, shared, repeat: {until, weekdays[]} | null, skipConflicts, ackExisting}
+ * 반복 예약에서 자리가 없는 날(conflicts)이 있거나, 함께 사용으로 이미 다른 예약이 있는 시간(existing)에 신청하면
+ * {needConfirm, conflicts, existing, okCount} 를 돌려주고 아무것도 만들지 않습니다.
+ * skipConflicts·ackExisting 을 true 로 다시 부르면 자리가 없는 날을 빼고 만듭니다.
  */
 function createBooking(data) {
   data = data || {};
@@ -1024,6 +1085,12 @@ function createBooking(data) {
       throw new Error('오늘부터 ' + conf.maxDays + '일 뒤까지만 신청할 수 있어요.');
     }
     var input = cleanInput_(data, room, periods);
+    var shared = !!data.shared && room.multi > 1;
+    var regular = regularMap_(periods);
+    var heads = tabHeaders_('예약');
+    if (heads.indexOf('사용학교') < 0 || heads.indexOf('사용부서') < 0 || heads.indexOf('공동사용') < 0) {
+      throw new Error("[예약] 탭에 '사용학교'·'사용부서'·'공동사용' 열이 없어요. 관리자가 앱스크립트 편집기에서 setup 을 한 번 더 실행해야 해요.");
+    }
 
     var dates = [data.date];
     var groupId = '';
@@ -1045,19 +1112,36 @@ function createBooking(data) {
 
     var all = bookings_();
     var okDates = [];
-    var conflicts = [];
+    var conflicts = [];   // 자리가 없어 신청할 수 없는 날
+    var existing = [];    // 신청은 되지만 같은 시간에 이미 다른 예약이 있는 날 (함께 사용)
+    var canShare = false;
     dates.forEach(function (d) {
-      var hit = findConflicts_(all, { roomId: room.id, date: d, periods: input.periods });
-      if (hit.length) conflicts.push({ date: d, periods: conflictText_(hit, input.periods, periods) });
-      else okDates.push(d);
+      var c = slotCheck_(all, room, d, input.periods, shared, regular);
+      if (c.full.length) {
+        conflicts.push({ date: d, periods: periodNames_(c.full, periods) });
+        if (!shared && room.multi > 1 && c.full.every(function (p) { return regular[p]; }) &&
+            !slotCheck_(all, room, d, input.periods, true, regular).full.length) canShare = true;
+        return;
+      }
+      okDates.push(d);
+      if (c.over.length) {
+        existing.push({
+          date: d,
+          list: c.over.map(function (b) {
+            return { periods: periodNames_(b.periods, periods), who: b.unit || b.name, school: b.school, purpose: b.purpose };
+          })
+        });
+      }
     });
 
     if (conflicts.length && !data.repeat) {
-      throw new Error(conflicts[0].periods + '에 이미 예약이 있어요. 다른 교시나 공간을 골라 주세요.');
+      throw new Error(conflicts[0].periods + '에 이미 예약이 있어요. ' + (canShare
+        ? "체육수업으로 함께 쓰는 경우라면 '체육수업으로 함께 사용'에 체크해 주세요. (최대 " + room.multi + '팀)'
+        : shared ? '이미 ' + room.multi + '팀이 예약해서 자리가 없어요.' : '다른 교시나 공간을 골라 주세요.'));
     }
     if (!okDates.length) throw new Error('고른 날짜 모두 이미 예약이 있어요.');
-    if (conflicts.length && !data.skipConflicts) {
-      return { needConfirm: true, conflicts: conflicts, okCount: okDates.length };
+    if ((conflicts.length && !data.skipConflicts) || (existing.length && !data.ackExisting)) {
+      return { needConfirm: true, conflicts: conflicts, existing: existing, okCount: okDates.length, max: room.multi };
     }
 
     var status = me.role === '학생' ? '승인대기' : '확정';
@@ -1068,7 +1152,8 @@ function createBooking(data) {
         id: 'R' + newId_(), groupId: groupId, roomId: room.id, date: d, periods: input.periods,
         email: me.email, name: me.name, role: me.role, dept: me.dept,
         purpose: input.purpose, people: input.people, status: status,
-        createdAt: now, updatedAt: '', handler: '', memo: ''
+        createdAt: now, updatedAt: '', handler: '', memo: '',
+        school: input.school, unit: input.unit, shared: shared
       };
     });
     appendRows_('예약', made.map(bookingRow_));
@@ -1117,14 +1202,16 @@ function updateBooking(id, data) {
     var room = rooms.filter(function (r) { return r.id === b.roomId; })[0];
     if (!room) throw new Error('공간을 찾을 수 없어요.');
     var input = cleanInput_(data, room, periods);
-    var hit = findConflicts_(all, { roomId: b.roomId, date: b.date, periods: input.periods }, b.id);
-    if (hit.length) throw new Error(conflictText_(hit, input.periods, periods) + '에 이미 다른 예약이 있어요.');
+    var full = slotCheck_(all, room, b.date, input.periods, b.shared, regularMap_(periods), b.id).full;
+    if (full.length) throw new Error(periodNames_(full, periods) + '에 이미 다른 예약이 있어요.');
 
     var before = JSON.parse(JSON.stringify(b));
     var moved = input.periods.join(',') !== b.periods.join(',');
     b.periods = input.periods;
     b.purpose = input.purpose;
     b.people = input.people;
+    b.school = input.school;
+    b.unit = input.unit;
     b.updatedAt = nowStr_();
     if (moved && b.role === '학생' && !me.admin) {
       b.status = '승인대기';
@@ -1178,6 +1265,10 @@ function adminBookings(q) {
   var to = isDate_(q.to) ? q.to : addDays_(today, 30);
   var order = periodOrder_(periods_());
   var all = bookings_().sort(byDateThenPeriod_(order));
+  var roomOf = {};
+  rooms_().forEach(function (r) { roomOf[r.id] = r; });
+  var regular = regularMap_(periods_());
+  var capOf = function (roomId, pid) { return slotCap_(roomOf[roomId], true, regular, pid); };
   var withEmail = function (b) {
     var p = publicBooking_(b, me);
     p.email = b.email;
@@ -1187,7 +1278,7 @@ function adminBookings(q) {
   return {
     from: from, to: to,
     ledgerOn: ledgerOn_(), sync: ledgerStatus_(),
-    clashes: findClashes_(all, today).map(function (c) {
+    clashes: findClashes_(all, today, capOf).map(function (c) {
       return { roomId: c.roomId, date: c.date, periods: c.periods, a: withEmail(c.a), b: withEmail(c.b) };
     }),
     pending: all.filter(function (b) { return b.status === '승인대기'; }).map(withEmail),
@@ -1302,6 +1393,7 @@ function updateRows_(name, list) {
   if (MOCK.onSave) MOCK.onSave();
 }
 
+function tabHeaders_(name) { return TABS_[name].slice(); }
 function currentEmail_() { return MOCK.user; }
 function withLock_(fn) { return fn(); }
 
@@ -1326,7 +1418,7 @@ function photoData_(id) { return 'data:image/gif;base64,R0lGODlhAQABAAAAACw='; }
  * google.script.run 을 흉내 냅니다. 데이터는 이 브라우저(localStorage)에만 저장됩니다.
  */
 (function () {
-  var KEY = 'space-rental-preview-v1';
+  var KEY = 'space-rental-preview-v2';
   var saved = null;
   try { saved = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) {}
   if (saved && saved.db) { MOCK.db = saved.db; MOCK.user = saved.user || MOCK.user; MOCK.seq = saved.seq || 0; }
@@ -1339,13 +1431,15 @@ function photoData_(id) { return 'data:image/gif;base64,R0lGODlhAQABAAAAACw='; }
     mockReset_();
     var t = today_();
     var seed = [
-      ['teacher@school.example', { roomId: 'A102', date: t, periods: ['P3', 'P4'], purpose: '(예시) 진로 특강', people: 90 }],
-      ['teacher@school.example', { roomId: 'A103', date: t, periods: ['PL'], purpose: '(예시) 독서 토론', people: 12 }],
-      ['teacher@school.example', { roomId: 'A202', date: t, periods: ['P6', 'P7'], purpose: '(예시) 교과 협의회', people: 8 }],
-      ['student@school.example', { roomId: 'A203', date: t, periods: ['PA'], purpose: '(예시) 동아리 발표 준비', people: 6 }],
-      ['student2@school.example', { roomId: 'A403', date: addDays_(t, 1), periods: ['PA'], purpose: '(예시) 댄스 동아리 연습', people: 15,
+      ['teacher@school.example', { roomId: 'A102', date: t, periods: ['P3', 'P4'], school: ['고'], unit: '진로상담부', purpose: '(예시) 진로 특강', people: 90 }],
+      ['teacher@school.example', { roomId: 'A103', date: t, periods: ['PL'], school: ['고'], unit: '국어과', purpose: '(예시) 독서 토론', people: 12 }],
+      ['teacher@school.example', { roomId: 'A202', date: t, periods: ['P6', 'P7'], school: ['고'], unit: '수학과', purpose: '(예시) 교과 협의회', people: 8 }],
+      ['student@school.example', { roomId: 'A203', date: t, periods: ['PA'], school: ['고'], unit: '과학 동아리', purpose: '(예시) 동아리 발표 준비', people: 6 }],
+      ['student2@school.example', { roomId: 'A403', date: addDays_(t, 1), periods: ['PA'], school: ['고'], unit: '댄스 동아리', purpose: '(예시) 댄스 동아리 연습', people: 15,
         repeat: { until: addDays_(t, 21), weekdays: [weekday_(addDays_(t, 1))] } }],
-      ['teacher@school.example', { roomId: 'A401', date: t, periods: ['P1', 'P2', 'P3', 'P4', 'P5'], purpose: '(예시) 합창 연습', people: 30 }]
+      ['teacher@school.example', { roomId: 'A401', date: t, periods: ['P1', 'P2', 'P3', 'P4', 'P5'], school: ['고'], unit: '음악과', purpose: '(예시) 합창 연습', people: 30 }],
+      ['teacher@school.example', { roomId: 'C101', date: t, periods: ['P2', 'P3'], school: ['고'], unit: '1학년 체육', purpose: '(예시) 체육수업', people: 30, shared: true }],
+      ['teacher@school.example', { roomId: 'C101', date: t, periods: ['P3'], school: ['중'], unit: '중 2학년 체육', purpose: '(예시) 체육수업', people: 28, shared: true, ackExisting: true }]
     ];
     var me = MOCK.user;
     seed.forEach(function (s) { MOCK.user = s[0]; try { createBooking(s[1]); } catch (e) {} });
@@ -1497,6 +1591,11 @@ function statusBadge(st) {
   var cls = st === '확정' ? 'ok' : st === '승인대기' ? 'wait' : st === '반려' ? 'no' : 'dim';
   return '<span class="badge ' + cls + '">' + esc(st === '승인대기' ? '승인 대기' : st) + '</span>';
 }
+/** 지난번에 적은 사용 학교·부서를 이 기기에 기억해 두었다가 다음 신청 때 채워 줍니다. */
+function lastUsed(key, fallback) {
+  try { var v = JSON.parse(localStorage.getItem('space.' + key) || 'null'); return v == null ? fallback : v; } catch (e) { return fallback; }
+}
+function remember(key, value) { try { localStorage.setItem('space.' + key, JSON.stringify(value)); } catch (e) {} }
 function canBook() { return S.init.me.registered; }
 function ppl(n) { return n ? ' · ' + n + '명' : ''; }
 
@@ -1512,6 +1611,23 @@ function bookingAt(roomId, date, pid) {
   }
   return null;
 }
+function bookingsAt(roomId, date, pid) {
+  return (S.days[date] || []).filter(function (b) { return b.roomId === roomId && b.periods.indexOf(pid) >= 0; });
+}
+function isRegular(pid) {
+  var p = S.init.periods.filter(function (x) { return x.id === pid; })[0];
+  return !!p && /^\d+\s*교시$/.test(p.name);
+}
+/** 그 교시에 함께 들어갈 수 있는 예약 수: 체육관·동진실처럼 '동시예약수'가 있는 공간의 일과 중 교시만 여러 팀 */
+function slotCap(r, pid) { return r && r.multi > 1 && isRegular(pid) ? r.multi : 1; }
+function whoText(b) { return (b.school ? '[' + b.school + '] ' : '') + (b.unit || b.name || ''); }
+var SCHOOLS = ['중', '고', '법인'];
+function schoolChips(list) {
+  return '<div class="chips" role="group" aria-label="사용 학교">' + SCHOOLS.map(function (x) {
+    var on = list.indexOf(x) >= 0;
+    return '<button type="button" class="chip ' + (on ? 'on' : '') + '" data-a="school" data-v="' + x + '" role="checkbox" aria-checked="' + on + '">' + (on ? '✓ ' : '') + x + '</button>';
+  }).join('') + '</div>';
+}
 function slotClass(b) { return !b ? 'free' : b.mine ? 'mine' : b.status === '확정' ? 'busy' : 'wait'; }
 function roomState(r) {
   if (!r.bookable) return { k: 'off', t: '신청 불가' };
@@ -1519,8 +1635,11 @@ function roomState(r) {
   if (S.period !== 'all') {
     var b = bookingAt(r.id, S.date, S.period);
     if (!b) return { k: 'free', t: '비어 있음' };
+    var cap = slotCap(r, S.period), cnt = bookingsAt(r.id, S.date, S.period).length;
+    if (cap > 1 && cnt < cap) return { k: 'part', t: cnt + '/' + cap + '팀 사용 중 · 체육수업 가능' };
+    if (cap > 1) return { k: 'busy', t: cap + '팀 사용 중 (꽉 참)' };
     if (b.mine) return { k: 'mine', t: b.status === '확정' ? '내 예약' : '내 신청 (승인 대기)' };
-    return b.status === '확정' ? { k: 'busy', t: '사용 중' + (b.name ? ' · ' + b.name : '') } : { k: 'wait', t: '승인 대기' };
+    return b.status === '확정' ? { k: 'busy', t: '사용 중' + (whoText(b) ? ' · ' + whoText(b) : '') } : { k: 'wait', t: '승인 대기' };
   }
   var n = ps.filter(function (p) { return bookingAt(r.id, S.date, p.id); }).length;
   if (!n) return { k: 'free', t: '종일 비어 있음' };
@@ -1674,15 +1793,22 @@ function sheetHead(eyebrow, title) {
     '<button type="button" class="x" data-a="close" aria-label="닫기">×</button></div>';
 }
 function periodRows(roomId, date, sel, ownId) {
+  var r = room(roomId);
   return S.init.periods.map(function (p) {
-    var b = bookingAt(roomId, date, p.id);
-    if (b && b.id === ownId) b = null;
-    var on = sel.indexOf(p.id) >= 0;
-    var k = b ? (b.status === '확정' ? 'busy' : 'wait') : (on ? 'sel' : 'free');
-    var txt = b ? (b.status === '확정' ? '사용 중' : '승인 대기') + (b.mine ? ' · 내 예약' : b.name ? ' · ' + b.name : '') + (b.purpose ? ' · ' + b.purpose : '')
-      : (on ? '선택함' : '비어 있음');
-    return '<button type="button" class="prow ' + k + '" ' + (b ? 'disabled' : 'data-a="pick" data-p="' + esc(p.id) + '" aria-pressed="' + on + '"') + '>' +
-      '<span class="box" aria-hidden="true">' + (on && !b ? '✓' : '') + '</span>' +
+    var list = bookingsAt(roomId, date, p.id).filter(function (b) { return b.id !== ownId; });
+    var cap = slotCap(r, p.id), full = list.length >= cap;
+    var on = sel.indexOf(p.id) >= 0 && !full;
+    var b = list[0];
+    var k = full ? (b.status === '확정' ? 'busy' : 'wait') : on ? 'sel' : list.length ? 'shared' : 'free';
+    var each = list.map(function (x) {
+      return [x.mine ? '내 예약' : '', whoText(x), x.purpose].filter(Boolean).join(' · ') + (x.status === '확정' ? '' : ' (승인 대기)');
+    }).filter(Boolean);
+    var txt;
+    if (!list.length) txt = on ? '선택함' : '비어 있음';
+    else if (cap > 1) txt = list.length + '/' + cap + '팀' + (full ? ' (꽉 참)' : on ? ' · 선택함' : ' · 체육수업은 함께 사용 가능') + (each.length ? ' — ' + each.join(' / ') : '');
+    else txt = (b.status === '확정' ? '사용 중' : '승인 대기') + (each[0] ? ' · ' + each[0].replace(' (승인 대기)', '') : '');
+    return '<button type="button" class="prow ' + k + '" ' + (full ? 'disabled' : 'data-a="pick" data-p="' + esc(p.id) + '" aria-pressed="' + on + '"') + '>' +
+      '<span class="box" aria-hidden="true">' + (on ? '✓' : '') + '</span>' +
       '<span class="pn">' + esc(p.name) + '<span class="pt">' + esc(p.start) + (p.end ? '~' + esc(p.end) : '') + '</span></span>' +
       '<span class="ps">' + esc(txt) + '</span></button>';
   }).join('');
@@ -1733,8 +1859,12 @@ function sheetRoom(sh) {
     var f = sh.f;
     h += '<h3 class="sec">신청 내용</h3>' +
       '<p class="sub">' + esc(fmt(sh.date)) + ' · ' + esc(pnames(sh.sel)) + '</p>' +
-      '<label class="f" for="f-purpose">사용 목적</label><input class="in" id="f-purpose" data-f="purpose" maxlength="100" placeholder="예: 과학 동아리 발표 준비" value="' + esc(f.purpose) + '">' +
-      '<label class="f" for="f-people">사용 인원' + (r.capacity ? ' (정원 ' + r.capacity + '명)' : '') + '</label><input class="in" id="f-people" data-f="people" type="number" inputmode="numeric" min="1" ' + (r.capacity ? 'max="' + r.capacity + '"' : '') + ' value="' + esc(f.people) + '">' +
+      '<label class="f">1) 사용 학교 (해당하는 곳 모두)</label>' + schoolChips(f.school) +
+      '<label class="f" for="f-unit">2) 사용 부서 (개인이면 선생님 성함)</label><input class="in" id="f-unit" data-f="unit" maxlength="40" placeholder="예: 교육과정부, 홍길동" value="' + esc(f.unit) + '">' +
+      '<label class="f" for="f-purpose">3) 사용 목적</label><input class="in" id="f-purpose" data-f="purpose" maxlength="100" placeholder="예: 과학 동아리 발표 준비" value="' + esc(f.purpose) + '">' +
+      '<label class="f" for="f-people">4) 사용 예상 인원' + (r.capacity ? ' (정원 ' + r.capacity + '명)' : '') + '</label><input class="in" id="f-people" data-f="people" type="number" inputmode="numeric" min="1" ' + (r.capacity ? 'max="' + r.capacity + '"' : '') + ' value="' + esc(f.people) + '">' +
+      (r.multi > 1 ? '<label class="switch"><input type="checkbox" data-a="shared" ' + (f.shared ? 'checked' : '') + '> 체육수업으로 함께 사용</label>' +
+        '<p class="sub" style="margin:4px 0 0 32px">일과 중(1~7교시) 체육수업은 최대 ' + r.multi + '팀까지 같은 시간에 쓸 수 있어요. 체크하지 않으면 비어 있는 시간에만 신청돼요.</p>' : '') +
       '<label class="switch"><input type="checkbox" data-a="repeat" ' + (f.repeat ? 'checked' : '') + '> 일정 기간 동안 반복해서 신청</label>';
     if (f.repeat) {
       var ds = repeatDates(sh);
@@ -1755,13 +1885,24 @@ function sheetRoom(sh) {
   return h + '</div>';
 }
 function confirmHtml(sh) {
-  var c = sh.confirm;
-  return '<div class="notice warn" style="margin-top:12px"><b>이미 예약이 있는 날이 ' + c.conflicts.length + '일 있어요.</b>' +
-    '<ul class="clist">' + c.conflicts.map(function (x) { return '<li>' + esc(fmt(x.date)) + ' · ' + esc(x.periods) + '</li>'; }).join('') + '</ul>' +
-    '이 날들을 빼고 나머지 ' + c.okCount + '회만 신청할까요?</div>' +
-    (sh.err ? '<div class="err" role="alert">' + esc(sh.err) + '</div>' : '') +
+  var c = sh.confirm, h = '';
+  if (c.existing && c.existing.length) {
+    h += '<div class="notice warn" style="margin-top:12px"><b>같은 시간에 이미 예약이 있어요.</b> 함께 사용해도 되는지 확인해 주세요. (최대 ' + c.max + '팀)' +
+      '<ul class="clist">' + c.existing.map(function (x) {
+        return '<li>' + esc(fmt(x.date)) + '<ul>' + x.list.map(function (b) {
+          return '<li>' + esc(b.periods) + ' · ' + esc((b.school ? '[' + b.school + '] ' : '') + b.who) + (b.purpose ? ' · ' + esc(b.purpose) : '') + '</li>';
+        }).join('') + '</ul></li>';
+      }).join('') + '</ul></div>';
+  }
+  if (c.conflicts.length) {
+    h += '<div class="notice warn" style="margin-top:12px"><b>자리가 없어 신청할 수 없는 날이 ' + c.conflicts.length + '일 있어요.</b>' +
+      '<ul class="clist">' + c.conflicts.map(function (x) { return '<li>' + esc(fmt(x.date)) + ' · ' + esc(x.periods) + '</li>'; }).join('') + '</ul>' +
+      '이 날들을 빼고 나머지 ' + c.okCount + '회만 신청할까요?</div>';
+  }
+  var label = c.conflicts.length ? c.okCount + '회만 신청' : c.okCount > 1 ? c.okCount + '회 함께 사용으로 신청' : '함께 사용으로 신청';
+  return h + (sh.err ? '<div class="err" role="alert">' + esc(sh.err) + '</div>' : '') +
     '<div class="row"><button type="button" class="btn grow" data-a="unconfirm">돌아가기</button>' +
-    '<button type="button" class="btn primary grow" data-a="submit" data-skip="1" ' + (sh.busy ? 'disabled' : '') + '>' + c.okCount + '회만 신청</button></div>';
+    '<button type="button" class="btn primary grow" data-a="submit" data-skip="1" ' + (sh.busy ? 'disabled' : '') + '>' + label + '</button></div>';
 }
 /* ---------- 그리기: 일정 요약 ---------- */
 function schedRange(mode, anchor) {
@@ -1881,8 +2022,10 @@ function sheetEdit(sh) {
   var h = sheetHead('예약 수정 · ' + fmt(b.date), r ? r.name : '') + '<div class="sheet-body">';
   if (!S.days[b.date]) return h + '<div class="spin"></div></div>';
   h += '<h3 class="sec" style="margin-top:6px">교시</h3>' + periodRows(b.roomId, b.date, sh.sel, b.id) +
-    '<label class="f" for="f-purpose">사용 목적</label><input class="in" id="f-purpose" data-f="purpose" maxlength="100" value="' + esc(sh.f.purpose) + '">' +
-    '<label class="f" for="f-people">사용 인원' + (r && r.capacity ? ' (정원 ' + r.capacity + '명)' : '') + '</label><input class="in" id="f-people" data-f="people" type="number" inputmode="numeric" min="1" value="' + esc(sh.f.people || '') + '">';
+    '<label class="f">1) 사용 학교 (해당하는 곳 모두)</label>' + schoolChips(sh.f.school) +
+    '<label class="f" for="f-unit">2) 사용 부서 (개인이면 선생님 성함)</label><input class="in" id="f-unit" data-f="unit" maxlength="40" value="' + esc(sh.f.unit) + '">' +
+    '<label class="f" for="f-purpose">3) 사용 목적</label><input class="in" id="f-purpose" data-f="purpose" maxlength="100" value="' + esc(sh.f.purpose) + '">' +
+    '<label class="f" for="f-people">4) 사용 예상 인원' + (r && r.capacity ? ' (정원 ' + r.capacity + '명)' : '') + '</label><input class="in" id="f-people" data-f="people" type="number" inputmode="numeric" min="1" value="' + esc(sh.f.people || '') + '">';
   if (b.role === '학생' && !S.init.me.admin) h += '<p class="sub" style="margin-top:12px">교시를 바꾸면 다시 관리자 승인을 받아야 해요.</p>';
   if (sh.err) h += '<div class="err" role="alert">' + esc(sh.err) + '</div>';
   h += '<div class="sticky-go"><button type="button" class="btn primary wide" data-a="save" ' + (sh.busy ? 'disabled' : '') + '>' + (sh.busy ? '저장하는 중…' : '수정 저장') + '</button></div>';
@@ -1891,7 +2034,7 @@ function sheetEdit(sh) {
 function sheetCancel(sh) {
   var b = sh.b, r = room(b.roomId);
   var h = sheetHead('예약 취소', (r ? r.name : '') + ' · ' + fmtShort(b.date)) + '<div class="sheet-body">' +
-    '<p>' + esc(pnames(b.periods)) + ' · ' + esc(b.purpose) + (b.name && !b.mine ? ' · 신청자 ' + esc(b.name) : '') + '</p>' +
+    '<p>' + esc(pnames(b.periods)) + ' · ' + (b.unit ? esc(whoText(b)) + ' · ' : '') + esc(b.purpose) + (b.name && !b.mine ? ' · 신청자 ' + esc(b.name) : '') + '</p>' +
     '<p class="sub" style="margin:8px 0 14px">취소한 내용은 기록에 남아요.</p>';
   if (sh.err) h += '<div class="err" role="alert">' + esc(sh.err) + '</div>';
   h += '<button type="button" class="btn danger wide" data-a="cancel-go" data-scope="one" ' + (sh.busy ? 'disabled' : '') + '>' + (b.groupId ? '이 날만 취소' : '예약 취소') + '</button>';
@@ -1967,7 +2110,7 @@ function groupCard(g, admin) {
   var b = g.items[0], r = room(b.roomId);
   var head = '<p class="eyebrow">' + esc(r ? roomLabel(r) : '') + (g.items.length > 1 ? ' · 반복 ' + g.items.length + '회' : '') + '</p>' +
     '<h3>' + esc(r ? r.name : '(삭제된 공간)') + '</h3>' +
-    '<p class="meta">' + esc(b.purpose) + ppl(b.people) + (admin ? ' · ' + esc(b.name) + (b.dept ? ' (' + esc(b.dept) + ')' : '') : '') + '</p>';
+    '<p class="meta">' + esc(whoText({ school: b.school, unit: b.unit }) ? whoText({ school: b.school, unit: b.unit }) + ' · ' : '') + esc(b.purpose) + ppl(b.people) + (b.shared ? ' · 함께 사용' : '') + (admin ? ' · ' + esc(b.name) + (b.dept ? ' (' + esc(b.dept) + ')' : '') : '') + '</p>';
   if (g.items.length === 1) {
     return '<article class="card item">' + head + '<p class="meta"><b style="color:var(--ink)">' + esc(fmt(b.date)) + '</b> · ' + esc(pnames(b.periods)) + ' ' + statusBadge(b.status) + '</p>' +
       (b.memo ? '<p class="meta">사유: ' + esc(b.memo) + '</p>' : '') +
@@ -2032,7 +2175,7 @@ function viewAdmin() {
       var r = room(c.roomId);
       var line = function (b) {
         return '<div class="drow"><span class="grow">' + (b.ledger ? '<span class="badge wait">대장</span> ' : '<span class="badge ok">웹</span> ') +
-          '<b>' + esc(b.ledger ? b.purpose : b.name) + '</b>' + (b.ledger ? '' : ' · ' + esc(b.purpose)) + ' · ' + esc(pnames(b.periods)) + '</span>' +
+          '<b>' + esc(b.ledger ? b.purpose : (b.unit ? whoText(b) : b.name)) + '</b>' + (b.ledger ? '' : ' · ' + esc(b.purpose)) + ' · ' + esc(pnames(b.periods)) + '</span>' +
           statusBadge(b.status) + bookingActs(b, true) + '</div>';
       };
       return '<article class="card item"><p class="eyebrow">' + esc(r ? roomLabel(r) : '') + '</p>' +
@@ -2049,7 +2192,7 @@ function viewAdmin() {
       return '<article class="card item"><p class="eyebrow">' + esc(r ? roomLabel(r) : '') + ' · 신청 ' + esc(b.createdAt) + '</p>' +
         '<h3>' + esc(r ? r.name : '(삭제된 공간)') + ' · ' + esc(pnames(b.periods)) + '</h3>' +
         '<p class="meta"><b style="color:var(--ink)">' + esc(b.name) + '</b>' + (b.dept ? ' (' + esc(b.dept) + ')' : '') + ' · ' + esc(b.email) + '</p>' +
-        '<p class="meta">' + esc(b.purpose) + ppl(b.people) + '</p>' +
+        '<p class="meta">' + esc(whoText({ school: b.school, unit: b.unit }) ? whoText({ school: b.school, unit: b.unit }) + ' · ' : '') + esc(b.purpose) + ppl(b.people) + (b.shared ? ' · 함께 사용' : '') + '</p>' +
         '<p class="meta">' + (g.items.length > 1 ? '반복 ' + g.items.length + '회: ' : '') + g.items.map(function (x) { return esc(fmtShort(x.date)); }).join(', ') + '</p>' +
         '<div class="acts"><button type="button" class="btn small primary" data-a="approve" data-id="' + esc(b.id) + '">' + (g.items.length > 1 ? g.items.length + '회 모두 승인' : '승인') + '</button>' +
         '<button type="button" class="btn small danger" data-a="reject" data-id="' + esc(b.id) + '">반려</button></div></article>';
@@ -2062,7 +2205,7 @@ function viewAdmin() {
     var r = room(b.roomId);
     var live = b.status === '확정' || b.status === '승인대기';
     return '<div class="drow ' + (live ? '' : 'dim') + '" style="' + (b === a.data.list[0] ? 'border-top:0' : '') + '"><span class="grow"><b>' + esc(fmtShort(b.date)) + '</b> ' + esc(pnames(b.periods)) +
-      '<br>' + esc(r ? r.name : '(삭제된 공간)') + ' · ' + esc(b.name) + ' · ' + esc(b.purpose) + ppl(b.people) + (b.groupId ? ' · 반복' : '') + '</span>' +
+      '<br>' + esc(r ? r.name : '(삭제된 공간)') + ' · ' + esc(b.name) + (b.unit ? ' · ' + esc(whoText({ school: b.school, unit: b.unit })) : '') + ' · ' + esc(b.purpose) + ppl(b.people) + (b.shared ? ' · 함께 사용' : '') + (b.groupId ? ' · 반복' : '') + '</span>' +
       statusBadge(b.status) + bookingActs(b, true) + '</div>';
   }).join('') + '</div>';
 }
@@ -2100,13 +2243,14 @@ function openRoom(id, opt) {
   var date = opt.date || S.date;
   S.sheet = {
     type: 'room', id: id, date: date, sel: (opt.periods || []).slice(), video: false, err: '', busy: false, confirm: null,
-    f: { purpose: opt.purpose || '', people: opt.people || '', repeat: false, days: [wd(date)], until: addDays(date, 28) }
+    f: { school: lastUsed('school', []), unit: lastUsed('unit', S.init.me.dept || ''), purpose: opt.purpose || '', people: opt.people || '', shared: false, repeat: false, days: [wd(date)], until: addDays(date, 28) }
   };
   if (S.period !== 'all' && !opt.periods && date >= S.init.today && !bookingAt(id, date, S.period)) S.sheet.sel = [S.period];
+  var rm = room(id);
   renderSheet();
   loadDay(date).then(function () {
     if (!S.sheet || S.sheet.id !== id) return;
-    S.sheet.sel = S.sheet.sel.filter(function (p) { return !bookingAt(id, date, p); });
+    S.sheet.sel = S.sheet.sel.filter(function (p) { return bookingsAt(id, date, p).length < slotCap(rm, p); });
     renderSheet();
   }, fail);
 }
@@ -2169,6 +2313,14 @@ var A = {
     renderSheet();
   },
   repeat: function (el) { S.sheet.f.repeat = el.checked; renderSheet(); },
+  shared: function (el) { S.sheet.f.shared = el.checked; S.sheet.err = ''; renderSheet(); },
+  school: function (el) {
+    var list = S.sheet.f.school, v = el.dataset.v, i = list.indexOf(v);
+    if (i >= 0) list.splice(i, 1); else list.push(v);
+    S.sheet.f.school = SCHOOLS.filter(function (x) { return list.indexOf(x) >= 0; });
+    S.sheet.err = '';
+    renderSheet();
+  },
   wday: function (el) {
     var d = +el.dataset.d, days = S.sheet.f.days, i = days.indexOf(d);
     if (i >= 0) days.splice(i, 1); else days.push(d);
@@ -2177,14 +2329,18 @@ var A = {
   unconfirm: function () { S.sheet.confirm = null; S.sheet.err = ''; renderSheet(); },
   submit: function (el) {
     var sh = S.sheet, f = sh.f;
+    if (!f.school.length) { sh.err = '사용 학교(중·고·법인)를 한 개 이상 골라 주세요.'; renderSheet(); return; }
+    if (!String(f.unit).trim()) { sh.err = '사용 부서를 적어 주세요. 개인이면 선생님 성함을 적어 주세요.'; renderSheet(); return; }
     if (!String(f.purpose).trim()) { sh.err = '사용 목적을 적어 주세요.'; renderSheet(); return; }
-    if (!(parseInt(f.people, 10) >= 1)) { sh.err = '사용 인원을 숫자로 적어 주세요.'; renderSheet(); return; }
+    if (!(parseInt(f.people, 10) >= 1)) { sh.err = '사용 예상 인원을 숫자로 적어 주세요.'; renderSheet(); return; }
+    remember('school', f.school); remember('unit', f.unit);
     sh.busy = true; sh.err = '';
     renderSheet();
     call('createBooking', {
-      roomId: sh.id, date: sh.date, periods: sh.sel, purpose: f.purpose, people: f.people,
+      roomId: sh.id, date: sh.date, periods: sh.sel, school: f.school, unit: f.unit, purpose: f.purpose, people: f.people,
+      shared: !!f.shared,
       repeat: f.repeat ? { until: f.until, weekdays: f.days } : null,
-      skipConflicts: !!el.dataset.skip
+      skipConflicts: !!el.dataset.skip, ackExisting: !!el.dataset.skip
     }).then(function (r) {
       sh.busy = false;
       if (r.needConfirm) { sh.confirm = r; renderSheet(); return; }
@@ -2198,7 +2354,7 @@ var A = {
   edit: function (el) {
     var b = findBooking(el.dataset.id);
     if (!b) return;
-    S.sheet = { type: 'edit', b: b, date: b.date, sel: b.periods.slice(), err: '', busy: false, f: { purpose: b.purpose, people: b.people } };
+    S.sheet = { type: 'edit', b: b, date: b.date, sel: b.periods.slice(), err: '', busy: false, f: { school: b.school ? b.school.split(',') : [], unit: b.unit || '', purpose: b.purpose, people: b.people } };
     renderSheet();
     loadDay(b.date).then(renderSheet, fail);
   },
@@ -2206,7 +2362,7 @@ var A = {
     var sh = S.sheet;
     sh.busy = true; sh.err = '';
     renderSheet();
-    call('updateBooking', sh.b.id, { periods: sh.sel, purpose: sh.f.purpose, people: sh.f.people }).then(function (r) {
+    call('updateBooking', sh.b.id, { periods: sh.sel, school: sh.f.school, unit: sh.f.unit, purpose: sh.f.purpose, people: sh.f.people }).then(function (r) {
       toast(r.status === '승인대기' && sh.b.status === '확정' ? '수정했어요. 교시가 바뀌어 다시 승인을 기다려요.' : '수정했어요.');
       S.sheet = null;
       return refreshAfterWrite().then(render);
@@ -2305,6 +2461,7 @@ document.addEventListener('click', function (e) {
 document.addEventListener('change', function (e) {
   var el = e.target;
   if (el.dataset.a === 'repeat') A.repeat(el);
+  if (el.dataset.a === 'shared') A.shared(el);
   if (el.dataset.date) setDate(el.dataset.date, el.value);
   if (el.dataset.rerender) renderSheet();
 });

@@ -16,7 +16,7 @@ function server(user) {
 }
 const plain = (v) => JSON.parse(JSON.stringify(v));
 const base = (extra) => Object.assign(
-  { roomId: 'A202', date: '2026-11-13', periods: ['P5', 'P6'], purpose: '동아리 회의', people: 10 }, extra);
+  { roomId: 'A202', date: '2026-11-13', periods: ['P5', 'P6'], school: ['고'], unit: '수학과', purpose: '동아리 회의', people: 10 }, extra);
 
 test('날짜 계산과 반복 날짜 펼치기', () => {
   const s = server();
@@ -300,4 +300,68 @@ test('대장 가져오기를 켜면 대장에서 온 예약은 웹에서 고치�
   s.MOCK.user = TEACHER;
   assert.throws(() => s.createBooking(base({ periods: ['P5'] })), /5교시에 이미 예약/);
   assert.throws(() => s.runLedgerSync(), /관리자만/);
+});
+
+test('신청 항목: 사용 학교와 사용 부서는 꼭 넣어야 하고, 예약과 기록에 남는다', () => {
+  const s = server(TEACHER);
+  assert.throws(() => s.createBooking(base({ school: [] })), /사용 학교/);
+  assert.throws(() => s.createBooking(base({ school: ['대학'] })), /사용 학교/);
+  assert.throws(() => s.createBooking(base({ unit: ' ' })), /사용 부서/);
+  s.createBooking(base({ school: ['법인', '중'], unit: '김교사' }));
+  const b = plain(s.getDay('2026-11-13'))[0];
+  assert.equal(b.school, '중,법인');
+  assert.equal(b.unit, '김교사');
+  s.updateBooking(b.id, base({ school: ['고'], unit: '교육과정부' }));
+  assert.equal(plain(s.getDay('2026-11-13'))[0].unit, '교육과정부');
+  s.MOCK.user = ADMIN;
+  const h = plain(s.getHistory(''));
+  assert.match(h[0].text, /\[고\] 교육과정부/);
+  assert.equal(JSON.parse(h[0].before)['사용부서'], '김교사');
+  s.MOCK.user = 'nobody@school.example';
+  assert.equal(plain(s.getDay('2026-11-13'))[0].unit, '', '미등록 계정에는 가린다');
+});
+
+test('체육관: 일과 중 체육수업은 3팀까지 함께 쓰고, 기존 예약을 먼저 알려 준다', () => {
+  const s = server(TEACHER);
+  const gym = (extra) => base(Object.assign({ roomId: 'C101', periods: ['P2', 'P3'], people: 30, purpose: '체육수업', shared: true }, extra));
+  assert.equal(plain(s.getInit()).rooms.find((r) => r.id === 'C101').multi, 3);
+
+  assert.equal(s.createBooking(gym({ unit: '1학년 체육' })).created, 1, '첫 팀은 바로 신청');
+  const ask = plain(s.createBooking(gym({ unit: '2학년 체육', periods: ['P3'] })));
+  assert.equal(ask.needConfirm, true, '둘째 팀은 기존 예약을 먼저 보여 준다');
+  assert.deepEqual(ask.existing, [{ date: '2026-11-13', list: [{ periods: '2교시, 3교시', who: '1학년 체육', school: '고', purpose: '체육수업' }] }]);
+  assert.equal(plain(s.getDay('2026-11-13')).length, 1, '확인 전에는 만들지 않는다');
+  assert.equal(s.createBooking(gym({ unit: '2학년 체육', periods: ['P3'], ackExisting: true })).created, 1);
+  assert.equal(s.createBooking(gym({ unit: '중 체육', school: ['중'], periods: ['P3'], ackExisting: true })).created, 1);
+  assert.throws(() => s.createBooking(gym({ unit: '넷째 팀', periods: ['P3'], ackExisting: true })), /이미 3팀이 예약해서 자리가 없어요/);
+  assert.equal(s.createBooking(gym({ unit: '넷째 팀', periods: ['P2'], ackExisting: true })).created, 1, '2교시는 아직 1팀뿐');
+
+  // 함께 사용에 체크하지 않으면 빈 시간에만 신청할 수 있다
+  assert.throws(() => s.createBooking(gym({ shared: false, periods: ['P2'] })), /체육수업으로 함께 사용'에 체크/);
+  assert.equal(s.createBooking(gym({ shared: false, periods: ['P5'], purpose: '학년 행사' })).created, 1);
+  // 일과 밖(방과후)은 한 팀만
+  s.createBooking(gym({ periods: ['PA'] }));
+  assert.throws(() => s.createBooking(gym({ periods: ['PA'], ackExisting: true })), /방과후에 이미 예약/);
+  // 다른 공간은 함께 사용이 안 된다
+  s.createBooking(base({ periods: ['P2'] }));
+  assert.throws(() => s.createBooking(base({ periods: ['P2'], shared: true, ackExisting: true })), /2교시에 이미 예약/);
+
+  // 허용 수 안에서 겹친 것은 관리 화면의 겹침에 나오지 않는다
+  s.MOCK.user = ADMIN;
+  assert.equal(plain(s.adminBookings({})).clashes.length, 0);
+});
+
+test('체육관: 반복 신청은 자리가 없는 날과 함께 쓰는 날을 한 번에 알려 준다', () => {
+  const s = server(TEACHER);
+  const gym = (extra) => base(Object.assign({ roomId: 'C101', periods: ['P2'], people: 30, purpose: '체육수업', shared: true }, extra));
+  s.createBooking(gym({ date: '2026-11-13' }));
+  ['A', 'B', 'C'].forEach((u) => s.createBooking(gym({ date: '2026-11-20', unit: u, ackExisting: true })));
+  const repeat = { until: '2026-11-27', weekdays: [5] };
+  const ask = plain(s.createBooking(gym({ date: '2026-11-13', unit: '새 팀', repeat })));
+  assert.equal(ask.needConfirm, true);
+  assert.deepEqual(ask.conflicts.map((c) => c.date), ['2026-11-20']);
+  assert.deepEqual(ask.existing.map((c) => c.date), ['2026-11-13']);
+  assert.equal(ask.okCount, 2);
+  const r = plain(s.createBooking(gym({ date: '2026-11-13', unit: '새 팀', repeat, skipConflicts: true, ackExisting: true })));
+  assert.equal(r.created, 2);
 });

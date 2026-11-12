@@ -3,7 +3,7 @@
  * google.script.run 을 흉내 냅니다. 데이터는 이 브라우저(localStorage)에만 저장됩니다.
  */
 (function () {
-  var KEY = 'space-rental-preview-v1';
+  var KEY = 'space-rental-preview-v2';
   var saved = null;
   try { saved = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) {}
   if (saved && saved.db) { MOCK.db = saved.db; MOCK.user = saved.user || MOCK.user; MOCK.seq = saved.seq || 0; }
@@ -16,13 +16,15 @@
     mockReset_();
     var t = today_();
     var seed = [
-      ['teacher@school.example', { roomId: 'A102', date: t, periods: ['P3', 'P4'], purpose: '(예시) 진로 특강', people: 90 }],
-      ['teacher@school.example', { roomId: 'A103', date: t, periods: ['PL'], purpose: '(예시) 독서 토론', people: 12 }],
-      ['teacher@school.example', { roomId: 'A202', date: t, periods: ['P6', 'P7'], purpose: '(예시) 교과 협의회', people: 8 }],
-      ['student@school.example', { roomId: 'A203', date: t, periods: ['PA'], purpose: '(예시) 동아리 발표 준비', people: 6 }],
-      ['student2@school.example', { roomId: 'A403', date: addDays_(t, 1), periods: ['PA'], purpose: '(예시) 댄스 동아리 연습', people: 15,
+      ['teacher@school.example', { roomId: 'A102', date: t, periods: ['P3', 'P4'], school: ['고'], unit: '진로상담부', purpose: '(예시) 진로 특강', people: 90 }],
+      ['teacher@school.example', { roomId: 'A103', date: t, periods: ['PL'], school: ['고'], unit: '국어과', purpose: '(예시) 독서 토론', people: 12 }],
+      ['teacher@school.example', { roomId: 'A202', date: t, periods: ['P6', 'P7'], school: ['고'], unit: '수학과', purpose: '(예시) 교과 협의회', people: 8 }],
+      ['student@school.example', { roomId: 'A203', date: t, periods: ['PA'], school: ['고'], unit: '과학 동아리', purpose: '(예시) 동아리 발표 준비', people: 6 }],
+      ['student2@school.example', { roomId: 'A403', date: addDays_(t, 1), periods: ['PA'], school: ['고'], unit: '댄스 동아리', purpose: '(예시) 댄스 동아리 연습', people: 15,
         repeat: { until: addDays_(t, 21), weekdays: [weekday_(addDays_(t, 1))] } }],
-      ['teacher@school.example', { roomId: 'A401', date: t, periods: ['P1', 'P2', 'P3', 'P4', 'P5'], purpose: '(예시) 합창 연습', people: 30 }]
+      ['teacher@school.example', { roomId: 'A401', date: t, periods: ['P1', 'P2', 'P3', 'P4', 'P5'], school: ['고'], unit: '음악과', purpose: '(예시) 합창 연습', people: 30 }],
+      ['teacher@school.example', { roomId: 'C101', date: t, periods: ['P2', 'P3'], school: ['고'], unit: '1학년 체육', purpose: '(예시) 체육수업', people: 30, shared: true }],
+      ['teacher@school.example', { roomId: 'C101', date: t, periods: ['P3'], school: ['중'], unit: '중 2학년 체육', purpose: '(예시) 체육수업', people: 28, shared: true, ackExisting: true }]
     ];
     var me = MOCK.user;
     seed.forEach(function (s) { MOCK.user = s[0]; try { createBooking(s[1]); } catch (e) {} });
