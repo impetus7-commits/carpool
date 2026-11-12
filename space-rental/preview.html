@@ -181,6 +181,48 @@ input.in, select.in { width: 100%; border: 1px solid var(--line); background: va
 .sticky-go { position: sticky; bottom: 0; background: var(--card); border-top: 1px solid var(--line); padding: 12px 18px max(14px, env(safe-area-inset-bottom)); margin: 16px -18px 0; }
 .clist { margin: 8px 0; padding-left: 20px; font-size: 14px; }
 
+/* ----- 일정 요약 (주간·월간·분기) ----- */
+.stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 12px 0; }
+.stat { background: var(--soft); border-radius: 12px; padding: 10px 12px; }
+.stat b { display: block; font: 700 20px var(--display); }
+.stat span { font-size: 12px; color: var(--sub); }
+.rangebar { display: flex; align-items: center; gap: 6px; margin: 12px 0 4px; }
+.rangebar .lab { flex: 1; text-align: center; font-weight: 600; }
+.wk { width: 100%; border-collapse: separate; border-spacing: 2px; table-layout: fixed; font-size: 11px; }
+.wk th { font-weight: 600; color: var(--sub); padding: 4px 0; font-size: 12px; }
+.wk th.pcol { width: 52px; text-align: left; }
+.wk th button { border: 0; background: none; padding: 2px 0; width: 100%; font-weight: 600; color: var(--ink); line-height: 1.25; }
+.wk th button small { display: block; font-weight: 400; color: var(--sub); }
+.wk th.today button { color: var(--brand); }
+.wk td { height: 40px; border-radius: 5px; background: var(--free-bg); padding: 2px 3px; overflow: hidden; line-height: 1.2; vertical-align: middle; text-align: center; word-break: break-all; }
+.wk td div { max-height: 2.4em; overflow: hidden; }
+.wk td.busy { background: var(--busy-bg); color: var(--busy); }
+.wk td.wait { background: var(--wait-bg); color: var(--wait); }
+.wk td.mine { background: var(--mine-bg); color: var(--mine); }
+.cal { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; }
+.cal .dow { text-align: center; font-size: 12px; color: var(--sub); padding: 2px 0; }
+.cal button, .cal .pad0 { border: 0; border-radius: 7px; min-height: 52px; padding: 4px 2px; background: var(--soft); display: flex; flex-direction: column; align-items: center; gap: 1px; font-size: 13px; }
+.cal .pad0 { background: none; }
+.cal button b { font-weight: 600; }
+.cal button small { font-size: 11px; color: var(--sub); }
+.cal button.h1 { background: var(--busy-bg); background: color-mix(in srgb, var(--busy) 16%, var(--card)); }
+.cal button.h2 { background: var(--busy-bg); background: color-mix(in srgb, var(--busy) 32%, var(--card)); }
+.cal button.h3 { background: var(--busy-bg); background: color-mix(in srgb, var(--busy) 50%, var(--card)); }
+.cal button.h4 { background: var(--busy); color: var(--card); }
+.cal button.h3 small, .cal button.h4 small { color: inherit; }
+.cal button.today { outline: 2px solid var(--brand); outline-offset: -2px; }
+.cal.mini button, .cal.mini .pad0 { min-height: 30px; padding: 2px 0; font-size: 12px; justify-content: center; }
+.qgrid { display: grid; gap: 16px; }
+.qgrid h4 { margin: 0 0 6px; font: 700 15px var(--display); }
+.heatkey { display: flex; align-items: center; gap: 4px; font-size: 12px; color: var(--sub); margin-top: 10px; }
+.heatkey i { width: 16px; height: 16px; border-radius: 4px; display: inline-block; }
+.bars { list-style: none; padding: 0; margin: 6px 0 0; font-size: 14px; }
+.bars li { display: grid; grid-template-columns: minmax(0, 1fr) 44px; gap: 8px; align-items: center; margin-bottom: 6px; }
+.bars .bar { background: var(--soft); border-radius: 6px; overflow: hidden; position: relative; min-height: 28px; display: flex; align-items: center; }
+.bars .bar i { position: absolute; left: 0; top: 0; bottom: 0; background: var(--brand-soft); }
+.bars .bar span { position: relative; padding: 2px 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bars em { font-style: normal; color: var(--sub); text-align: right; font-size: 13px; }
+
 /* ----- 추천 ----- */
 .findgrid { display: grid; gap: 14px; }
 .pad { padding: 18px; }
@@ -552,7 +594,7 @@ function setup() {
  *
  * 화면에서 부르는 함수:
  *   getInit, getDay, recommend, createBooking, updateBooking, cancelBooking,
- *   myBookings, adminBookings, decide, getHistory, getPhoto
+ *   myBookings, adminBookings, decide, getHistory, getPhoto, getRoomRange
  *
  * 데이터는 Store.gs 의 readTab_/appendRows_/updateRows_ 로만 읽고 씁니다.
  * 모든 쓰기는 withLock_ 안에서 처리하고 [기록] 탭에 남깁니다.
@@ -732,6 +774,17 @@ function getDay(date) {
   var me = me_();
   return bookings_().filter(function (b) { return b.date === date && isActive_(b); })
     .map(function (b) { return publicBooking_(b, me); });
+}
+
+/** 한 공간의 기간(최대 100일) 안 살아 있는 예약 — 주간·월간·분기 일정 요약용 */
+function getRoomRange(roomId, from, to) {
+  if (!isDate_(from) || !isDate_(to) || to < from) throw new Error('기간이 올바르지 않아요.');
+  if (toUtc_(to) - toUtc_(from) > 100 * 86400000) throw new Error('한 번에 100일까지만 볼 수 있어요.');
+  var me = me_();
+  var order = periodOrder_(periods_());
+  return bookings_().filter(function (b) {
+    return b.roomId === roomId && b.date >= from && b.date <= to && isActive_(b);
+  }).sort(byDateThenPeriod_(order)).map(function (b) { return publicBooking_(b, me); });
 }
 
 /** 조건에 맞는 공간을 이유와 함께 추천합니다. */
@@ -1140,7 +1193,7 @@ function photoData_(id) { return 'data:image/gif;base64,R0lGODlhAQABAAAAACw='; }
 
   var server = { getInit: getInit, getDay: getDay, recommend: recommend, createBooking: createBooking,
     updateBooking: updateBooking, cancelBooking: cancelBooking, myBookings: myBookings,
-    adminBookings: adminBookings, decide: decide, getHistory: getHistory, getPhoto: getPhoto };
+    adminBookings: adminBookings, decide: decide, getHistory: getHistory, getPhoto: getPhoto, getRoomRange: getRoomRange };
 
   function runner(ok, bad) {
     var r = {
@@ -1446,7 +1499,7 @@ function renderSheet() {
   var top = old ? old.scrollTop : 0;
   if (!S.sheet) { root.innerHTML = ''; document.body.style.overflow = ''; return; }
   var sh = S.sheet;
-  var inner = sh.type === 'room' ? sheetRoom(sh) : sh.type === 'edit' ? sheetEdit(sh) : sh.type === 'cancel' ? sheetCancel(sh) : sheetReject(sh);
+  var inner = sh.type === 'room' ? sheetRoom(sh) : sh.type === 'sched' ? sheetSched(sh) : sh.type === 'edit' ? sheetEdit(sh) : sh.type === 'cancel' ? sheetCancel(sh) : sheetReject(sh);
   root.innerHTML = '<div class="scrim" data-a="close"></div><div class="sheet ' + (sh.type === 'cancel' || sh.type === 'reject' ? 'small' : '') +
     '" role="dialog" aria-modal="true" aria-labelledby="sheet-title">' + inner + '</div>';
   document.body.style.overflow = 'hidden';
@@ -1503,7 +1556,8 @@ function sheetRoom(sh) {
 
   if (!r.bookable) return h + '<div class="notice">이 공간은 신청을 받지 않아요.</div></div>';
 
-  h += '<h3 class="sec">예약 현황</h3>' + dateBar('sheet', sh.date);
+  h += '<button type="button" class="btn wide" data-a="sched">주간 · 월간 · 분기 일정 요약 보기</button>' +
+    '<h3 class="sec">예약 현황</h3>' + dateBar('sheet', sh.date);
   if (!S.days[sh.date]) return h + '<div class="spin"></div></div>';
   if (sh.confirm) return h + confirmHtml(sh) + '</div>';
 
@@ -1547,6 +1601,119 @@ function confirmHtml(sh) {
     '<div class="row"><button type="button" class="btn grow" data-a="unconfirm">돌아가기</button>' +
     '<button type="button" class="btn primary grow" data-a="submit" data-skip="1" ' + (sh.busy ? 'disabled' : '') + '>' + c.okCount + '회만 신청</button></div>';
 }
+/* ---------- 그리기: 일정 요약 ---------- */
+function schedRange(mode, anchor) {
+  var d = toDate(anchor);
+  if (mode === 'week') {
+    var mon = addDays(anchor, -((d.getDay() + 6) % 7));
+    return { from: mon, to: addDays(mon, 6), label: fmtShort(mon) + ' ~ ' + fmtShort(addDays(mon, 6)) };
+  }
+  var y = d.getFullYear(), m = d.getMonth();
+  if (mode === 'month') return { from: fromDate(new Date(y, m, 1)), to: fromDate(new Date(y, m + 1, 0)), label: y + '년 ' + (m + 1) + '월' };
+  var q = Math.floor(m / 3);
+  return { from: fromDate(new Date(y, q * 3, 1)), to: fromDate(new Date(y, q * 3 + 3, 0)), label: y + '년 ' + (q + 1) + '분기 (' + (q * 3 + 1) + '~' + (q * 3 + 3) + '월)' };
+}
+function schedLoad() {
+  var sh = S.sheet, r = schedRange(sh.mode, sh.anchor), key = r.from + '~' + r.to;
+  if (sh.cache[key]) return;
+  call('getRoomRange', sh.id, r.from, r.to).then(function (list) {
+    if (S.sheet !== sh) return;
+    sh.cache[key] = list;
+    renderSheet();
+  }).catch(fail);
+}
+function schedIndex(list) {
+  var map = {};
+  list.forEach(function (b) {
+    var day = map[b.date] || (map[b.date] = {});
+    b.periods.forEach(function (p) { day[p] = b; });
+  });
+  return map;
+}
+function calHtml(year, month, idx, mini) {
+  var total = S.init.periods.length || 1;
+  var first = new Date(year, month, 1), days = new Date(year, month + 1, 0).getDate();
+  var h = '<div class="cal ' + (mini ? 'mini' : '') + '">' + [1, 2, 3, 4, 5, 6, 0].map(function (d) { return '<div class="dow">' + WD[d] + '</div>'; }).join('');
+  for (var i = 0; i < (first.getDay() + 6) % 7; i++) h += '<div class="pad0"></div>';
+  for (var d = 1; d <= days; d++) {
+    var date = fromDate(new Date(year, month, d));
+    var n = idx[date] ? Object.keys(idx[date]).length : 0;
+    var lv = !n ? 0 : Math.min(4, Math.ceil(n / total * 4));
+    h += '<button type="button" class="h' + lv + (date === S.init.today ? ' today' : '') + '" data-a="sched-day" data-d="' + date + '" aria-label="' + fmt(date) + ', 예약된 교시 ' + n + '개">' +
+      '<b>' + d + '</b>' + (mini ? '' : '<small>' + (n ? n + '교시' : '') + '</small>') + '</button>';
+  }
+  return h + '</div>';
+}
+function sheetSched(sh) {
+  var r = room(sh.id), range = schedRange(sh.mode, sh.anchor), list = sh.cache[range.from + '~' + range.to];
+  var h = sheetHead(roomLabel(r) + ' · 일정 요약', r.name) + '<div class="sheet-body">' +
+    '<button type="button" class="btn small" data-a="sched-back">‹ 공간 정보·신청으로</button>' +
+    '<div class="chips" style="margin-top:12px" role="group" aria-label="요약 단위">' + [['week', '주간'], ['month', '월간'], ['quarter', '분기']].map(function (m) {
+      return '<button type="button" class="chip ' + (sh.mode === m[0] ? 'on' : '') + '" data-a="sched-mode" data-m="' + m[0] + '" aria-pressed="' + (sh.mode === m[0]) + '">' + m[1] + '</button>';
+    }).join('') + '</div>' +
+    '<div class="rangebar"><button type="button" class="btn" data-a="sched-shift" data-d="-1" aria-label="이전">‹</button><span class="lab">' + esc(range.label) + '</span>' +
+    '<button type="button" class="btn" data-a="sched-shift" data-d="1" aria-label="다음">›</button><button type="button" class="btn" data-a="sched-shift" data-d="0">오늘</button></div>';
+  if (!list) return h + '<div class="spin"></div></div>';
+
+  var idx = schedIndex(list), ps = S.init.periods;
+  var used = 0, wkUsed = 0, wkDays = 0, purpose = {}, byWd = [0, 0, 0, 0, 0, 0, 0];
+  for (var d = range.from; d <= range.to; d = addDays(d, 1)) {
+    var w = wd(d), n = idx[d] ? Object.keys(idx[d]).length : 0;
+    used += n; byWd[w] += n;
+    if (w >= 1 && w <= 5) { wkDays++; wkUsed += n; }
+  }
+  list.forEach(function (b) {
+    var k = b.purpose || (b.mine ? '내 예약' : '예약');
+    purpose[k] = (purpose[k] || 0) + b.periods.length;
+  });
+  var rate = wkDays && ps.length ? Math.round(wkUsed / (wkDays * ps.length) * 100) : 0;
+  h += '<div class="stats"><div class="stat"><b>' + list.length + '건</b><span>예약</span></div>' +
+    '<div class="stat"><b>' + used + '</b><span>사용 교시</span></div>' +
+    '<div class="stat"><b>' + rate + '%</b><span>평일 이용률</span></div></div>';
+
+  if (sh.mode === 'week') {
+    var days = [];
+    for (var i = 0; i < 7; i++) days.push(addDays(range.from, i));
+    if (!idx[days[5]] && !idx[days[6]]) days = days.slice(0, 5);
+    h += '<table class="wk"><thead><tr><th class="pcol">교시</th>' + days.map(function (d) {
+      return '<th class="' + (d === S.init.today ? 'today' : '') + '"><button type="button" data-a="sched-day" data-d="' + d + '" aria-label="' + fmt(d) + ' 보기">' + WD[wd(d)] + '<small>' + toDate(d).getDate() + '</small></button></th>';
+    }).join('') + '</tr></thead><tbody>' + ps.map(function (p) {
+      return '<tr><th class="pcol" scope="row">' + esc(p.name) + '</th>' + days.map(function (d) {
+        var b = idx[d] && idx[d][p.id];
+        if (!b) return '<td></td>';
+        var t = b.purpose || (b.status === '확정' ? '사용 중' : '승인 대기');
+        return '<td class="' + slotClass(b) + '" title="' + esc(t + (b.name ? ' · ' + b.name : '')) + '"><div>' + esc(t) + '</div></td>';
+      }).join('') + '</tr>';
+    }).join('') + '</tbody></table><p class="sub" style="margin-top:8px">요일을 누르면 그날의 예약 현황으로 가요.</p>';
+  } else if (sh.mode === 'month') {
+    var a = toDate(range.from);
+    h += calHtml(a.getFullYear(), a.getMonth(), idx, false);
+  } else {
+    var q = toDate(range.from);
+    h += '<div class="qgrid">' + [0, 1, 2].map(function (k) {
+      var m = new Date(q.getFullYear(), q.getMonth() + k, 1);
+      return '<div><h4>' + (m.getMonth() + 1) + '월</h4>' + calHtml(m.getFullYear(), m.getMonth(), idx, true) + '</div>';
+    }).join('') + '</div>';
+  }
+  if (sh.mode !== 'week') {
+    h += '<div class="heatkey">적음 <i style="background:var(--soft)"></i><i class="h1"></i><i class="h2"></i><i class="h3"></i><i class="h4"></i> 많음 · 날짜를 누르면 그날로 가요</div>';
+    var max = Math.max.apply(null, byWd) || 1;
+    h += '<h3 class="sec">요일별 사용 교시</h3><ul class="bars">' + [1, 2, 3, 4, 5, 6, 0].filter(function (w) { return w >= 1 && w <= 5 || byWd[w]; }).map(function (w) {
+      return '<li><div class="bar"><i style="width:' + Math.round(byWd[w] / max * 100) + '%"></i><span>' + WD[w] + '요일</span></div><em>' + byWd[w] + '</em></li>';
+    }).join('') + '</ul>';
+  }
+  var top = Object.keys(purpose).sort(function (x, y) { return purpose[y] - purpose[x]; }).slice(0, 6);
+  if (top.length) {
+    var pm = purpose[top[0]];
+    h += '<h3 class="sec">많이 쓴 내용 (교시 수)</h3><ul class="bars">' + top.map(function (k) {
+      return '<li><div class="bar"><i style="width:' + Math.round(purpose[k] / pm * 100) + '%"></i><span>' + esc(k) + '</span></div><em>' + purpose[k] + '</em></li>';
+    }).join('') + '</ul>';
+  } else {
+    h += '<p class="empty">이 기간에는 예약이 없어요.</p>';
+  }
+  return h + '</div>';
+}
+
 function sheetEdit(sh) {
   var b = sh.b, r = room(b.roomId);
   var h = sheetHead('예약 수정 · ' + fmt(b.date), r ? r.name : '') + '<div class="sheet-body">';
@@ -1791,6 +1958,22 @@ var A = {
   room: function (el) { openRoom(el.dataset.id); },
   close: function () { S.sheet = null; renderSheet(); },
   video: function () { S.sheet.video = true; renderSheet(); },
+  sched: function () {
+    S.sheet = { type: 'sched', id: S.sheet.id, mode: 'week', anchor: S.sheet.date, cache: {} };
+    renderSheet();
+    schedLoad();
+  },
+  'sched-mode': function (el) { S.sheet.mode = el.dataset.m; S.sheet.keepScroll = false; renderSheet(); schedLoad(); },
+  'sched-shift': function (el) {
+    var sh = S.sheet, n = +el.dataset.d, d = toDate(sh.anchor);
+    if (!n) sh.anchor = S.init.today;
+    else if (sh.mode === 'week') sh.anchor = addDays(sh.anchor, 7 * n);
+    else sh.anchor = fromDate(new Date(d.getFullYear(), d.getMonth() + (sh.mode === 'month' ? n : 3 * n), 1));
+    renderSheet();
+    schedLoad();
+  },
+  'sched-day': function (el) { openRoom(S.sheet.id, { date: el.dataset.d }); },
+  'sched-back': function () { openRoom(S.sheet.id, { date: S.sheet.anchor }); },
   pick: function (el) {
     var sel = S.sheet.sel, p = el.dataset.p, i = sel.indexOf(p);
     if (i >= 0) sel.splice(i, 1); else sel.push(p);

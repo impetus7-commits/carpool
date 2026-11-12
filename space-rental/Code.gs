@@ -3,7 +3,7 @@
  *
  * 화면에서 부르는 함수:
  *   getInit, getDay, recommend, createBooking, updateBooking, cancelBooking,
- *   myBookings, adminBookings, decide, getHistory, getPhoto
+ *   myBookings, adminBookings, decide, getHistory, getPhoto, getRoomRange
  *
  * 데이터는 Store.gs 의 readTab_/appendRows_/updateRows_ 로만 읽고 씁니다.
  * 모든 쓰기는 withLock_ 안에서 처리하고 [기록] 탭에 남깁니다.
@@ -183,6 +183,17 @@ function getDay(date) {
   var me = me_();
   return bookings_().filter(function (b) { return b.date === date && isActive_(b); })
     .map(function (b) { return publicBooking_(b, me); });
+}
+
+/** 한 공간의 기간(최대 100일) 안 살아 있는 예약 — 주간·월간·분기 일정 요약용 */
+function getRoomRange(roomId, from, to) {
+  if (!isDate_(from) || !isDate_(to) || to < from) throw new Error('기간이 올바르지 않아요.');
+  if (toUtc_(to) - toUtc_(from) > 100 * 86400000) throw new Error('한 번에 100일까지만 볼 수 있어요.');
+  var me = me_();
+  var order = periodOrder_(periods_());
+  return bookings_().filter(function (b) {
+    return b.roomId === roomId && b.date >= from && b.date <= to && isActive_(b);
+  }).sort(byDateThenPeriod_(order)).map(function (b) { return publicBooking_(b, me); });
 }
 
 /** 조건에 맞는 공간을 이유와 함께 추천합니다. */

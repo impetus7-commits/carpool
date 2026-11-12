@@ -223,3 +223,18 @@ test('사진: [공간] 탭에 등록된 드라이브 파일만 서버가 대신 
   assert.throws(() => s.getPhoto('9ZZZdEfGhIjKlMnOpQrStUvWxYz012345'), /등록된 사진이 아니에요/);
   assert.throws(() => s.getPhoto(''), /등록된 사진이 아니에요/);
 });
+
+test('일정 요약: 한 공간의 기간 안 살아 있는 예약만 날짜순으로 준다', () => {
+  const s = server(TEACHER);
+  s.createBooking(base({ date: '2026-11-20', periods: ['P3'] }));
+  s.createBooking(base({ date: '2026-11-13', periods: ['P5', 'P6'] }));
+  s.createBooking(base({ date: '2026-11-16', periods: ['P1'], roomId: 'A203' }));
+  s.createBooking(base({ date: '2026-12-25', periods: ['P1'] }));
+  const cancelled = plain(s.myBookings()).find((b) => b.date === '2026-11-20');
+  s.cancelBooking(cancelled.id, 'one');
+  const list = plain(s.getRoomRange('A202', '2026-11-01', '2026-11-30'));
+  assert.deepEqual(list.map((b) => b.date), ['2026-11-13']);
+  assert.deepEqual(list[0].periods, ['P5', 'P6']);
+  assert.throws(() => s.getRoomRange('A202', '2026-11-30', '2026-11-01'), /기간이 올바르지/);
+  assert.throws(() => s.getRoomRange('A202', '2026-01-01', '2026-12-31'), /100일까지만/);
+});
