@@ -90,7 +90,7 @@ function setup() {
     if (sh.getLastRow() === 0) {
       sh.getRange(1, 1, 1, head.length).setValues([head]);
     }
-    sh.getRange(1, 1, 1, head.length).setFontWeight('bold').setBackground('#1f3a5f').setFontColor('#ffffff');
+    sh.getRange(1, 1, 1, head.length).setFontWeight('bold').setBackground('#1c7c45').setFontColor('#ffffff');
     sh.setFrozenRows(1);
     if (sh.getLastRow() === 1 && SAMPLE_[name]) {
       sh.getRange(2, 1, SAMPLE_[name].length, head.length).setValues(SAMPLE_[name]);

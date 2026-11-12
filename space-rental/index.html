@@ -10,26 +10,29 @@
 <link href="https://fonts.googleapis.com/css2?family=Hahmlet:wght@600;700&family=IBM+Plex+Sans+KR:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
 :root {
-  --bg: #f3f0e8; --card: #fffdf8; --ink: #1b2333; --sub: #5d6778; --line: #d9d2c3; --soft: #ebe6da;
-  --brand: #1f3a5f; --brand-ink: #ffffff; --brand-soft: #e3eaf3;
-  --free: #1f7350; --free-bg: #dff0e6;
-  --busy: #a83f31; --busy-bg: #f6dfda;
-  --wait: #8a5d00; --wait-bg: #f7e9c2;
-  --mine: #1f3a5f; --mine-bg: #dbe6f5;
-  --grid: rgba(31, 58, 95, .07);
-  --shadow: 0 1px 2px rgba(27, 35, 51, .06), 0 8px 24px rgba(27, 35, 51, .08);
+  /* 그린 파스텔 톤 */
+  --bg: #f0f8f1; --card: #fcfefb; --ink: #1c3a29; --sub: #567062; --line: #cde3d2; --soft: #e2f1e5;
+  --brand: #1c7c45; --brand-ink: #ffffff; --brand-soft: #d5efdc;
+  --top-bg: #c6ead0; --top-ink: #143d27; --top-on: rgba(255, 255, 255, .6);
+  --free: #1c7c45; --free-bg: #dcf3e2;
+  --busy: #b0463c; --busy-bg: #fbe2dd;
+  --wait: #866000; --wait-bg: #fcefc6;
+  --mine: #2a6a8c; --mine-bg: #dcecf6;
+  --grid: rgba(28, 124, 69, .08);
+  --shadow: 0 1px 2px rgba(28, 58, 41, .05), 0 8px 24px rgba(28, 58, 41, .08);
   --display: 'Hahmlet', 'Noto Serif KR', serif;
   --body: 'IBM Plex Sans KR', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
 }
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #11151c; --card: #1a2029; --ink: #e9ecf2; --sub: #9aa4b5; --line: #2e3745; --soft: #232b37;
-    --brand: #9fc0ec; --brand-ink: #10203a; --brand-soft: #22324a;
-    --free: #72cfa2; --free-bg: #173427;
-    --busy: #f29384; --busy-bg: #3f211d;
-    --wait: #e8c05f; --wait-bg: #3a2f12;
-    --mine: #9fc0ec; --mine-bg: #22324a;
-    --grid: rgba(159, 192, 236, .07);
+    --bg: #0f1913; --card: #17231b; --ink: #e5f2e8; --sub: #9bb2a3; --line: #2a3d30; --soft: #203026;
+    --brand: #8fd8a8; --brand-ink: #0e2a19; --brand-soft: #1f3b2a;
+    --top-bg: #1b3526; --top-ink: #dcf3e2; --top-on: rgba(143, 216, 168, .2);
+    --free: #84d6a2; --free-bg: #173624;
+    --busy: #f29a8d; --busy-bg: #40221e;
+    --wait: #e8c466; --wait-bg: #3a3012;
+    --mine: #8fc6e8; --mine-bg: #1c3344;
+    --grid: rgba(143, 216, 168, .07);
     --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 8px 24px rgba(0, 0, 0, .35);
   }
 }
@@ -42,7 +45,7 @@ h1, h2, h3, p { margin: 0; }
 :focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; border-radius: 6px; }
 
 /* ----- 머리 ----- */
-.top { position: sticky; top: 0; z-index: 20; background: var(--brand); color: var(--brand-ink); padding: max(10px, env(safe-area-inset-top)) 16px 10px; }
+.top { position: sticky; top: 0; z-index: 20; background: var(--top-bg); color: var(--top-ink); border-bottom: 1px solid var(--line); padding: max(10px, env(safe-area-inset-top)) 16px 10px; }
 .top-in { max-width: 1180px; margin: 0 auto; display: flex; align-items: center; gap: 16px; }
 .brand { min-width: 0; flex: 1; }
 .brand small { display: block; font-size: 12px; letter-spacing: .08em; opacity: .8; }
@@ -52,7 +55,7 @@ h1, h2, h3, p { margin: 0; }
 .nav { display: flex; gap: 4px; }
 .nav button { border: 0; background: transparent; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 4px; font-size: 12px; font-weight: 500; flex: 1; border-radius: 10px; position: relative; }
 .nav svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-.nav .n { position: absolute; top: 2px; left: calc(50% + 6px); background: var(--busy); color: #fff; border-radius: 99px; font-size: 11px; min-width: 18px; padding: 0 5px; line-height: 18px; }
+.nav .n { position: absolute; top: 2px; left: calc(50% + 6px); background: var(--busy); color: var(--card); border-radius: 99px; font-size: 11px; min-width: 18px; padding: 0 5px; line-height: 18px; }
 .nav.bottom { position: fixed; z-index: 20; left: 0; right: 0; bottom: 0; background: var(--card); border-top: 1px solid var(--line); padding: 6px 8px max(6px, env(safe-area-inset-bottom)); color: var(--sub); }
 .nav.bottom button.on { color: var(--brand); background: var(--brand-soft); }
 .nav.inline { display: none; }
@@ -214,7 +217,7 @@ details.more > summary { cursor: pointer; color: var(--sub); padding: 10px 0; fo
   .nav.bottom { display: none; }
   .nav.inline { display: flex; }
   .nav.inline button { flex-direction: row; gap: 8px; padding: 8px 14px; font-size: 15px; color: inherit; opacity: .8; flex: none; }
-  .nav.inline button.on { background: rgba(255, 255, 255, .16); opacity: 1; }
+  .nav.inline button.on { background: var(--top-on); opacity: 1; }
   .nav.inline .n { position: static; }
   main { padding: 24px 24px 60px; }
   .mapgrid { grid-template-columns: 340px 1fr; align-items: start; }
