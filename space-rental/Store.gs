@@ -60,7 +60,10 @@ function appendRows_(name, objs) {
   var vals = objs.map(function (o) {
     return head.map(function (h) { return cell_(o[h]); });
   });
-  sh.getRange(sh.getLastRow() + 1, 1, vals.length, head.length).setNumberFormat('@').setValues(vals);
+  var start = sh.getLastRow() + 1;
+  var need = start + vals.length - 1 - sh.getMaxRows();
+  if (need > 0) sh.insertRowsAfter(sh.getMaxRows(), need);
+  sh.getRange(start, 1, vals.length, head.length).setNumberFormat('@').setValues(vals);
   delete tabCache_[name];
 }
 
