@@ -1249,6 +1249,7 @@ function statusBadge(st) {
   return '<span class="badge ' + cls + '">' + esc(st === '승인대기' ? '승인 대기' : st) + '</span>';
 }
 function canBook() { return S.init.me.registered; }
+function ppl(n) { return n ? ' · ' + n + '명' : ''; }
 
 /* ---------- 데이터 ---------- */
 function loadDay(date, force) {
@@ -1519,7 +1520,7 @@ function sheetEdit(sh) {
   if (!S.days[b.date]) return h + '<div class="spin"></div></div>';
   h += '<h3 class="sec" style="margin-top:6px">교시</h3>' + periodRows(b.roomId, b.date, sh.sel, b.id) +
     '<label class="f" for="f-purpose">사용 목적</label><input class="in" id="f-purpose" data-f="purpose" maxlength="100" value="' + esc(sh.f.purpose) + '">' +
-    '<label class="f" for="f-people">사용 인원' + (r && r.capacity ? ' (정원 ' + r.capacity + '명)' : '') + '</label><input class="in" id="f-people" data-f="people" type="number" inputmode="numeric" min="1" value="' + esc(sh.f.people) + '">';
+    '<label class="f" for="f-people">사용 인원' + (r && r.capacity ? ' (정원 ' + r.capacity + '명)' : '') + '</label><input class="in" id="f-people" data-f="people" type="number" inputmode="numeric" min="1" value="' + esc(sh.f.people || '') + '">';
   if (b.role === '학생' && !S.init.me.admin) h += '<p class="sub" style="margin-top:12px">교시를 바꾸면 다시 관리자 승인을 받아야 해요.</p>';
   if (sh.err) h += '<div class="err" role="alert">' + esc(sh.err) + '</div>';
   h += '<div class="sticky-go"><button type="button" class="btn primary wide" data-a="save" ' + (sh.busy ? 'disabled' : '') + '>' + (sh.busy ? '저장하는 중…' : '수정 저장') + '</button></div>';
@@ -1603,7 +1604,7 @@ function groupCard(g, admin) {
   var b = g.items[0], r = room(b.roomId);
   var head = '<p class="eyebrow">' + esc(r ? roomLabel(r) : '') + (g.items.length > 1 ? ' · 반복 ' + g.items.length + '회' : '') + '</p>' +
     '<h3>' + esc(r ? r.name : '(삭제된 공간)') + '</h3>' +
-    '<p class="meta">' + esc(b.purpose) + ' · ' + b.people + '명' + (admin ? ' · ' + esc(b.name) + (b.dept ? ' (' + esc(b.dept) + ')' : '') : '') + '</p>';
+    '<p class="meta">' + esc(b.purpose) + ppl(b.people) + (admin ? ' · ' + esc(b.name) + (b.dept ? ' (' + esc(b.dept) + ')' : '') : '') + '</p>';
   if (g.items.length === 1) {
     return '<article class="card item">' + head + '<p class="meta"><b style="color:var(--ink)">' + esc(fmt(b.date)) + '</b> · ' + esc(pnames(b.periods)) + ' ' + statusBadge(b.status) + '</p>' +
       (b.memo ? '<p class="meta">사유: ' + esc(b.memo) + '</p>' : '') +
@@ -1664,7 +1665,7 @@ function viewAdmin() {
       return '<article class="card item"><p class="eyebrow">' + esc(r ? roomLabel(r) : '') + ' · 신청 ' + esc(b.createdAt) + '</p>' +
         '<h3>' + esc(r ? r.name : '(삭제된 공간)') + ' · ' + esc(pnames(b.periods)) + '</h3>' +
         '<p class="meta"><b style="color:var(--ink)">' + esc(b.name) + '</b>' + (b.dept ? ' (' + esc(b.dept) + ')' : '') + ' · ' + esc(b.email) + '</p>' +
-        '<p class="meta">' + esc(b.purpose) + ' · ' + b.people + '명</p>' +
+        '<p class="meta">' + esc(b.purpose) + ppl(b.people) + '</p>' +
         '<p class="meta">' + (g.items.length > 1 ? '반복 ' + g.items.length + '회: ' : '') + g.items.map(function (x) { return esc(fmtShort(x.date)); }).join(', ') + '</p>' +
         '<div class="acts"><button type="button" class="btn small primary" data-a="approve" data-id="' + esc(b.id) + '">' + (g.items.length > 1 ? g.items.length + '회 모두 승인' : '승인') + '</button>' +
         '<button type="button" class="btn small danger" data-a="reject" data-id="' + esc(b.id) + '">반려</button></div></article>';
@@ -1677,7 +1678,7 @@ function viewAdmin() {
     var r = room(b.roomId);
     var live = b.status === '확정' || b.status === '승인대기';
     return '<div class="drow ' + (live ? '' : 'dim') + '" style="' + (b === a.data.list[0] ? 'border-top:0' : '') + '"><span class="grow"><b>' + esc(fmtShort(b.date)) + '</b> ' + esc(pnames(b.periods)) +
-      '<br>' + esc(r ? r.name : '(삭제된 공간)') + ' · ' + esc(b.name) + ' · ' + esc(b.purpose) + ' · ' + b.people + '명' + (b.groupId ? ' · 반복' : '') + '</span>' +
+      '<br>' + esc(r ? r.name : '(삭제된 공간)') + ' · ' + esc(b.name) + ' · ' + esc(b.purpose) + ppl(b.people) + (b.groupId ? ' · 반복' : '') + '</span>' +
       statusBadge(b.status) + bookingActs(b, true) + '</div>';
   }).join('') + '</div>';
 }
