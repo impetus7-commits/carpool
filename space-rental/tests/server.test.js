@@ -475,3 +475,17 @@ test('화면(index.html)의 스크립트에 문법 오류가 없다', () => {
   const src = html.slice(start + 8, html.indexOf('</script>', start));
   assert.doesNotThrow(() => new Function(src));
 });
+
+test('통계: 관리자만 기간 안의 모든 공간 예약을 받는다', () => {
+  const s = server(TEACHER);
+  s.createBooking(base());
+  s.createBooking(base({ roomId: 'A203', date: '2026-11-20', school: ['중'] }));
+  s.createBooking(base({ date: '2026-12-25' }));
+  const gone = plain(s.myBookings()).find((b) => b.date === '2026-11-20');
+  assert.throws(() => s.getStats('2026-11-01', '2026-11-30'), /관리자만/);
+  s.MOCK.user = ADMIN;
+  assert.deepEqual(plain(s.getStats('2026-11-01', '2026-11-30')).map((b) => b.roomId + ' ' + b.date + ' ' + b.school), ['A202 2026-11-13 고', 'A203 2026-11-20 중']);
+  s.cancelBooking(gone.id, 'one');
+  assert.equal(plain(s.getStats('2026-11-01', '2026-11-30')).length, 1, '취소한 예약은 빼고');
+  assert.throws(() => s.getStats('2026-01-01', '2027-12-31'), /1년까지만/);
+});

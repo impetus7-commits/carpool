@@ -94,6 +94,7 @@ h1, h2, h3, p { margin: 0; }
 .hcal .mk { background: var(--mine-bg); box-shadow: inset 0 0 0 1.5px var(--mine); color: var(--mine); font-weight: 600; }
 .hcal .mw { background: var(--wait-bg); box-shadow: inset 0 0 0 1.5px var(--wait); color: var(--wait); font-weight: 600; }
 .hcal .pick { outline: 3px solid var(--brand); outline-offset: 1px; }
+.hcal .h1 { background: var(--busy-bg); } .hcal .h2 { background: color-mix(in srgb, var(--busy) 32%, var(--card)); } .hcal .h3 { background: color-mix(in srgb, var(--busy) 50%, var(--card)); } .hcal .h4 { background: var(--busy); color: var(--card); }
 .teams { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 10px; text-align: center; font-size: 13px; }
 .teams b { display: block; font-size: 15px; margin-top: 6px; }
 .teams span { color: var(--sub); font-size: 12px; }
@@ -184,7 +185,6 @@ input.in, select.in { width: 100%; border: 1px solid var(--line); background: va
 .strip i.busy { background: var(--busy); opacity: 1; }
 .strip i.wait { background: var(--wait); opacity: 1; }
 .strip i.mine { background: var(--mine); opacity: 1; }
-.corridor { border-top: 2px dashed var(--ink); text-align: center; font-size: 12px; letter-spacing: .3em; color: var(--sub); padding: 6px; background: var(--card); border-radius: 0 0 4px 4px; }
 .legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 13px; color: var(--sub); margin-top: 12px; }
 .legend span { display: inline-flex; align-items: center; gap: 6px; }
 
@@ -273,7 +273,7 @@ input.in, select.in { width: 100%; border: 1px solid var(--line); background: va
 .heatkey i.h4 { background: var(--busy); }
 .bars { list-style: none; padding: 0; margin: 6px 0 0; font-size: 14px; }
 .bars li { margin-bottom: 6px; }
-.barbtn { display: grid; grid-template-columns: minmax(0, 1fr) 44px; gap: 8px; align-items: center; width: 100%; border: 0; background: none; padding: 0; text-align: left; min-height: 36px; }
+.barbtn { display: grid; grid-template-columns: minmax(0, 1fr) 56px; gap: 8px; align-items: center; width: 100%; border: 0; background: none; padding: 0; text-align: left; min-height: 36px; }
 .barbtn.on .bar { outline: 2px solid var(--brand); }
 .barbtn.on .bar i { background: var(--brand); opacity: .35; }
 .barbtn:hover .bar { filter: brightness(.97); }
@@ -293,7 +293,67 @@ input.in, select.in { width: 100%; border: 1px solid var(--line); background: va
 .bars .bar { background: var(--soft); border-radius: 6px; overflow: hidden; position: relative; min-height: 28px; display: flex; align-items: center; }
 .bars .bar i { position: absolute; left: 0; top: 0; bottom: 0; background: var(--brand-soft); }
 .bars .bar span { position: relative; padding: 2px 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.bars em { font-style: normal; color: var(--sub); text-align: right; font-size: 13px; }
+.bars em { font-style: normal; color: var(--sub); text-align: right; font-size: 13px; white-space: nowrap; }
+
+/* ----- 통계 보고서 (화면과 PDF 공용) ----- */
+.report { display: grid; gap: 12px; }
+.report.print { --card: #ffffff; --ink: #1c3a29; --sub: #567062; --line: #cde3d2; --soft: #e9f4ec; --brand: #1c7c45; --brand-ink: #ffffff; --brand-soft: #d5efdc;
+  --busy: #b0463c; --wait: #b98a16; --mine: #2a6a8c; background: #fff; color: var(--ink); font-family: var(--body); gap: 0; }
+.report.print > * { margin-bottom: 0; border-radius: 0; box-shadow: none; }
+.rhead { background: var(--brand); color: var(--brand-ink); border-radius: 16px; padding: 18px 20px; }
+.rhead p { font-size: 13px; opacity: .85; }
+.rhead h3 { font: 700 26px/1.25 var(--display); margin: 2px 0 10px; }
+.rmeta { display: flex; gap: 6px 18px; flex-wrap: wrap; font-size: 13px; }
+.rmeta b { font-weight: 600; }
+.rsec { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 16px 18px; }
+.rsec h4 { margin: 0 0 2px; font: 700 17px var(--display); display: flex; align-items: center; gap: 8px; }
+.rsec h4::before { content: ''; width: 6px; height: 18px; border-radius: 3px; background: var(--brand); }
+.rsub { font-size: 12.5px; color: var(--sub); margin-bottom: 10px; }
+.rtiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 10px; }
+.rtiles > div { background: var(--soft); border-radius: 12px; padding: 12px 8px; text-align: center; }
+.rtiles b { display: block; font: 700 24px var(--display); color: var(--brand); }
+.rtiles b small { font-size: 14px; font-weight: 600; }
+.rtiles span { font-size: 12px; color: var(--sub); }
+.rbars { display: grid; gap: 6px; }
+.rbar { display: grid; grid-template-columns: 22px minmax(70px, 34%) 1fr 48px; gap: 8px; align-items: center; font-size: 13.5px; }
+.rk { width: 22px; height: 22px; border-radius: 50%; background: var(--soft); display: grid; place-items: center; font-size: 11px; font-weight: 700; color: var(--sub); }
+.rbar:nth-child(-n+3) .rk { background: var(--brand); color: var(--brand-ink); }
+.rl { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rt { background: var(--soft); border-radius: 6px; height: 16px; overflow: hidden; }
+.rt i { display: block; height: 100%; background: var(--brand); border-radius: 6px; }
+.rbar b { text-align: right; font-weight: 600; }
+.rcols { display: flex; gap: 6px; align-items: flex-end; height: 170px; padding-top: 4px; }
+.rcol { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; height: 100%; font-size: 12px; }
+.rcol b { font-weight: 600; font-size: 12.5px; }
+.rct { flex: 1; width: 100%; max-width: 46px; display: flex; align-items: flex-end; background: var(--soft); border-radius: 6px 6px 0 0; margin: 3px 0; overflow: hidden; }
+.rct i { display: block; width: 100%; background: var(--brand); border-radius: 6px 6px 0 0; }
+.rcl { color: var(--sub); white-space: nowrap; }
+.rsplit { display: flex; height: 30px; border-radius: 8px; overflow: hidden; background: var(--soft); }
+.rsplit i, .rlegend i { display: block; }
+.s0 { background: var(--wait); } .s1 { background: var(--brand); } .s2 { background: var(--mine); }
+.rlegend { display: flex; gap: 6px 18px; flex-wrap: wrap; margin-top: 10px; font-size: 13.5px; }
+.rlegend span { display: inline-flex; align-items: center; gap: 6px; }
+.rlegend i { width: 12px; height: 12px; border-radius: 3px; }
+@media (max-width: 520px) { .rtiles { grid-template-columns: repeat(2, 1fr); } .rcl { font-size: 10.5px; } }
+
+/* ----- 누를 수 있는 곳 표시 ----- */
+button:not(:disabled), a, summary, select, input[type="checkbox"], input[type="date"] { cursor: pointer; }
+.room, .fl, .chip, .btn, .prow:not(:disabled), .barbtn, .cal button:not(:disabled), .yrow button, .wk th button, .dlist .drow, .nav button { transition: transform .08s, box-shadow .12s, filter .12s; }
+.room:hover, .prow:not(:disabled):hover, .cal button:not(:disabled):hover, .chip:hover, .btn:not(:disabled):hover { box-shadow: 0 0 0 2px var(--brand); }
+.fl:not(.on):hover, .dlist .drow:hover, .nav button:hover { background: var(--brand-soft); }
+.yrow button:hover { outline: 2px solid var(--brand); }
+.room:active, .chip:active, .btn:not(:disabled):active, .prow:not(:disabled):active, .fl:active, .cal button:not(:disabled):active { transform: scale(.97); }
+/* 화살표: 누르면 다음 화면이 열리는 곳 */
+.room { position: relative; padding-right: 26px; }
+.room::after { content: '›'; position: absolute; right: 8px; top: 6px; font-size: 20px; line-height: 1; font-weight: 700; opacity: .55; }
+.fl em::after { content: ' ›'; font-weight: 700; font-size: 16px; }
+.barbtn em::after { content: ' ▾'; font-size: 11px; }
+.barbtn.on em::after { content: ' ▴'; }
+.barbtn[data-a="sched-month"] em::after { content: ' ›'; font-size: 14px; }
+.dlist button.drow::after { content: '›'; font-size: 18px; font-weight: 700; color: var(--sub); margin-left: 4px; }
+.wk th button { text-decoration: underline dotted; text-underline-offset: 3px; }
+.cal button:not(:disabled) b, .hcal .tap { text-decoration: underline dotted; text-underline-offset: 3px; }
+.demo-in .room::after, .demo-in .barbtn em::after { opacity: .35; }
 
 /* ----- 추천 ----- */
 .findgrid { display: grid; gap: 14px; }
@@ -886,7 +946,7 @@ function setup() {
  *
  * 화면에서 부르는 함수:
  *   getInit, getDay, recommend, createBooking, updateBooking, cancelBooking,
- *   myBookings, adminBookings, getHistory, getPhoto, getRoomRange, runLedgerSync
+ *   myBookings, adminBookings, getHistory, getPhoto, getRoomRange, getStats, runLedgerSync
  *
  * 데이터는 Store.gs 의 readTab_/appendRows_/updateRows_ 로만 읽고 씁니다.
  * 모든 쓰기는 withLock_ 안에서 처리하고 [기록] 탭에 남깁니다.
@@ -1506,6 +1566,15 @@ function confirmPending() {
   });
 }
 
+/** 통계용: 기간(최대 1년) 안의 살아 있는 예약 전체. 관리자만. */
+function getStats(from, to) {
+  var me = requireAdmin_();
+  if (!isDate_(from) || !isDate_(to) || to < from) throw new Error('기간이 올바르지 않아요.');
+  if (toUtc_(to) - toUtc_(from) > 370 * 86400000) throw new Error('한 번에 1년까지만 볼 수 있어요.');
+  return bookings_().filter(function (b) { return isActive_(b) && b.date >= from && b.date <= to; })
+    .map(function (b) { return publicBooking_(b, me); });
+}
+
 /** 관리자가 화면에서 누르는 "지금 가져오기" */
 function runLedgerSync() {
   requireAdmin_();
@@ -1646,7 +1715,7 @@ var Session = { getEffectiveUser: function () { return { getEmail: function () {
 
   var server = { getInit: getInit, getDay: getDay, recommend: recommend, createBooking: createBooking,
     updateBooking: updateBooking, cancelBooking: cancelBooking, myBookings: myBookings,
-    adminBookings: adminBookings, getHistory: getHistory, getPhoto: getPhoto, getRoomRange: getRoomRange, runLedgerSync: runLedgerSync };
+    adminBookings: adminBookings, getHistory: getHistory, getPhoto: getPhoto, getRoomRange: getRoomRange, getStats: getStats, runLedgerSync: runLedgerSync };
 
   function runner(ok, bad) {
     var r = {
@@ -1694,6 +1763,9 @@ var S = {
   mineCal: { month: '', day: '' },   // 내 예약 달력: 보고 있는 달, 고른 날짜
   admin: { tab: 'list', data: null, hist: null, q: '', from: '', to: '', syncing: false },
   pendingCount: 0,
+  // 관리 → 통계: 기간, 공간(빈 값 = 전체), 불러온 예약, 보고서에 넣을 항목
+  stats: { from: '', to: '', room: '', data: null, key: '', busy: false, err: '', pdf: '',
+    pick: { sum: true, room: true, school: true, wd: true, month: true, period: true, unit: true, purpose: true } },
   photos: {}   // 드라이브 파일 ID → 서버가 읽어 준 그림(data: 주소) 또는 'fail'
 };
 var WD = ['일', '월', '화', '수', '목', '금', '토'];
@@ -1845,6 +1917,7 @@ function refreshAfterWrite() {
   S.mine = null;
   S.admin.data = null;
   S.admin.hist = null;
+  S.stats.data = null; S.stats.key = '';
   S.find.results = null;
   var jobs = [loadDay(S.date)];
   if (S.sheet && S.sheet.date && S.sheet.date !== S.date) jobs.push(loadDay(S.sheet.date));
@@ -1947,8 +2020,8 @@ function viewMap() {
   var list = roomsOf(S.building, S.floor);
   h += '<section class="card plan-card"><p class="eyebrow">' + esc(fmt(S.date)) + ' · ' + esc(S.period === 'all' ? '하루 전체' : pname(S.period)) + '</p>' +
     '<h2 class="title">' + esc(S.building + ' ' + floorLabel(S.floor)) + '</h2>' +
-    '<p class="sub">' + (S.date < S.init.today ? '지난 날짜의 사용 내역을 보고 있어요. 공간을 누르면 그날의 교시별 내역이 보여요.' : '공간을 누르면 소개를 보고 신청할 수 있어요.') + '</p>' +
-    '<div class="plan"><div class="rooms">' + list.map(roomCell).join('') + '</div><div class="corridor">복 도</div></div>' +
+    '<p class="sub">' + (S.date < S.init.today ? '지난 날짜의 사용 내역을 보고 있어요. 공간 칸(›)을 누르면 그날의 교시별 내역이 보여요.' : '공간 칸(›)을 누르면 소개를 보고 신청할 수 있어요.') + '</p>' +
+    '<div class="plan"><div class="rooms">' + list.map(roomCell).join('') + '</div></div>' +
     '<div class="legend"><span><i class="dot free"></i>비어 있음</span><span><i class="dot busy"></i>사용 중</span>' +
     '<span><i class="dot part"></i>일부 교시 예약</span><span><i class="dot off"></i>신청 불가</span></div>' +
     '</section></div>';
@@ -2067,7 +2140,7 @@ function sheetRoom(sh) {
 
   if (!r.bookable) return h + '<div class="notice">이 공간은 신청을 받지 않아요.</div></div>';
 
-  h += '<button type="button" class="btn wide" data-a="sched">일정 요약 보기 (주간 · 월간 · 분기 · 연도, 통계)</button>' +
+  h += '<button type="button" class="btn wide" data-a="sched">일정 보기 (주간 · 월간 · 분기 · 연도)</button>' +
     '<h3 class="sec">예약 현황</h3>' + dateBar('sheet', sh.date);
   if (!S.days[sh.date]) return h + '<div class="spin"></div></div>';
   if (sh.confirm) return h + confirmHtml(sh) + '</div>';
@@ -2176,7 +2249,7 @@ function calHtml(year, month, idx, mini) {
 }
 function sheetSched(sh) {
   var r = room(sh.id), range = schedRange(sh.mode, sh.anchor), list = sh.cache[range.from + '~' + range.to];
-  var h = sheetHead(roomLabel(r) + ' · 일정 요약', r.name) + '<div class="sheet-body">' +
+  var h = sheetHead(roomLabel(r) + ' · 일정', r.name) + '<div class="sheet-body">' +
     '<button type="button" class="btn small" data-a="sched-back">‹ 공간 정보·신청으로</button>' +
     '<div class="chips" style="margin-top:12px" role="group" aria-label="요약 단위">' + [['week', '주간'], ['month', '월간'], ['quarter', '분기'], ['year', '연도']].map(function (m) {
       return '<button type="button" class="chip ' + (sh.mode === m[0] ? 'on' : '') + '" data-a="sched-mode" data-m="' + m[0] + '" aria-pressed="' + (sh.mode === m[0]) + '">' + m[1] + '</button>';
@@ -2197,9 +2270,12 @@ function sheetSched(sh) {
     purpose[k] = (purpose[k] || 0) + b.periods.length;
   });
   var rate = wkDays && ps.length ? Math.round(wkUsed / (wkDays * ps.length) * 100) : 0;
-  h += '<div class="stats"><div class="stat"><b>' + list.length + '건</b><span>예약</span></div>' +
-    '<div class="stat"><b>' + used + '</b><span>사용 교시</span></div>' +
-    '<div class="stat"><b>' + rate + '%</b><span>평일 이용률</span></div></div>';
+  var showStats = S.init.me.admin;   // 통계(숫자·순위)는 관리자에게만 보입니다. 전체 통계는 관리 → 통계.
+  if (showStats) {
+    h += '<div class="stats"><div class="stat"><b>' + list.length + '건</b><span>예약</span></div>' +
+      '<div class="stat"><b>' + used + '</b><span>사용 교시</span></div>' +
+      '<div class="stat"><b>' + rate + '%</b><span>평일 이용률</span></div></div>';
+  }
 
   if (sh.mode === 'week') {
     var days = [];
@@ -2261,6 +2337,11 @@ function sheetSched(sh) {
     return '<button type="button" class="barbtn ' + (on ? 'on' : '') + '" data-a="sched-detail" data-k="' + k + '" data-v="' + esc(v) + '" aria-expanded="' + !!on + '">' +
       '<span class="bar"><i style="width:' + Math.round(n / max * 100) + '%"></i><span>' + esc(label) + '</span></span><em>' + n + '</em></button>';
   };
+  if (!showStats) {
+    if (sh.mode !== 'week') h += '<div class="heatkey">적음 <i style="background:var(--soft)"></i><i class="h1"></i><i class="h2"></i><i class="h3"></i><i class="h4"></i> 많음 · 날짜를 누르면 그날로 가요</div>';
+    if (!list.length) h += '<p class="empty">이 기간에는 예약이 없어요.</p>';
+    return h + '</div>';
+  }
   if (sh.mode !== 'week') {
     h += '<div class="heatkey">적음 <i style="background:var(--soft)"></i><i class="h1"></i><i class="h2"></i><i class="h3"></i><i class="h4"></i> 많음 · 날짜를 누르면 그날로 가요</div>';
     if (sh.mode === 'year') h += sh.monthBars;
@@ -2415,7 +2496,7 @@ function viewHelp() {
     for (var d = 2; d <= 29; d++) h += '<span class="' + (marks[d] || '') + (d === pick ? ' pick' : '') + '">' + d + '</span>';
     return h + '</div>';
   };
-  var nav = [['flow', '예약 4단계'], ['pick', '공간 고르기'], ['book', '신청하기'], ['repeat', '반복 예약'], ['multi', '여러 공간'], ['share', '함께 사용'], ['mine', '내 예약'], ['find', '추천'], ['stat', '통계']];
+  var nav = [['flow', '예약 4단계'], ['pick', '공간 고르기'], ['book', '신청하기'], ['repeat', '반복 예약'], ['multi', '여러 공간'], ['share', '함께 사용'], ['mine', '내 예약'], ['find', '추천'], ['stat', '일정 보기']];
   if (admin) nav.push(['admin', '관리자']);
 
   var h = '<p class="eyebrow">사용법</p><h2 class="title" style="margin-bottom:6px">공간 대여 사용 안내</h2>' +
@@ -2497,23 +2578,21 @@ function viewHelp() {
   ], demo('추천 결과', '<div class="rec" style="margin:0;padding:0;display:grid"><div class="rank">1</div><div><p class="eyebrow">본관 2층 · 정원 16명</p><h3 style="font-size:17px;font-weight:600;margin:0">세미나실 2</h3>' +
       '<ul class="why"><li class="y">5교시 비어 있음</li><li class="y">14명에게 알맞은 크기 (정원 16명)</li><li class="y">전자칠판 있음</li></ul></div></div>'));
 
-  h += helpSec('stat', 8, '일정 요약과 통계', '공간마다 주간·월간·분기·연도별로 얼마나 쓰였는지 봅니다.', [
-    '공간을 열고 <b>일정 요약 보기</b>를 누른 뒤 주간·월간·분기·연도를 고릅니다.',
-    '예약 건수, 사용 교시, 평일 이용률과 <b>학교별(중·고·법인)</b>·요일별·내용별 사용 교시가 나옵니다.',
-    '<b>막대를 누르면</b> 해당 내역이 펼쳐지고, 날짜를 누르면 그날의 예약 현황으로 갑니다. 지난 기간도 볼 수 있습니다.'
-  ], demo('월간 요약', '<div class="stats" style="margin-top:0"><div class="stat"><b>13건</b><span>예약</span></div><div class="stat"><b>67</b><span>사용 교시</span></div><div class="stat"><b>29%</b><span>평일 이용률</span></div></div>' +
-      '<p class="eyebrow" style="margin:6px 0">학교별 사용 교시</p><ul class="bars">' +
-      [['고', 48, 100], ['중', 15, 31], ['법인', 4, 8]].map(function (x) {
-        return '<li><div class="barbtn"><span class="bar"><i style="width:' + x[2] + '%"></i><span>' + x[0] + '</span></span><em>' + x[1] + '</em></div></li>';
-      }).join('') + '</ul>'));
+  h += helpSec('stat', 8, '공간 일정 보기', '공간마다 주간·월간·분기·연도별 일정을 달력으로 봅니다.', [
+    '공간을 열고 <b>일정 보기</b>를 누른 뒤 주간·월간·분기·연도를 고릅니다.',
+    '많이 쓴 날일수록 진하게 칠해집니다. <b>날짜를 누르면</b> 그날의 예약 현황으로 갑니다.',
+    '날짜를 오늘 이전으로 넘기면 지난 내역도 볼 수 있습니다. 통계는 관리자 화면에 있습니다.'
+  ], demo('월간 일정', miniCal({ 3: 'h2', 5: 'h3', 10: 'h2', 12: 'h4', 13: 'h1', 17: 'h3', 19: 'h2', 24: 'h4', 26: 'h1' }) +
+      '<p class="sub" style="margin:8px 0 0">색이 진할수록 예약된 교시가 많은 날</p>'));
 
   if (admin) {
     h += helpSec('admin', 9, '관리자', '관리 메뉴의 탭에서 처리합니다. 숫자가 붙은 탭은 확인할 일이 있다는 뜻입니다.', [
       '<b>겹침</b>: 같은 시간에 허용 수보다 많이 잡힌 예약입니다. 한쪽을 취소하거나 대장을 고칩니다.',
       '<b>전체 예약</b>·<b>기록</b>: 기간을 정해 모든 예약을 보고, 누가 무엇을 바꿨는지 변경 전후와 함께 확인합니다.',
+      '<b>통계</b>: 기간과 공간을 골라 공간별·학교별·요일별·월별·교시별·부서별·내용별 사용 현황을 보고, 원하는 항목만 골라 <b>PDF 파일로 내려받습니다</b>.',
       '<b>대장 가져오기</b>: 기존 사용 대장이 바뀌었을 때 <b>지금 가져오기</b>를 누릅니다. 자동으로는 가져오지 않습니다.',
       '공간·사용자·교시·설정은 구글시트에서 고치면 바로 반영됩니다. 함께 쓸 수 있는 팀 수는 [공간] 탭의 <b>동시예약수</b>입니다.'
-    ], demo('관리 메뉴의 탭', '<div class="chips">' + chip('전체 예약', true) + chip('겹침 1') + chip('기록') + chip('대장 가져오기') + '</div>' +
+    ], demo('관리 메뉴의 탭', '<div class="chips">' + chip('전체 예약', true) + chip('겹침 1') + chip('통계') + chip('기록') + chip('대장 가져오기') + '</div>' +
         '<div class="drow" style="border-top:0"><span class="grow"><b>11/13(금)</b> 5교시, 6교시<br>세미나실 1 · 홍길동 · [고] 교육과정부 · 설명회 준비 · 12명</span><span class="badge ok">확정</span><span class="btn small">수정</span><span class="btn small danger">취소</span></div>'));
   }
   return h;
@@ -2605,12 +2684,13 @@ function viewMine() {
 function viewAdmin() {
   var a = S.admin;
   var nClash = a.data ? a.data.clashes.length : 0;
-  var tabs = [['list', '전체 예약'], ['clash', '겹침' + (nClash ? ' ' + nClash : '')], ['hist', '기록']];
+  var tabs = [['list', '전체 예약'], ['clash', '겹침' + (nClash ? ' ' + nClash : '')], ['stats', '통계'], ['hist', '기록']];
   if (S.init.ledgerOn) tabs.push(['ledger', '대장 가져오기']);
   var h = '<p class="eyebrow">관리</p><h2 class="title" style="margin-bottom:12px">예약 관리</h2><div class="tabs">' + tabs.map(function (t) {
     return '<button type="button" class="chip ' + (a.tab === t[0] ? 'on' : '') + '" data-a="atab" data-t="' + t[0] + '" aria-pressed="' + (a.tab === t[0]) + '">' + esc(t[1]) + '</button>';
   }).join('') + (S.init.sheetUrl ? '<a class="chip" href="' + esc(S.init.sheetUrl) + '" target="_blank" rel="noopener" style="text-decoration:none;color:inherit;display:inline-flex;align-items:center">구글시트 열기 ↗</a>' : '') + '</div>';
 
+  if (a.tab === 'stats') return h + viewStats();
   if (a.tab === 'hist') {
     h += '<form class="row" data-form="hist" style="margin-bottom:12px"><input class="in grow" data-admin="q" placeholder="이름, 공간, 날짜, 동작으로 찾기" value="' + esc(a.q) + '" aria-label="기록 검색"><button class="btn">찾기</button></form>';
     if (!a.hist) return h + '<div class="spin"></div>';
@@ -2660,6 +2740,186 @@ function viewAdmin() {
       '<br>' + esc(r ? r.name : '(삭제된 공간)') + ' · ' + esc(b.name) + (b.unit ? ' · ' + esc(whoText({ school: b.school, unit: b.unit })) : '') + ' · ' + esc(b.purpose) + ppl(b.people) + (b.shared ? ' · 함께 사용' : '') + (b.groupId ? ' · 반복' : '') + '</span>' +
       statusBadge(b.status) + bookingActs(b, true) + '</div>';
   }).join('') + '</div>';
+}
+
+/* ---------- 그리기: 관리 → 통계 (인포그래픽, PDF) ---------- */
+var STAT_SECTIONS = [['sum', '요약'], ['room', '공간별'], ['school', '학교별'], ['wd', '요일별'], ['month', '월별'], ['period', '교시별'], ['unit', '부서별'], ['purpose', '내용별']];
+function statsPreset(kind) {
+  var t = toDate(S.init.today), y = t.getFullYear(), m = t.getMonth();
+  var r = kind === 'month' ? [new Date(y, m, 1), new Date(y, m + 1, 0)]
+    : kind === 'last' ? [new Date(y, m - 1, 1), new Date(y, m, 0)]
+    : kind === 'quarter' ? [new Date(y, Math.floor(m / 3) * 3, 1), new Date(y, Math.floor(m / 3) * 3 + 3, 0)]
+    : kind === 'year' ? [new Date(y, 0, 1), new Date(y, 11, 31)]
+    : [new Date(m >= 2 ? y : y - 1, 2, 1), new Date(m >= 2 ? y + 1 : y, 2, 0)];   // 학년도: 3월 ~ 다음 해 2월
+  return [fromDate(r[0]), fromDate(r[1])];
+}
+function loadStats() {
+  var st = S.stats;
+  if (!st.from) { var p = statsPreset('month'); st.from = p[0]; st.to = p[1]; }
+  var key = st.from + '~' + st.to;
+  if (st.key === key && st.data) return Promise.resolve();
+  st.busy = true; st.err = ''; st.data = null;   // 기간이 바뀌면 이전 통계를 지우고 다시 불러옴
+  return call('getStats', st.from, st.to).then(function (list) { st.data = list; st.key = key; st.busy = false; })
+    .catch(function (e) { st.busy = false; st.data = null; st.err = e.message; });
+}
+/** 통계 계산 */
+function statsCompute() {
+  var st = S.stats, ps = S.init.periods, rooms = S.init.rooms.filter(function (r) { return r.bookable; });
+  var list = st.data.filter(function (b) { return !st.room || b.roomId === st.room; });
+  var scope = st.room ? rooms.filter(function (r) { return r.id === st.room; }) : rooms;
+  var add = function (o, k, n) { o[k] = (o[k] || 0) + n; };
+  var byRoom = {}, bySchool = {}, byWd = [0, 0, 0, 0, 0, 0, 0], byMonth = {}, byPeriod = {}, byUnit = {}, byPurpose = {}, used = 0, slot = {};
+  list.forEach(function (b) {
+    var n = b.periods.length;
+    used += n;
+    add(byRoom, b.roomId, n);
+    (b.school ? b.school.split(',') : ['고']).forEach(function (k) { add(bySchool, k, n); });
+    byWd[wd(b.date)] += n;
+    add(byMonth, b.date.slice(0, 7), n);
+    b.periods.forEach(function (p) { add(byPeriod, p, 1); slot[b.roomId + '|' + b.date + '|' + p] = 1; });
+    add(byUnit, b.unit || (b.ledger ? b.purpose : b.name) || '(미기재)', n);   // 대장에서 온 예약은 적힌 내용(대개 부서 이름)을 부서로 봄
+    add(byPurpose, b.purpose || '(미기재)', n);
+  });
+  var wkDays = 0;
+  for (var d = st.from; d <= st.to; d = addDays(d, 1)) { var w = wd(d); if (w >= 1 && w <= 5) wkDays++; }
+  var wkSlots = Object.keys(slot).filter(function (k) { var w = wd(k.split('|')[1]); return w >= 1 && w <= 5; }).length;
+  var cap = wkDays * ps.length * scope.length;
+  var top = function (o, n) { return Object.keys(o).sort(function (x, y) { return o[y] - o[x] || (x < y ? -1 : 1); }).slice(0, n).map(function (k) { return [k, o[k]]; }); };
+  return { list: list, used: used, rooms: scope.length, usedRooms: Object.keys(byRoom).length, rate: cap ? Math.round(wkSlots / cap * 1000) / 10 : 0,
+    wkDays: wkDays, byRoom: top(byRoom, 15), bySchool: bySchool, byWd: byWd, byMonth: byMonth, byPeriod: byPeriod,
+    byUnit: top(byUnit, 10), byPurpose: top(byPurpose, 10), roomUse: byRoom };
+}
+/** 보고서(인포그래픽) HTML. 화면과 PDF 가 같은 것을 씁니다. */
+function statsReport(c) {
+  var st = S.stats, ps = S.init.periods, pick = st.pick, h = '';
+  var r = st.room ? room(st.room) : null;
+  var sec = function (id, title, sub, body) {
+    return pick[id] ? '<section class="rsec"><h4>' + title + '</h4>' + (sub ? '<p class="rsub">' + sub + '</p>' : '') + body + '</section>' : '';
+  };
+  var hbars = function (rows, unit) {
+    if (!rows.length) return '<p class="rsub">해당 내역이 없습니다.</p>';
+    var max = rows[0][1] || 1;
+    return '<div class="rbars">' + rows.map(function (x, i) {
+      return '<div class="rbar"><span class="rk">' + (i + 1) + '</span><span class="rl">' + esc(x[0]) + '</span><span class="rt"><i style="width:' + Math.max(2, Math.round(x[1] / max * 100)) + '%"></i></span><b>' + x[1] + (unit || '') + '</b></div>';
+    }).join('') + '</div>';
+  };
+  var cols = function (rows) {
+    var max = Math.max.apply(null, rows.map(function (x) { return x[1]; })) || 1;
+    return '<div class="rcols">' + rows.map(function (x) {
+      return '<div class="rcol"><b>' + x[1] + '</b><span class="rct"><i style="height:' + Math.max(x[1] ? 3 : 0, Math.round(x[1] / max * 100)) + '%"></i></span><span class="rcl">' + esc(x[0]) + '</span></div>';
+    }).join('') + '</div>';
+  };
+  h += '<header class="rhead"><p>' + esc(S.init.settings.school) + ' 공간 대여</p><h3>공간 사용 통계</h3>' +
+    '<div class="rmeta"><span>기간 <b>' + esc(st.from) + ' ~ ' + esc(st.to) + '</b></span><span>대상 <b>' + esc(r ? r.name : '전체 공간 ' + c.rooms + '곳') + '</b></span>' +
+    '<span>작성 <b>' + esc(S.init.today) + '</b></span></div></header>';
+  h += sec('sum', '한눈에 보기', '', '<div class="rtiles"><div><b>' + c.list.length + '</b><span>예약 건수</span></div><div><b>' + c.used + '</b><span>사용 교시</span></div>' +
+    '<div><b>' + (st.room ? c.wkDays : c.usedRooms + '<small>/' + c.rooms + '</small>') + '</b><span>' + (st.room ? '평일 수' : '사용된 공간') + '</span></div>' +
+    '<div><b>' + c.rate + '<small>%</small></b><span>평일 이용률</span></div></div>' +
+    '<p class="rsub" style="margin-top:8px">평일 이용률 = 평일(월~금)에 예약된 교시 ÷ (평일 ' + c.wkDays + '일 × 교시 ' + ps.length + '개 × 공간 ' + c.rooms + '곳)</p>');
+  if (!st.room) {
+    h += sec('room', '공간별 사용 교시', '많이 쓴 순서 · 상위 15곳', hbars(c.byRoom.map(function (x) { var rr = room(x[0]); return [rr ? rr.name : '(삭제된 공간)', x[1]]; })));
+  }
+  var sKeys = SCHOOLS.filter(function (k) { return c.bySchool[k]; }), sTotal = sKeys.reduce(function (n, k) { return n + c.bySchool[k]; }, 0);
+  h += sec('school', '학교별 사용 교시', '여러 학교를 고른 예약은 각 학교에 모두 셉니다. 학교 구분이 없는 예약은 고등학교로 셉니다.',
+    sKeys.length ? '<div class="rsplit">' + sKeys.map(function (k) {
+      return '<i class="s' + SCHOOLS.indexOf(k) + '" style="width:' + (c.bySchool[k] / sTotal * 100) + '%"></i>';
+    }).join('') + '</div><div class="rlegend">' + sKeys.map(function (k) {
+      return '<span><i class="s' + SCHOOLS.indexOf(k) + '"></i><b>' + k + '</b> ' + c.bySchool[k] + '교시 · ' + Math.round(c.bySchool[k] / sTotal * 100) + '%</span>';
+    }).join('') + '</div>' : '<p class="rsub">해당 내역이 없습니다.</p>');
+  h += sec('wd', '요일별 사용 교시', '', cols([1, 2, 3, 4, 5, 6, 0].filter(function (w) { return w >= 1 && w <= 5 || c.byWd[w]; }).map(function (w) { return [WD[w], c.byWd[w]]; })));
+  var months = [];
+  for (var d = toDate(st.from.slice(0, 7) + '-01'); fromDate(d) <= st.to; d = new Date(d.getFullYear(), d.getMonth() + 1, 1)) {
+    var k = fromDate(d).slice(0, 7);
+    months.push([(d.getMonth() + 1) + '월', c.byMonth[k] || 0]);
+  }
+  if (months.length > 1) h += sec('month', '월별 사용 교시', '', cols(months));
+  h += sec('period', '교시별 사용 횟수', '그 교시에 예약이 들어간 횟수', cols(ps.map(function (p) { return [p.name, c.byPeriod[p.id] || 0]; })));
+  h += sec('unit', '많이 쓴 부서', '사용 교시 기준 · 상위 10', hbars(c.byUnit));
+  h += sec('purpose', '많이 쓴 내용', '사용 교시 기준 · 상위 10', hbars(c.byPurpose));
+  return h;
+}
+function viewStats() {
+  var st = S.stats;
+  var h = '<section class="card pad" style="margin-bottom:14px"><p class="eyebrow">통계</p>' +
+    '<div class="chips" style="margin:8px 0 10px" role="group" aria-label="기간 빠른 선택">' +
+    [['month', '이번 달'], ['last', '지난달'], ['quarter', '이번 분기'], ['year', '올해'], ['school', '이번 학년도']].map(function (x) {
+      var p = statsPreset(x[0]), on = p[0] === st.from && p[1] === st.to;
+      return '<button type="button" class="chip ' + (on ? 'on' : '') + '" data-a="stat-preset" data-k="' + x[0] + '" aria-pressed="' + on + '">' + x[1] + '</button>';
+    }).join('') + '</div>' +
+    '<form class="row" data-form="stats" style="flex-wrap:wrap"><input class="in grow" type="date" data-stat="from" value="' + esc(st.from) + '" aria-label="시작일"><span>~</span>' +
+    '<input class="in grow" type="date" data-stat="to" value="' + esc(st.to) + '" aria-label="종료일"><button class="btn">보기</button></form>' +
+    '<label class="f" for="stat-room">대상 공간</label><select class="in" id="stat-room" data-stat-room="1"><option value="">전체 공간</option>' +
+    S.init.rooms.filter(function (r) { return r.bookable; }).map(function (r) {
+      return '<option value="' + esc(r.id) + '"' + (st.room === r.id ? ' selected' : '') + '>' + esc(r.building + ' ' + floorLabel(r.floor) + ' · ' + r.name) + '</option>';
+    }).join('') + '</select>' +
+    '<label class="f">보고서에 넣을 항목 (눌러서 넣고 빼기)</label><div class="chips" role="group" aria-label="보고서 항목">' + STAT_SECTIONS.map(function (x) {
+      var on = st.pick[x[0]];
+      return '<button type="button" class="chip ' + (on ? 'on' : '') + '" data-a="stat-pick" data-k="' + x[0] + '" role="checkbox" aria-checked="' + !!on + '">' + (on ? '✓ ' : '') + x[1] + '</button>';
+    }).join('') + '</div>' +
+    '<button type="button" class="btn primary wide" style="margin-top:16px" data-a="stat-pdf"' + (st.pdf || !st.data ? ' disabled' : '') + '>' + (st.pdf || 'PDF 파일로 내려받기') + '</button>' +
+    '<p class="sub" style="margin-top:8px">아래에 보이는 보고서가 그대로 PDF(A4)로 저장돼요.</p></section>';
+  if (st.err) return h + '<div class="err" role="alert">' + esc(st.err) + '</div>';
+  if (st.busy || !st.data) return h + '<div class="spin"></div>';
+  return h + '<div class="report" id="report">' + statsReport(statsCompute()) + '</div>';
+}
+/** 스크립트 파일을 한 번만 불러옵니다. */
+function loadScript(src) {
+  return new Promise(function (resolve, reject) {
+    if (document.querySelector('script[data-src="' + src + '"]')) { resolve(); return; }
+    var el = document.createElement('script');
+    el.src = src; el.dataset.src = src;
+    el.onload = resolve;
+    el.onerror = function () { el.remove(); reject(new Error('PDF 도구를 불러오지 못했어요. 인터넷 연결을 확인해 주세요.')); };
+    document.head.appendChild(el);
+  });
+}
+/** 보고서를 A4 PDF 로 만들어 내려받습니다. 항목 단위로 그려서 쪽이 바뀔 때 항목이 잘리지 않게 합니다. */
+function statsPdf() {
+  var st = S.stats, CDN = 'https://cdnjs.cloudflare.com/ajax/libs/';
+  var say = function (t) { st.pdf = t; render(); };
+  say('PDF 만드는 중… (준비)');
+  return Promise.all([loadScript(CDN + 'html2canvas/1.4.1/html2canvas.min.js'), loadScript(CDN + 'jspdf/2.5.1/jspdf.umd.min.js')]).then(function () {
+    // 화면 크기·어두운 화면과 상관없이 같은 모양이 나오도록, 폭 760px 의 밝은 보고서를 따로 만들어 그립니다.
+    var box = document.createElement('div');
+    box.className = 'report print';
+    box.style.cssText = 'position:fixed;left:-10000px;top:0;width:760px';
+    box.innerHTML = statsReport(statsCompute());
+    document.body.appendChild(box);
+    var parts = Array.prototype.slice.call(box.children);
+    var pdf = new window.jspdf.jsPDF({ unit: 'mm', format: 'a4' });
+    var W = 210, H = 297, M = 12, y = M, i = 0;
+    var next = function () {
+      if (i >= parts.length) return null;
+      say('PDF 만드는 중… (' + (i + 1) + '/' + parts.length + ')');
+      return window.html2canvas(parts[i], { scale: 2, backgroundColor: '#ffffff', logging: false }).then(function (cv) {
+        var w = W - 2 * M, hmm = cv.height / cv.width * w;
+        if (hmm > H - 2 * M) { w = w * (H - 2 * M) / hmm; hmm = H - 2 * M; }   // 한 쪽보다 긴 항목은 줄여서 넣음
+        if (y + hmm > H - M && y > M) { pdf.addPage(); y = M; }
+        pdf.addImage(cv.toDataURL('image/jpeg', 0.93), 'JPEG', M + (W - 2 * M - w) / 2, y, w, hmm);
+        y += hmm + 4;
+        i++;
+        return next();
+      });
+    };
+    return Promise.resolve(next()).then(function () {
+      box.remove();
+      // 파일 이름을 지정해 내려받기
+      var link = document.createElement('a');
+      link.href = URL.createObjectURL(pdf.output('blob'));
+      // 파일 이름은 영문·숫자만 씁니다 (한글 이름은 일부 환경에서 'download' 로 바뀌어 확장자가 사라집니다).
+      link.download = 'space-stats_' + st.from + '_' + st.to + (st.room ? '_' + String(st.room).replace(/[^\w-]/g, '') : '') + '.pdf';
+      document.body.appendChild(link);
+      link.click();
+      setTimeout(function () { URL.revokeObjectURL(link.href); link.remove(); }, 4000);
+      st.pdf = '';
+      render();
+      toast('PDF 파일을 내려받았어요.');
+    }, function (e) { box.remove(); throw e; });
+  }).catch(function (e) {
+    st.pdf = '';
+    render();
+    toast(e && e.message ? e.message : 'PDF 를 만들지 못했어요.');
+  });
 }
 
 /* ---------- 동작 ---------- */
@@ -2716,6 +2976,7 @@ var A = {
     if (S.view === 'admin') {
       if (!S.admin.data) loadAdmin().then(render, fail);
       if (S.admin.tab === 'hist' && !S.admin.hist) loadHist().then(render, fail);
+      if (S.admin.tab === 'stats') loadStats().then(render);
     }
     if (S.view === 'find' && !S.find.date) { S.find.date = S.date; render(); }
   },
@@ -2861,6 +3122,15 @@ var A = {
     var t = document.getElementById('help-' + el.dataset.id);
     if (t) t.scrollIntoView({ behavior: 'smooth', block: 'start' });
   },
+  'stat-preset': function (el) {
+    var p = statsPreset(el.dataset.k);
+    S.stats.from = p[0]; S.stats.to = p[1];
+    var job = loadStats();
+    render();
+    job.then(render);
+  },
+  'stat-pick': function (el) { S.stats.pick[el.dataset.k] = !S.stats.pick[el.dataset.k]; render(); },
+  'stat-pdf': function () { statsPdf(); },
   'sync-now': function () {
     S.admin.syncing = true;
     render();
@@ -2874,6 +3144,7 @@ var A = {
     S.admin.tab = el.dataset.t;
     render();
     if (S.admin.tab === 'hist' && !S.admin.hist) loadHist().then(render, fail);
+    else if (S.admin.tab === 'stats') { var job = loadStats(); render(); job.then(render); }
     else if (!S.admin.data) loadAdmin().then(render, fail);
     else if (S.admin.tab === 'ledger') loadAdmin().then(render, fail);   // 마지막 결과를 새로 읽음
   },
@@ -2905,6 +3176,13 @@ var FORMS = {
       .catch(function (e) { f.busy = false; f.err = e.message; render(); });
   },
   hist: function () { S.admin.hist = null; render(); loadHist().then(render, fail); },
+  stats: function () {
+    var st = S.stats;
+    if (!st.from || !st.to || st.to < st.from) { st.err = '기간을 확인해 주세요.'; render(); return; }
+    var job = loadStats();
+    render();
+    job.then(render);
+  },
   range: function () { S.admin.data = null; render(); loadAdmin().then(render, fail); }
 };
 
@@ -2920,12 +3198,14 @@ document.addEventListener('change', function (e) {
   if (el.dataset.a === 'shared') A.shared(el);
   if (el.dataset.date) setDate(el.dataset.date, el.value);
   if (el.dataset.rerender) renderSheet();
+  if (el.dataset.statRoom) { S.stats.room = el.value; render(); }
 });
 document.addEventListener('input', function (e) {
   var el = e.target;
   if (el.dataset.f && S.sheet) S.sheet.f[el.dataset.f] = el.value;
   if (el.dataset.find) S.find[el.dataset.find] = el.value;
   if (el.dataset.admin) S.admin[el.dataset.admin] = el.value;
+  if (el.dataset.stat) S.stats[el.dataset.stat] = el.value;
 });
 document.addEventListener('submit', function (e) {
   e.preventDefault();

@@ -3,7 +3,7 @@
  *
  * 화면에서 부르는 함수:
  *   getInit, getDay, recommend, createBooking, updateBooking, cancelBooking,
- *   myBookings, adminBookings, getHistory, getPhoto, getRoomRange, runLedgerSync
+ *   myBookings, adminBookings, getHistory, getPhoto, getRoomRange, getStats, runLedgerSync
  *
  * 데이터는 Store.gs 의 readTab_/appendRows_/updateRows_ 로만 읽고 씁니다.
  * 모든 쓰기는 withLock_ 안에서 처리하고 [기록] 탭에 남깁니다.
@@ -621,6 +621,15 @@ function confirmPending() {
     console.log('승인 대기 예약 ' + all.length + '건을 확정으로 바꿨습니다.');
     return all.length;
   });
+}
+
+/** 통계용: 기간(최대 1년) 안의 살아 있는 예약 전체. 관리자만. */
+function getStats(from, to) {
+  var me = requireAdmin_();
+  if (!isDate_(from) || !isDate_(to) || to < from) throw new Error('기간이 올바르지 않아요.');
+  if (toUtc_(to) - toUtc_(from) > 370 * 86400000) throw new Error('한 번에 1년까지만 볼 수 있어요.');
+  return bookings_().filter(function (b) { return isActive_(b) && b.date >= from && b.date <= to; })
+    .map(function (b) { return publicBooking_(b, me); });
 }
 
 /** 관리자가 화면에서 누르는 "지금 가져오기" */
