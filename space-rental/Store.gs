@@ -109,6 +109,16 @@ function photoData_(id) {
   return encode(thumb.getContentType(), thumb.getBytes());
 }
 
+/** 메일 보내기 (함께 사용 알림). 배포한 계정의 이름으로 나갑니다. */
+function sendMail_(to, subject, body) {
+  MailApp.sendEmail(to, subject, body);
+}
+
+/** 알림 메일을 보낼 수 있도록 권한을 허용합니다. 편집기에서 한 번 실행하세요. */
+function allowMail() {
+  console.log('메일 권한이 허용되었습니다. 오늘 더 보낼 수 있는 메일: ' + MailApp.getRemainingDailyQuota() + '통. 새 버전으로 다시 배포해 주세요.');
+}
+
 /** 사진을 서버가 읽을 수 있도록 권한을 허용합니다. 편집기에서 한 번 실행하세요. */
 function allowPhotos() {
   DriveApp.getRootFolder();

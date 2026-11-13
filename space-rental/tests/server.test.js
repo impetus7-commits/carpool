@@ -97,7 +97,7 @@ test('반복 예약: 기간 안의 요일마다 만들고, 겹치는 날은 확�
   const ask = plain(s.createBooking(base({ date: '2026-11-12', repeat })));
   assert.equal(ask.needConfirm, true);
   assert.equal(ask.okCount, 3);
-  assert.deepEqual(ask.conflicts, [{ date: '2026-11-19', periods: '6교시' }]);
+  assert.deepEqual(ask.conflicts, [{ room: '세미나실 1', date: '2026-11-19', periods: '6교시' }]);
   assert.equal(plain(s.myBookings()).length, 1, '확인 전에는 아무것도 만들지 않는다');
 
   const r = plain(s.createBooking(base({ date: '2026-11-12', repeat, skipConflicts: true })));
@@ -322,28 +322,28 @@ test('신청 항목: 사용 학교와 사용 부서는 꼭 넣어야 하고, 예
   assert.equal(plain(s.getDay('2026-11-13'))[0].unit, '', '미등록 계정에는 가린다');
 });
 
-test('체육관: 일과 중 체육수업은 3팀까지 함께 쓰고, 기존 예약을 먼저 알려 준다', () => {
+test('함께 사용: 동시예약수만큼 같은 시간에 예약할 수 있고, 기존 예약을 먼저 알려 준다', () => {
   const s = server(TEACHER);
-  const gym = (extra) => base(Object.assign({ roomId: 'C101', periods: ['P2', 'P3'], people: 30, purpose: '체육수업', shared: true }, extra));
+  const gym = (extra) => base(Object.assign({ roomId: 'C101', periods: ['P2', 'P3'], people: 30, purpose: '배구', shared: true }, extra));
   assert.equal(plain(s.getInit()).rooms.find((r) => r.id === 'C101').multi, 3);
 
-  assert.equal(s.createBooking(gym({ unit: '1학년 체육' })).created, 1, '첫 팀은 바로 신청');
-  const ask = plain(s.createBooking(gym({ unit: '2학년 체육', periods: ['P3'] })));
+  assert.equal(s.createBooking(gym({ unit: '1학년' })).created, 1, '첫 팀은 바로 신청');
+  const ask = plain(s.createBooking(gym({ unit: '2학년', periods: ['P3'] })));
   assert.equal(ask.needConfirm, true, '둘째 팀은 기존 예약을 먼저 보여 준다');
-  assert.deepEqual(ask.existing, [{ date: '2026-11-13', list: [{ periods: '2교시, 3교시', who: '1학년 체육', school: '고', purpose: '체육수업' }] }]);
+  assert.deepEqual(ask.existing, [{ room: '체육관', date: '2026-11-13', max: 3, list: [{ periods: '2교시, 3교시', who: '1학년', school: '고', purpose: '배구' }] }]);
   assert.equal(plain(s.getDay('2026-11-13')).length, 1, '확인 전에는 만들지 않는다');
-  assert.equal(s.createBooking(gym({ unit: '2학년 체육', periods: ['P3'], ackExisting: true })).created, 1);
-  assert.equal(s.createBooking(gym({ unit: '중 체육', school: ['중'], periods: ['P3'], ackExisting: true })).created, 1);
+  assert.equal(s.createBooking(gym({ unit: '2학년', periods: ['P3'], ackExisting: true })).created, 1);
+  assert.equal(s.createBooking(gym({ unit: '중 3학년', school: ['중'], periods: ['P3'], ackExisting: true })).created, 1);
   assert.throws(() => s.createBooking(gym({ unit: '넷째 팀', periods: ['P3'], ackExisting: true })), /이미 3팀이 예약해서 자리가 없어요/);
   assert.equal(s.createBooking(gym({ unit: '넷째 팀', periods: ['P2'], ackExisting: true })).created, 1, '2교시는 아직 1팀뿐');
 
   // 함께 사용에 체크하지 않으면 빈 시간에만 신청할 수 있다
-  assert.throws(() => s.createBooking(gym({ shared: false, periods: ['P2'] })), /체육수업으로 함께 사용'에 체크/);
+  assert.throws(() => s.createBooking(gym({ shared: false, periods: ['P2'] })), /'함께 사용'에 체크해 주세요. \(최대 3팀\)/);
   assert.equal(s.createBooking(gym({ shared: false, periods: ['P5'], purpose: '학년 행사' })).created, 1);
-  // 일과 밖(방과후)은 한 팀만
-  s.createBooking(gym({ periods: ['PA'] }));
-  assert.throws(() => s.createBooking(gym({ periods: ['PA'], ackExisting: true })), /방과후에 이미 예약/);
-  // 다른 공간은 함께 사용이 안 된다
+  // 방과후·야간도 동시예약수만큼 함께 쓸 수 있다 (교시 구분 없이 동시예약수로만 관리)
+  s.createBooking(gym({ periods: ['PA', 'PN'] }));
+  assert.equal(s.createBooking(gym({ periods: ['PA'], unit: '캠핑 2팀', ackExisting: true })).created, 1);
+  // 동시예약수가 없는 공간은 함께 사용이 안 된다
   s.createBooking(base({ periods: ['P2'] }));
   assert.throws(() => s.createBooking(base({ periods: ['P2'], shared: true, ackExisting: true })), /2교시에 이미 예약/);
 
@@ -352,9 +352,9 @@ test('체육관: 일과 중 체육수업은 3팀까지 함께 쓰고, 기존 예
   assert.equal(plain(s.adminBookings({})).clashes.length, 0);
 });
 
-test('체육관: 반복 신청은 자리가 없는 날과 함께 쓰는 날을 한 번에 알려 준다', () => {
+test('함께 사용: 반복 신청은 자리가 없는 날과 함께 쓰는 날을 한 번에 알려 준다', () => {
   const s = server(TEACHER);
-  const gym = (extra) => base(Object.assign({ roomId: 'C101', periods: ['P2'], people: 30, purpose: '체육수업', shared: true }, extra));
+  const gym = (extra) => base(Object.assign({ roomId: 'C101', periods: ['P2'], people: 30, purpose: '배구', shared: true }, extra));
   s.createBooking(gym({ date: '2026-11-13' }));
   ['A', 'B', 'C'].forEach((u) => s.createBooking(gym({ date: '2026-11-20', unit: u, ackExisting: true })));
   const repeat = { until: '2026-11-27', weekdays: [5] };
@@ -365,6 +365,99 @@ test('체육관: 반복 신청은 자리가 없는 날과 함께 쓰는 날을 �
   assert.equal(ask.okCount, 2);
   const r = plain(s.createBooking(gym({ date: '2026-11-13', unit: '새 팀', repeat, skipConflicts: true, ackExisting: true })));
   assert.equal(r.created, 2);
+});
+
+test('함께 사용 알림: 먼저 예약한 사람에게 메일을 보낸다 (본인·대장 예약 제외, 설정으로 끌 수 있음)', () => {
+  const s = server(TEACHER);
+  const gym = (extra) => base(Object.assign({ roomId: 'C101', periods: ['P2', 'P3'], people: 30, purpose: '배구', shared: true }, extra));
+  s.createBooking(gym({ unit: '1학년' }));
+  s.createBooking(gym({ unit: '1학년 B', periods: ['P3'], ackExisting: true }));
+  assert.equal((s.MOCK.mails || []).length, 0, '내 예약과 겹칠 때는 보내지 않는다');
+
+  s.MOCK.user = ADMIN;
+  const r = plain(s.createBooking(gym({ unit: '교육과정부', periods: ['P3', 'P4'], purpose: '학년 행사', ackExisting: true })));
+  assert.equal(r.notified, 1);
+  const mail = plain(s.MOCK.mails);
+  assert.equal(mail.length, 1, '같은 사람에게는 한 통으로 묶는다');
+  assert.equal(mail[0].to, TEACHER);
+  assert.match(mail[0].subject, /함께 사용 신청/);
+  assert.match(mail[0].body, /신청한 팀: \[고\] 교육과정부 \(김관리\)/);
+  assert.match(mail[0].body, /11월 13일\(금\) 체육관 3교시 \(내 예약: 1학년 · 배구\)/);
+  assert.match(mail[0].body, /11월 13일\(금\) 체육관 3교시 \(내 예약: 1학년 B · 배구\)/);
+
+  s.MOCK.db['설정'].push({ '항목': '함께사용알림', '값': 'N', '설명': '' });
+  s.MOCK.user = STUDENT2;
+  s.createBooking(gym({ date: '2026-11-13', periods: ['P2'], unit: '동아리', ackExisting: true }));
+  assert.equal(s.MOCK.mails.length, 1, '설정에서 끄면 보내지 않는다');
+});
+
+test('여러 공간을 같은 일정으로 한 번에 예약한다 (하루, 반복)', () => {
+  const s = server(TEACHER);
+  const r = plain(s.createBooking(base({ roomId: undefined, roomIds: ['A202', 'A203', 'B202'], people: 10 })));
+  assert.equal(r.created, 3);
+  assert.equal(r.rooms, 3);
+  const day = plain(s.getDay('2026-11-13'));
+  assert.deepEqual(day.map((b) => b.roomId).sort(), ['A202', 'A203', 'B202']);
+  assert.equal(new Set(day.map((b) => b.groupId)).size, 1, '한 번에 신청한 것은 같은 묶음');
+  assert.ok(day[0].groupId);
+
+  // 하루 신청은 한 곳이라도 자리가 없으면 아무것도 만들지 않는다
+  assert.throws(() => s.createBooking(base({ roomIds: ['A204', 'A203'], periods: ['P6', 'P7'] })), /세미나실 2 6교시에 이미 예약이 있어요.*아무 공간도 신청하지 않았어요/);
+  assert.equal(plain(s.getDay('2026-11-13')).length, 3);
+  // 정원은 공간마다 확인한다
+  assert.throws(() => s.createBooking(base({ roomIds: ['A204', 'A201'], periods: ['P1'], people: 20 })), /진로상담실의 정원은 8명/);
+  assert.throws(() => s.createBooking(base({ roomIds: ['A204', 'A101'], periods: ['P1'] })), /교무실은\(는\) 신청을 받지 않는/);
+
+  // 반복 + 여러 공간: 자리가 없는 곳만 빼고 만든다
+  const repeat = { until: '2026-11-27', weekdays: [5] };
+  const ask = plain(s.createBooking(base({ roomIds: ['A202', 'A204'], periods: ['P5'], repeat })));
+  assert.equal(ask.needConfirm, true);
+  assert.deepEqual(ask.conflicts, [{ room: '세미나실 1', date: '2026-11-13', periods: '5교시' }]);
+  assert.equal(ask.okCount, 5);
+  const made = plain(s.createBooking(base({ roomIds: ['A202', 'A204'], periods: ['P5'], repeat, skipConflicts: true })));
+  assert.equal(made.created, 5);
+  s.MOCK.user = ADMIN;
+  assert.equal(plain(s.getHistory('일괄신청')).length, 3);
+});
+
+test('반복·일괄 예약 한꺼번에 취소: 이 공간 전체, 함께 신청한 공간까지 전체', () => {
+  const s = server(TEACHER);
+  const repeat = { until: '2026-12-04', weekdays: [5] };   // 금요일 4회
+  s.createBooking(base({ roomIds: ['A202', 'A203'], repeat }));
+  const mine = () => plain(s.myBookings()).filter((b) => b.status === '확정');
+  assert.equal(mine().length, 8);
+  const third = mine().find((b) => b.roomId === 'A202' && b.date === '2026-11-27');
+
+  assert.equal(s.cancelBooking(third.id, 'following').cancelled, 2, '이 날부터: 같은 공간의 11/27, 12/4');
+  assert.deepEqual(mine().filter((b) => b.roomId === 'A202').map((b) => b.date), ['2026-11-13', '2026-11-20']);
+  assert.equal(mine().filter((b) => b.roomId === 'A203').length, 4, '다른 공간은 그대로');
+
+  const first = mine().find((b) => b.roomId === 'A203' && b.date === '2026-11-20');
+  assert.equal(s.cancelBooking(first.id, 'room').cancelled, 4, '이 공간의 반복 전체 (앞 날짜 포함)');
+  assert.equal(mine().length, 2);
+
+  s.createBooking(base({ roomIds: ['A204', 'B202'], periods: ['P1'], repeat }));
+  s.MOCK.now = '2026-11-25T10:00:00';   // 시간이 지난 뒤
+  const one = plain(s.myBookings()).find((b) => b.roomId === 'A204' && b.date === '2026-11-27');
+  assert.equal(s.cancelBooking(one.id, 'group').cancelled, 4, '함께 신청한 공간까지: 오늘 이후(11/27, 12/4) × 2곳');
+  const past = plain(s.myBookings()).filter((b) => b.roomId === 'A204' && b.status === '확정');
+  assert.deepEqual(past.map((b) => b.date), ['2026-11-13', '2026-11-20'], '지난 날짜는 기록으로 남긴다');
+  s.MOCK.user = STUDENT;
+  assert.throws(() => s.cancelBooking(one.id, 'group'), /본인이 신청한/);
+});
+
+test('학교 구분 짐작과 화면 설정(관리자 이름)', () => {
+  const s = server(TEACHER);
+  assert.equal(s.inferSchool_('중학교 법교육(1학년부)'), '중');
+  assert.equal(s.inferSchool_('동아리(고)'), '고');
+  assert.equal(s.inferSchool_('중2학년 스쿨핑 고1-1 스쿨핑'), '중,고');
+  assert.equal(s.inferSchool_('고 중간고사'), '고');
+  assert.equal(s.inferSchool_('중간고사 집중 대비'), '');
+  assert.equal(s.inferSchool_('법인 이사회'), '법인');
+  assert.equal(plain(s.getInit()).settings.admin, '');
+  s.mockReset_();
+  s.MOCK.db['설정'].forEach((r) => { if (r['항목'] === '관리자') r['값'] = '홍길동T'; });
+  assert.equal(plain(s.getInit()).settings.admin, '홍길동T');
 });
 
 test('대장 가져오기: 이름이 다른 곳은 정해 둔 짝으로 찾는다 (스쿨캠핑 → 작은정원)', () => {

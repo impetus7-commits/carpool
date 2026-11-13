@@ -51,6 +51,7 @@ function updateRows_(name, list) {
   if (MOCK.onSave) MOCK.onSave();
 }
 
+function sendMail_(to, subject, body) { (MOCK.mails || (MOCK.mails = [])).push({ to: to, subject: subject, body: body }); }
 function tabHeaders_(name) { return TABS_[name].slice(); }
 function currentEmail_() { return MOCK.user; }
 function withLock_(fn) { return fn(); }

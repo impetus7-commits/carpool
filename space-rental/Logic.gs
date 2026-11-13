@@ -300,8 +300,22 @@ function ledgerDiff_(existing, desired) {
   };
 }
 
-/** 일과 중 교시인지 (1교시, 2교시 … — 아침·점심·방과후·야간은 아님) */
-function isRegularPeriod_(name) { return /^\d+\s*교시$/.test(String(name || '').trim()); }
+/**
+ * 적힌 글에서 사용 학교(중·고·법인)를 짐작합니다. 알 수 없으면 ''.
+ * 예: "중학교 법교육" → 중, "동아리(고)" → 고, "중3 리허설" → 중, "고/수업(음악과)" → 고, "중+고 합동" → 중,고
+ * "중간고사", "집중", "고사" 처럼 낱말 속에 들어 있는 글자는 세지 않습니다.
+ */
+function inferSchool_(text) {
+  var t = ' ' + String(text == null ? '' : text) + ' ';
+  var solo = function (ch) {   // 앞뒤가 띄어쓰기·기호·숫자인 한 글자
+    return new RegExp('[\\s(\\[,·/+*~]' + ch + '(?=[\\s\\d/\\-+):(\\],·~]|$)').test(t);
+  };
+  var out = [];
+  if (/중학교|중등/.test(t) || solo('중')) out.push('중');
+  if (/고등학교|고교/.test(t) || solo('고')) out.push('고');
+  if (/법인/.test(t)) out.push('법인');
+  return out.join(',');
+}
 
 /**
  * from 이후 날짜에서 같은 공간·날짜·교시에 허용 수보다 많이 겹쳐 있는 살아 있는 예약 쌍.

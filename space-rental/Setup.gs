@@ -56,7 +56,9 @@ var SAMPLE_ = {
     ['학교이름', '우리고등학교', '화면 맨 위에 보이는 이름'],
     ['안내문', '사용 후에는 정리 정돈과 전원 확인을 부탁드립니다.', '첫 화면에 보이는 한 줄 안내 (비워도 됨)'],
     ['예약가능일수', '60', '오늘부터 며칠 뒤까지 신청할 수 있는지'],
-    ['반복예약최대일수', '200', '반복 예약의 종료일을 오늘부터 며칠 뒤까지 허용할지']
+    ['반복예약최대일수', '200', '반복 예약의 종료일을 오늘부터 며칠 뒤까지 허용할지'],
+    ['관리자', '', '화면 위쪽에 "관리자 : ○○" 로 보이는 이름 (비우면 표시하지 않음)'],
+    ['함께사용알림', 'Y', '함께 사용 신청이 들어오면 먼저 예약한 사람에게 메일로 알림 (Y 또는 N)']
   ]
 };
 
@@ -97,14 +99,6 @@ function setup() {
         var at = sh.getLastColumn() + 1;
         if (sh.getMaxColumns() < at + missing.length - 1) sh.insertColumnsAfter(sh.getMaxColumns(), at + missing.length - 1 - sh.getMaxColumns());
         sh.getRange(1, at, 1, missing.length).setNumberFormat('@').setValues([missing]);
-        if (name === '공간' && missing.indexOf('동시예약수') >= 0 && sh.getLastRow() > 1) {
-          // 체육관·동진실은 일과 중 체육수업 3팀까지 함께 쓸 수 있게 기본값을 넣습니다.
-          var iName = have.indexOf('이름'), col = at + missing.indexOf('동시예약수');
-          var names = iName < 0 ? [] : sh.getRange(2, iName + 1, sh.getLastRow() - 1, 1).getDisplayValues();
-          names.forEach(function (r, i) {
-            if (/^(체육관|동진실)$/.test(String(r[0]).trim())) sh.getRange(i + 2, col).setValue('3');
-          });
-        }
       }
     }
     var width = sh.getLastColumn();
@@ -114,6 +108,25 @@ function setup() {
       sh.getRange(2, 1, SAMPLE_[name].length, head.length).setValues(SAMPLE_[name]);
     }
   });
+
+  // [공간] 여러 팀이 함께 쓰는 곳은 동시예약수가 비어 있으면 3을 넣습니다 (다른 숫자를 적어 두었으면 그대로 둡니다).
+  var rooms = ss.getSheetByName('공간');
+  var rHead = rooms.getRange(1, 1, 1, rooms.getLastColumn()).getDisplayValues()[0].map(function (h) { return String(h).trim(); });
+  var cName = rHead.indexOf('이름'), cMulti = rHead.indexOf('동시예약수');
+  if (cName >= 0 && cMulti >= 0 && rooms.getLastRow() > 1) {
+    var rv = rooms.getRange(2, 1, rooms.getLastRow() - 1, rooms.getLastColumn()).getDisplayValues();
+    rv.forEach(function (r, i) {
+      if (/^(체육관|동진실|작은정원|스쿨캠핑)$/.test(String(r[cName]).trim()) && !String(r[cMulti]).trim()) {
+        rooms.getRange(i + 2, cMulti + 1).setNumberFormat('@').setValue('3');
+      }
+    });
+  }
+
+  // [설정] 새로 생긴 항목이 없으면 줄을 덧붙입니다.
+  var conf = ss.getSheetByName('설정');
+  var keys = conf.getLastRow() > 1 ? conf.getRange(2, 1, conf.getLastRow() - 1, 1).getDisplayValues().map(function (r) { return String(r[0]).trim(); }) : [];
+  var extra = SAMPLE_['설정'].filter(function (r) { return keys.indexOf(r[0]) < 0; });
+  if (extra.length) conf.getRange(conf.getLastRow() + 1, 1, extra.length, 3).setNumberFormat('@').setValues(extra);
 
   var users = ss.getSheetByName('사용자');
   if (users.getLastRow() === 1) {

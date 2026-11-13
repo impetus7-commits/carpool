@@ -59,6 +59,15 @@ h1, h2, h3, p { margin: 0; }
 .nav.bottom { position: fixed; z-index: 20; left: 0; right: 0; bottom: 0; background: var(--card); border-top: 1px solid var(--line); padding: 6px 8px max(6px, env(safe-area-inset-bottom)); color: var(--sub); }
 .nav.bottom button.on { color: var(--brand); background: var(--brand-soft); }
 .nav.inline { display: none; }
+.infobar { background: var(--brand-soft); border-bottom: 1px solid var(--line); font-size: 13px; padding: 6px 16px; }
+.infobar > div { max-width: 1180px; margin: 0 auto; }
+.help h3 { font: 700 17px var(--display); margin: 0; }
+.help details { border-top: 1px solid var(--line); }
+.help details:first-of-type { border-top: 0; }
+.help summary { cursor: pointer; padding: 14px 0; font-weight: 600; }
+.help ol, .help ul { margin: 0 0 14px; padding-left: 22px; }
+.help li { margin-bottom: 6px; }
+.help p { margin-bottom: 10px; }
 main { max-width: 1180px; margin: 0 auto; padding: 16px 16px 110px; }
 
 /* ----- 공통 ----- */
@@ -429,12 +438,8 @@ function bookingAt(roomId, date, pid) {
 function bookingsAt(roomId, date, pid) {
   return (S.days[date] || []).filter(function (b) { return b.roomId === roomId && b.periods.indexOf(pid) >= 0; });
 }
-function isRegular(pid) {
-  var p = S.init.periods.filter(function (x) { return x.id === pid; })[0];
-  return !!p && /^\d+\s*교시$/.test(p.name);
-}
-/** 그 교시에 함께 들어갈 수 있는 예약 수: 체육관·동진실처럼 '동시예약수'가 있는 공간의 일과 중 교시만 여러 팀 */
-function slotCap(r, pid) { return r && r.multi > 1 && isRegular(pid) ? r.multi : 1; }
+/** 같은 시간에 함께 들어갈 수 있는 예약 수: [공간] 탭의 '동시예약수' */
+function slotCap(r) { return r && r.multi > 1 ? r.multi : 1; }
 function whoText(b) { return (b.school ? '[' + b.school + '] ' : '') + (b.unit || b.name || ''); }
 var SCHOOLS = ['중', '고', '법인'];
 function schoolChips(list) {
@@ -450,8 +455,8 @@ function roomState(r) {
   if (S.period !== 'all') {
     var b = bookingAt(r.id, S.date, S.period);
     if (!b) return { k: 'free', t: '비어 있음' };
-    var cap = slotCap(r, S.period), cnt = bookingsAt(r.id, S.date, S.period).length;
-    if (cap > 1 && cnt < cap) return { k: 'part', t: cnt + '/' + cap + '팀 사용 중 · 체육수업 가능' };
+    var cap = slotCap(r), cnt = bookingsAt(r.id, S.date, S.period).length;
+    if (cap > 1 && cnt < cap) return { k: 'part', t: cnt + '/' + cap + '팀 사용 중 · 함께 사용 가능' };
     if (cap > 1) return { k: 'busy', t: cap + '팀 사용 중 (꽉 참)' };
     if (b.mine) return { k: 'mine', t: b.status === '확정' ? '내 예약' : '내 신청 (승인 대기)' };
     return b.status === '확정' ? { k: 'busy', t: '사용 중' + (whoText(b) ? ' · ' + whoText(b) : '') } : { k: 'wait', t: '승인 대기' };
@@ -484,10 +489,11 @@ function loadAdmin() {
   });
 }
 function loadHist() { return call('getHistory', S.admin.q).then(function (h) { S.admin.hist = h; }); }
-function groupUp(list) {
+/** 묶음ID 로 묶습니다. byRoom 이면 같은 묶음이라도 공간마다 따로 묶습니다. */
+function groupUp(list, byRoom) {
   var map = {}, out = [];
   list.forEach(function (b) {
-    var k = b.groupId || b.id;
+    var k = b.groupId ? b.groupId + (byRoom ? '|' + b.roomId : '') : b.id;
     if (!map[k]) { map[k] = { key: k, items: [] }; out.push(map[k]); }
     map[k].items.push(b);
   });
@@ -499,11 +505,13 @@ var ICON = {
   map: '<svg viewBox="0 0 24 24"><path d="M4 21V5l8-3 8 3v16M9 21v-5h6v5M8 8h2M14 8h2M8 12h2M14 12h2"/></svg>',
   find: '<svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>',
   mine: '<svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="16" rx="2"/><path d="M8 3v4M16 3v4M4 10h16M9 15l2 2 4-4"/></svg>',
-  admin: '<svg viewBox="0 0 24 24"><path d="M12 3 4 6v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V6z"/><path d="m9 12 2 2 4-4"/></svg>'
+  admin: '<svg viewBox="0 0 24 24"><path d="M12 3 4 6v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V6z"/><path d="m9 12 2 2 4-4"/></svg>',
+  help: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.7.4-1 .9-1 1.7M12 17h.01"/></svg>'
 };
 function navHtml(cls) {
   var items = [['map', '공간'], ['find', '추천'], ['mine', '내 예약']];
   if (S.init.me.admin) items.push(['admin', '관리']);
+  items.push(['help', '사용법']);
   return '<nav class="nav ' + cls + '" aria-label="메뉴">' + items.map(function (it) {
     var n = it[0] === 'admin' && S.pendingCount ? '<span class="n" aria-label="확인할 일 ' + S.pendingCount + '건">' + S.pendingCount + '</span>' : '';
     return '<button type="button" data-a="view" data-v="' + it[0] + '" class="' + (S.view === it[0] ? 'on' : '') + '"' +
@@ -516,10 +524,13 @@ function render() {
   var me = S.init.me;
   var who = me.registered ? '<b>' + esc(me.name) + '</b>' + esc(me.role) + (me.dept ? ' · ' + esc(me.dept) : '')
     : '<b>미등록 계정</b>조회만 가능';
-  var body = S.view === 'map' ? viewMap() : S.view === 'find' ? viewFind() : S.view === 'mine' ? viewMine() : viewAdmin();
+  var body = S.view === 'map' ? viewMap() : S.view === 'find' ? viewFind() : S.view === 'mine' ? viewMine() : S.view === 'help' ? viewHelp() : viewAdmin();
+  var st = S.init.settings;
   $('#app').innerHTML =
     '<header class="top"><div class="top-in"><div class="brand"><small>공간 대여</small><h1>' + esc(S.init.settings.school) + '</h1></div>' +
     navHtml('inline') + '<div class="who">' + who + '</div></div></header>' +
+    '<div class="infobar"><div>' + (st.admin ? '<b>관리자 : ' + esc(st.admin) + '</b><span aria-hidden="true"> · </span>' : '') +
+    '교직원 계정으로 로그인해야 사용할 수 있습니다.</div></div>' +
     '<main>' + body + '</main>' + navHtml('bottom');
   Object.keys(keep).forEach(function (id) { var el = document.getElementById(id); if (el) el.scrollLeft = keep[id]; });
   renderSheet();
@@ -531,7 +542,7 @@ function viewMap() {
   var h = '';
   if (!me.registered) {
     h += '<div class="notice warn">' + (me.email ? esc(me.email) + ' 계정은 등록되어 있지 않아요. ' : '로그인한 계정을 확인할 수 없어요. 학교 구글 계정으로 로그인해 주세요. ') +
-      '공간 소개와 예약 현황은 볼 수 있지만, 신청하려면 관리자에게 계정 등록을 요청해 주세요.</div>';
+      '공간 소개와 예약 현황은 볼 수 있지만, 신청하려면 교직원 계정으로 로그인해야 하고 관리자' + (st.admin ? '(' + esc(st.admin) + ')' : '') + '에게 계정 등록을 요청해야 합니다.</div>';
   } else if (st.notice) {
     h += '<div class="notice">' + esc(st.notice) + '</div>';
   }
@@ -611,7 +622,7 @@ function periodRows(roomId, date, sel, ownId) {
   var r = room(roomId);
   return S.init.periods.map(function (p) {
     var list = bookingsAt(roomId, date, p.id).filter(function (b) { return b.id !== ownId; });
-    var cap = slotCap(r, p.id), full = list.length >= cap;
+    var cap = slotCap(r), full = list.length >= cap;
     var on = sel.indexOf(p.id) >= 0 && !full;
     var b = list[0];
     var k = full ? (b.status === '확정' ? 'busy' : 'wait') : on ? 'sel' : list.length ? 'shared' : 'free';
@@ -620,13 +631,36 @@ function periodRows(roomId, date, sel, ownId) {
     }).filter(Boolean);
     var txt;
     if (!list.length) txt = on ? '선택함' : '비어 있음';
-    else if (cap > 1) txt = list.length + '/' + cap + '팀' + (full ? ' (꽉 참)' : on ? ' · 선택함' : ' · 체육수업은 함께 사용 가능') + (each.length ? ' — ' + each.join(' / ') : '');
+    else if (cap > 1) txt = list.length + '/' + cap + '팀' + (full ? ' (꽉 참)' : on ? ' · 선택함' : ' · 함께 사용 가능') + (each.length ? ' — ' + each.join(' / ') : '');
     else txt = (b.status === '확정' ? '사용 중' : '승인 대기') + (each[0] ? ' · ' + each[0].replace(' (승인 대기)', '') : '');
     return '<button type="button" class="prow ' + k + '" ' + (full ? 'disabled' : 'data-a="pick" data-p="' + esc(p.id) + '" aria-pressed="' + on + '"') + '>' +
       '<span class="box" aria-hidden="true">' + (on ? '✓' : '') + '</span>' +
       '<span class="pn">' + esc(p.name) + '<span class="pt">' + esc(p.start) + (p.end ? '~' + esc(p.end) : '') + '</span></span>' +
       '<span class="ps">' + esc(txt) + '</span></button>';
   }).join('');
+}
+/** 같은 일정으로 함께 예약할 다른 공간 고르기 */
+function moreRoomsHtml(sh) {
+  var f = sh.f;
+  var full = function (r) { return sh.sel.some(function (p) { return bookingsAt(r.id, sh.date, p).length >= slotCap(r); }); };
+  var others = S.init.rooms.filter(function (r) { return r.bookable && r.id !== sh.id; });
+  if (!others.length) return '';
+  var groups = [], by = {};
+  others.forEach(function (r) {
+    var k = r.building + ' ' + floorLabel(r.floor);
+    if (!by[k]) { by[k] = []; groups.push(k); }
+    by[k].push(r);
+  });
+  return '<details class="more"' + (f.moreOpen || f.more.length ? ' open' : '') + ' data-keep="moreOpen"><summary>같은 일정으로 다른 공간도 함께 예약' +
+    (f.more.length ? ' · ' + f.more.length + '곳 고름' : '') + '</summary>' +
+    '<p class="sub" style="margin-bottom:8px">고른 공간 모두에 같은 날짜·교시' + (f.repeat ? '·반복' : '') + '로 신청돼요. 하루 신청은 한 곳이라도 자리가 없으면 모두 신청되지 않아요.</p>' +
+    groups.map(function (k) {
+      return '<p class="eyebrow" style="margin:10px 0 6px">' + esc(k) + '</p><div class="chips">' + by[k].sort(function (x, y) { return x.order - y.order; }).map(function (r) {
+        var on = f.more.indexOf(r.id) >= 0, busy = full(r);
+        return '<button type="button" class="chip ' + (on ? 'on' : '') + '" data-a="more-room" data-id="' + esc(r.id) + '" role="checkbox" aria-checked="' + on + '"' +
+          (busy ? ' title="고른 교시에 이미 예약이 있어요"' : '') + '>' + (on ? '✓ ' : '') + esc(r.name) + (busy ? ' <small style="opacity:.75">(예약 있음)</small>' : '') + '</button>';
+      }).join('') + '</div>';
+    }).join('') + '</details>';
 }
 function repeatDates(sh) {
   if (!sh.f.repeat || !sh.f.until || sh.f.until < sh.date) return [];
@@ -659,7 +693,7 @@ function sheetRoom(sh) {
 
   if (!r.bookable) return h + '<div class="notice">이 공간은 신청을 받지 않아요.</div></div>';
 
-  h += '<button type="button" class="btn wide" data-a="sched">주간 · 월간 · 분기 · 연도 일정 요약 보기</button>' +
+  h += '<button type="button" class="btn wide" data-a="sched">일정 요약 보기 (주간 · 월간 · 분기 · 연도, 통계)</button>' +
     '<h3 class="sec">예약 현황</h3>' + dateBar('sheet', sh.date);
   if (!S.days[sh.date]) return h + '<div class="spin"></div></div>';
   if (sh.confirm) return h + confirmHtml(sh) + '</div>';
@@ -678,8 +712,11 @@ function sheetRoom(sh) {
       '<label class="f" for="f-unit">2) 사용 부서 (개인이면 선생님 성함)</label><input class="in" id="f-unit" data-f="unit" maxlength="40" placeholder="예: 교육과정부, 홍길동" value="' + esc(f.unit) + '">' +
       '<label class="f" for="f-purpose">3) 사용 목적</label><input class="in" id="f-purpose" data-f="purpose" maxlength="100" placeholder="예: 과학 동아리 발표 준비" value="' + esc(f.purpose) + '">' +
       '<label class="f" for="f-people">4) 사용 예상 인원' + (r.capacity ? ' (정원 ' + r.capacity + '명)' : '') + '</label><input class="in" id="f-people" data-f="people" type="number" inputmode="numeric" min="1" ' + (r.capacity ? 'max="' + r.capacity + '"' : '') + ' value="' + esc(f.people) + '">' +
-      (r.multi > 1 ? '<label class="switch"><input type="checkbox" data-a="shared" ' + (f.shared ? 'checked' : '') + '> 체육수업으로 함께 사용</label>' +
-        '<p class="sub" style="margin:4px 0 0 32px">일과 중(1~7교시) 체육수업은 최대 ' + r.multi + '팀까지 같은 시간에 쓸 수 있어요. 체크하지 않으면 비어 있는 시간에만 신청돼요.</p>' : '') +
+      (r.multi > 1 || f.more.some(function (id) { return room(id) && room(id).multi > 1; })
+        ? '<label class="switch"><input type="checkbox" data-a="shared" ' + (f.shared ? 'checked' : '') + '> 함께 사용</label>' +
+          '<p class="sub" style="margin:4px 0 0 32px">' + (r.multi > 1 ? '이 공간은 최대 ' + r.multi + '팀까지 같은 시간에 쓸 수 있어요. ' : '') +
+          '체크하면 이미 예약이 있는 시간에도 신청할 수 있고, 먼저 예약한 분에게 알림 메일이 가요. 체크하지 않으면 비어 있는 시간에만 신청돼요.</p>' : '') +
+      moreRoomsHtml(sh) +
       '<label class="switch"><input type="checkbox" data-a="repeat" ' + (f.repeat ? 'checked' : '') + '> 일정 기간 동안 반복해서 신청</label>';
     if (f.repeat) {
       var ds = repeatDates(sh);
@@ -695,26 +732,27 @@ function sheetRoom(sh) {
     if (S.init.me.role === '학생') h += '<p class="sub" style="margin-top:12px">학생 신청은 관리자 승인 뒤에 확정돼요.</p>';
     if (sh.err) h += '<div class="err" role="alert">' + esc(sh.err) + '</div>';
     h += '<div class="sticky-go"><button type="button" class="btn primary wide" data-a="submit" ' + (sh.busy ? 'disabled' : '') + '>' +
-      (sh.busy ? '신청하는 중…' : pnames(sh.sel) + ' 신청하기') + '</button></div>';
+      (sh.busy ? '신청하는 중…' : (f.more.length ? '공간 ' + (f.more.length + 1) + '곳 · ' : '') + pnames(sh.sel) + ' 신청하기') + '</button></div>';
   }
   return h + '</div>';
 }
 function confirmHtml(sh) {
   var c = sh.confirm, h = '';
+  var where = function (x) { return (c.many ? x.room + ' · ' : '') + fmt(x.date); };
   if (c.existing && c.existing.length) {
-    h += '<div class="notice warn" style="margin-top:12px"><b>같은 시간에 이미 예약이 있어요.</b> 함께 사용해도 되는지 확인해 주세요. (최대 ' + c.max + '팀)' +
+    h += '<div class="notice warn" style="margin-top:12px"><b>같은 시간에 이미 예약이 있어요.</b> 함께 사용해도 되는지 확인해 주세요. 신청하면 먼저 예약한 분에게 알림 메일이 가요.' +
       '<ul class="clist">' + c.existing.map(function (x) {
-        return '<li>' + esc(fmt(x.date)) + '<ul>' + x.list.map(function (b) {
+        return '<li>' + esc(where(x)) + ' (최대 ' + x.max + '팀)<ul>' + x.list.map(function (b) {
           return '<li>' + esc(b.periods) + ' · ' + esc((b.school ? '[' + b.school + '] ' : '') + b.who) + (b.purpose ? ' · ' + esc(b.purpose) : '') + '</li>';
         }).join('') + '</ul></li>';
       }).join('') + '</ul></div>';
   }
   if (c.conflicts.length) {
-    h += '<div class="notice warn" style="margin-top:12px"><b>자리가 없어 신청할 수 없는 날이 ' + c.conflicts.length + '일 있어요.</b>' +
-      '<ul class="clist">' + c.conflicts.map(function (x) { return '<li>' + esc(fmt(x.date)) + ' · ' + esc(x.periods) + '</li>'; }).join('') + '</ul>' +
-      '이 날들을 빼고 나머지 ' + c.okCount + '회만 신청할까요?</div>';
+    h += '<div class="notice warn" style="margin-top:12px"><b>자리가 없어 신청할 수 없는 곳이 ' + c.conflicts.length + '건 있어요.</b>' +
+      '<ul class="clist">' + c.conflicts.map(function (x) { return '<li>' + esc(where(x)) + ' · ' + esc(x.periods) + '</li>'; }).join('') + '</ul>' +
+      '이것을 빼고 나머지 ' + c.okCount + '건만 신청할까요?</div>';
   }
-  var label = c.conflicts.length ? c.okCount + '회만 신청' : c.okCount > 1 ? c.okCount + '회 함께 사용으로 신청' : '함께 사용으로 신청';
+  var label = c.conflicts.length ? c.okCount + '건만 신청' : c.okCount > 1 ? c.okCount + '건 함께 사용으로 신청' : '함께 사용으로 신청';
   return h + (sh.err ? '<div class="err" role="alert">' + esc(sh.err) + '</div>' : '') +
     '<div class="row"><button type="button" class="btn grow" data-a="unconfirm">돌아가기</button>' +
     '<button type="button" class="btn primary grow" data-a="submit" data-skip="1" ' + (sh.busy ? 'disabled' : '') + '>' + label + '</button></div>';
@@ -859,6 +897,17 @@ function sheetSched(sh) {
         detail('wd', w, WD[w] + '요일', function (b) { return wd(b.date) === w; }) + '</li>';
     }).join('') + '</ul>';
   }
+  // 학교별 사용 교시: 여러 학교를 고른 예약은 각 학교에 모두 셉니다.
+  var bySchool = {}, schoolOf = function (b) { return b.school ? b.school.split(',') : ['미분류']; };
+  list.forEach(function (b) { schoolOf(b).forEach(function (k) { bySchool[k] = (bySchool[k] || 0) + b.periods.length; }); });
+  var sKeys = SCHOOLS.concat(['미분류']).filter(function (k) { return bySchool[k]; });
+  if (sKeys.length) {
+    var sm = Math.max.apply(null, sKeys.map(function (k) { return bySchool[k]; }));
+    h += '<h3 class="sec">학교별 사용 교시</h3><p class="sub">학교를 누르면 해당 내역이 펼쳐져요.</p><ul class="bars">' + sKeys.map(function (k) {
+      return '<li>' + barBtn('school', k, k === '미분류' ? '미분류 (학교 구분 없음)' : k, bySchool[k], sm) +
+        detail('school', k, k, function (b) { return schoolOf(b).indexOf(k) >= 0; }) + '</li>';
+    }).join('') + '</ul>';
+  }
   var keyOf = function (b) { return b.purpose || (b.mine ? '내 예약' : '예약'); };
   var top = Object.keys(purpose).sort(function (x, y) { return purpose[y] - purpose[x]; }).slice(0, sh.mode === 'year' ? 10 : 6);
   if (top.length) {
@@ -887,15 +936,34 @@ function sheetEdit(sh) {
   h += '<div class="sticky-go"><button type="button" class="btn primary wide" data-a="save" ' + (sh.busy ? 'disabled' : '') + '>' + (sh.busy ? '저장하는 중…' : '수정 저장') + '</button></div>';
   return h + '</div>';
 }
+/** 같은 묶음으로 신청한 예약들 (화면에 불러온 것 가운데) */
+function groupMates(b) {
+  if (!b.groupId) return [b];
+  var seen = {}, out = [];
+  var pools = [S.mine || [], S.admin.data ? S.admin.data.list : [], S.admin.data ? S.admin.data.pending : []];
+  pools.forEach(function (list) {
+    list.forEach(function (x) { if (x.groupId === b.groupId && !seen[x.id]) { seen[x.id] = true; out.push(x); } });
+  });
+  return out.length ? out : [b];
+}
 function sheetCancel(sh) {
-  var b = sh.b, r = room(b.roomId);
+  var b = sh.b, r = room(b.roomId), t = S.init.today;
+  var live = groupMates(b).filter(function (x) { return (x.status === '확정' || x.status === '승인대기') && x.date >= t; });
+  var here = live.filter(function (x) { return x.roomId === b.roomId; });
+  var later = here.filter(function (x) { return x.date >= b.date; });
+  var roomsN = live.map(function (x) { return x.roomId; }).filter(function (id, i, arr) { return arr.indexOf(id) === i; }).length;
   var h = sheetHead('예약 취소', (r ? r.name : '') + ' · ' + fmtShort(b.date)) + '<div class="sheet-body">' +
     '<p>' + esc(pnames(b.periods)) + ' · ' + (b.unit ? esc(whoText(b)) + ' · ' : '') + esc(b.purpose) + (b.name && !b.mine ? ' · 신청자 ' + esc(b.name) : '') + '</p>' +
-    '<p class="sub" style="margin:8px 0 14px">취소한 내용은 기록에 남아요.</p>';
+    '<p class="sub" style="margin:8px 0 14px">취소한 내용은 기록에 남아요.' + (b.groupId ? ' 지난 날짜의 예약은 그대로 두어요.' : '') + '</p>';
   if (sh.err) h += '<div class="err" role="alert">' + esc(sh.err) + '</div>';
-  h += '<button type="button" class="btn danger wide" data-a="cancel-go" data-scope="one" ' + (sh.busy ? 'disabled' : '') + '>' + (b.groupId ? '이 날만 취소' : '예약 취소') + '</button>';
-  if (b.groupId) h += '<button type="button" class="btn danger wide" style="margin-top:8px" data-a="cancel-go" data-scope="following" ' + (sh.busy ? 'disabled' : '') + '>이 날부터 남은 반복 일정 모두 취소</button>';
-  return h + '<button type="button" class="btn wide" style="margin-top:8px" data-a="close">그만두기</button></div>';
+  var btn = function (scope, label) {
+    return '<button type="button" class="btn danger wide" style="margin-bottom:8px" data-a="cancel-go" data-scope="' + scope + '" ' + (sh.busy ? 'disabled' : '') + '>' + label + '</button>';
+  };
+  h += btn('one', b.groupId ? '이 날만 취소 (1건)' : '예약 취소');
+  if (b.groupId && later.length > 1 && later.length < here.length) h += btn('following', '이 날부터 남은 일정 취소 (' + later.length + '건)');
+  if (b.groupId && here.length > 1) h += btn('room', '이 공간의 반복 예약 전체 취소 (' + here.length + '건)');
+  if (b.groupId && roomsN > 1) h += btn('group', '함께 신청한 공간 ' + roomsN + '곳 모두 취소 (' + live.length + '건)');
+  return h + '<button type="button" class="btn wide" data-a="close">그만두기</button></div>';
 }
 function sheetReject(sh) {
   var g = sh.items, b = g[0], r = room(b.roomId);
@@ -954,6 +1022,47 @@ function recCard(x, rank) {
     '<button type="button" class="btn small ' + (rank ? 'primary' : '') + '" data-a="rec-open" data-id="' + esc(r.id) + '">' + (rank ? '살펴보고 신청' : '살펴보기') + '</button></div></article>';
 }
 
+/* ---------- 그리기: 사용법 ---------- */
+function viewHelp() {
+  var st = S.init.settings, sec = function (title, body, open) {
+    return '<details' + (open ? ' open' : '') + '><summary>' + title + '</summary>' + body + '</details>';
+  };
+  return '<p class="eyebrow">사용법</p><h2 class="title" style="margin-bottom:12px">공간 대여 사용 안내</h2><div class="card pad help">' +
+    sec('1. 시작하기', '<ul><li><b>교직원 계정으로 로그인</b>해야 사용할 수 있습니다. 관리자가 등록한 계정만 신청할 수 있고, 등록되지 않은 계정은 현황만 볼 수 있습니다.</li>' +
+      '<li>문의는 관리자' + (st.admin ? ' <b>' + esc(st.admin) + '</b>' : '') + '에게 해 주세요.</li>' +
+      '<li>휴대폰과 컴퓨터에서 같은 주소로 씁니다.</li></ul>', true) +
+    sec('2. 공간 예약하기', '<ol><li><b>공간</b> 메뉴에서 날짜를 고르고, 건물 → 층 → 공간을 누릅니다.</li>' +
+      '<li>공간 소개(사진·수용 인원·시설·특이사항)와 그날의 교시별 예약 현황을 확인합니다.</li>' +
+      '<li>비어 있는 교시를 눌러 고릅니다. 여러 교시를 고를 수 있습니다.</li>' +
+      '<li>① 사용 학교(중·고·법인) ② 사용 부서(개인이면 선생님 성함) ③ 사용 목적 ④ 사용 예상 인원을 적습니다.</li>' +
+      '<li><b>신청하기</b>를 누르면 교직원은 바로 확정되고, 학생은 관리자 승인 뒤에 확정됩니다.</li></ol>' +
+      '<p>배치도의 색: 초록 = 비어 있음, 붉은색 = 사용 중, 노랑 = 승인 대기, 반반 = 일부 교시 예약.</p>') +
+    sec('3. 반복 예약 (일정 기간)', '<ol><li>신청 내용 아래의 <b>일정 기간 동안 반복해서 신청</b>에 체크합니다.</li>' +
+      '<li>반복할 요일과 종료일을 고릅니다. 모두 몇 회인지 바로 보입니다.</li>' +
+      '<li>이미 예약이 있는 날이 있으면 목록을 보여 주고, 그 날을 빼고 신청할지 묻습니다.</li></ol>') +
+    sec('4. 여러 공간을 한 번에 예약', '<ol><li>공간 하나를 열고 교시를 고른 뒤, <b>같은 일정으로 다른 공간도 함께 예약</b>을 펼칩니다.</li>' +
+      '<li>함께 예약할 공간을 누릅니다. 고른 교시에 이미 예약이 있는 공간은 "(예약 있음)"으로 표시됩니다.</li>' +
+      '<li>하루 신청은 한 곳이라도 자리가 없으면 모두 신청되지 않습니다. 반복 신청은 자리가 없는 곳만 빼고 신청할 수 있습니다.</li></ol>') +
+    sec('5. 함께 사용', '<ul><li>일부 공간은 여러 팀이 같은 시간에 쓸 수 있습니다. 교시 칸에 "1/3팀"처럼 표시됩니다.</li>' +
+      '<li>이미 예약이 있는 시간에 신청하려면 <b>함께 사용</b>에 체크합니다. 먼저 있던 예약을 보여 주고 다시 확인을 받습니다.</li>' +
+      '<li>함께 사용으로 신청하면 먼저 예약한 분에게 알림 메일이 갑니다.</li></ul>') +
+    sec('6. 내 예약 확인·수정·취소', '<ul><li><b>내 예약</b> 메뉴에서 다가오는 예약과 지난 1년의 예약을 봅니다.</li>' +
+      '<li><b>수정</b>: 교시, 사용 학교, 부서, 목적, 인원을 바꿉니다. 날짜나 공간을 바꾸려면 취소하고 다시 신청합니다.</li>' +
+      '<li><b>취소</b>: 반복 예약은 "이 날만", "이 날부터 남은 일정", "이 공간의 반복 예약 전체", "함께 신청한 공간 모두" 가운데 고릅니다. 지난 날짜는 그대로 남습니다.</li>' +
+      '<li>기존 사용 대장에서 가져온 예약은 여기서 고칠 수 없고, 대장에서 고치면 자동으로 반영됩니다.</li></ul>') +
+    sec('7. 공간 추천', '<p><b>추천</b> 메뉴에서 날짜·교시·인원·용도·필요한 시설·검색어를 넣으면, 조건에 맞는 공간을 이유와 함께 보여 줍니다. 아는 것만 넣어도 됩니다.</p>') +
+    sec('8. 일정 요약과 통계', '<ul><li>공간을 열고 <b>일정 요약 보기</b>를 누르면 주간·월간·분기·연도별 사용 현황이 나옵니다.</li>' +
+      '<li>예약 건수, 사용 교시, 평일 이용률과 함께 학교별(중·고·법인)·요일별·내용별 사용 교시를 볼 수 있습니다.</li>' +
+      '<li>막대를 누르면 해당 내역이 펼쳐지고, 날짜를 누르면 그날의 예약 현황으로 갑니다.</li>' +
+      '<li>날짜를 오늘 이전으로 넘기면 지난 내역도 볼 수 있습니다.</li></ul>') +
+    (S.init.me.admin ? sec('9. 관리자', '<ul><li><b>승인 대기</b>: 학생 신청을 승인하거나 사유를 적어 반려합니다.</li>' +
+      '<li><b>겹침</b>: 같은 시간에 허용 수보다 많이 잡힌 예약을 보여 줍니다. 기존 대장 가져오기 결과와 "지금 가져오기"도 여기 있습니다.</li>' +
+      '<li><b>전체 예약</b>: 기간을 정해 모든 예약을 보고 수정·취소합니다.</li>' +
+      '<li><b>기록</b>: 신청·수정·취소·승인·반려와 대장 가져오기 내역을 변경 전후와 함께 봅니다.</li>' +
+      '<li>공간·사용자·교시·설정은 구글시트에서 고치면 바로 반영됩니다. 함께 쓸 수 있는 팀 수는 [공간] 탭의 <b>동시예약수</b>로 정합니다.</li></ul>') : '') +
+    '</div>';
+}
+
 /* ---------- 그리기: 내 예약 ---------- */
 function bookingActs(b, admin) {
   var live = b.status === '확정' || b.status === '승인대기';
@@ -978,16 +1087,20 @@ function groupCard(g, admin) {
       (x.memo ? ' · ' + esc(x.memo) : '') + '</span>' + statusBadge(x.status) + bookingActs(x, admin) + '</div>';
   });
   var SHOW = 5;
+  var next = g.items.filter(function (x) {
+    return (x.status === '확정' || x.status === '승인대기') && (admin || x.date >= S.init.today) && !(x.ledger && S.init.ledgerOn);
+  });
   return '<article class="card item">' + head + '<div style="margin-top:8px">' + rows.slice(0, SHOW).join('') +
     (rows.length > SHOW ? '<details class="more"><summary>나머지 ' + (rows.length - SHOW) + '회 더 보기</summary>' + rows.slice(SHOW).join('') + '</details>' : '') +
-    '</div></article>';
+    '</div>' + (next.length > 1 ? '<div class="acts"><button type="button" class="btn small danger" data-a="cancel" data-id="' + esc(next[0].id) + '">반복 예약 한꺼번에 취소…</button></div>' : '') +
+    '</article>';
 }
 function viewMine() {
   if (!S.init.me.registered) return '<div class="card empty">등록된 계정만 예약할 수 있어요.</div>';
   if (!S.mine) return '<div class="spin"></div>';
   var today = S.init.today;
   var isLive = function (b) { return b.date >= today && (b.status === '확정' || b.status === '승인대기'); };
-  var groups = groupUp(S.mine);
+  var groups = groupUp(S.mine, true);
   var now = groups.filter(function (g) { return g.items.some(isLive); });
   var past = groups.filter(function (g) { return !g.items.some(isLive); }).reverse();
   var h = '<p class="eyebrow">내 예약</p><h2 class="title" style="margin-bottom:14px">다가오는 예약 ' + now.length + '건</h2>';
@@ -1045,12 +1158,14 @@ function viewAdmin() {
     if (!gs.length) return h + '<div class="card empty">승인을 기다리는 신청이 없어요.</div>';
     return h + gs.map(function (g) {
       var b = g.items[0], r = room(b.roomId);
-      return '<article class="card item"><p class="eyebrow">' + esc(r ? roomLabel(r) : '') + ' · 신청 ' + esc(b.createdAt) + '</p>' +
-        '<h3>' + esc(r ? r.name : '(삭제된 공간)') + ' · ' + esc(pnames(b.periods)) + '</h3>' +
+      var uniq = function (arr) { return arr.filter(function (x, i) { return arr.indexOf(x) === i; }); };
+      var rn = uniq(g.items.map(function (x) { var rr = room(x.roomId); return rr ? rr.name : '(삭제된 공간)'; }));
+      return '<article class="card item"><p class="eyebrow">' + esc(rn.length > 1 ? '공간 ' + rn.length + '곳' : r ? roomLabel(r) : '') + ' · 신청 ' + esc(b.createdAt) + '</p>' +
+        '<h3>' + esc(rn.join(', ')) + ' · ' + esc(pnames(b.periods)) + '</h3>' +
         '<p class="meta"><b style="color:var(--ink)">' + esc(b.name) + '</b>' + (b.dept ? ' (' + esc(b.dept) + ')' : '') + ' · ' + esc(b.email) + '</p>' +
         '<p class="meta">' + esc(whoText({ school: b.school, unit: b.unit }) ? whoText({ school: b.school, unit: b.unit }) + ' · ' : '') + esc(b.purpose) + ppl(b.people) + (b.shared ? ' · 함께 사용' : '') + '</p>' +
-        '<p class="meta">' + (g.items.length > 1 ? '반복 ' + g.items.length + '회: ' : '') + g.items.map(function (x) { return esc(fmtShort(x.date)); }).join(', ') + '</p>' +
-        '<div class="acts"><button type="button" class="btn small primary" data-a="approve" data-id="' + esc(b.id) + '">' + (g.items.length > 1 ? g.items.length + '회 모두 승인' : '승인') + '</button>' +
+        '<p class="meta">' + (g.items.length > 1 ? '모두 ' + g.items.length + '건: ' : '') + uniq(g.items.map(function (x) { return fmtShort(x.date); })).map(esc).join(', ') + '</p>' +
+        '<div class="acts"><button type="button" class="btn small primary" data-a="approve" data-id="' + esc(b.id) + '">' + (g.items.length > 1 ? g.items.length + '건 모두 승인' : '승인') + '</button>' +
         '<button type="button" class="btn small danger" data-a="reject" data-id="' + esc(b.id) + '">반려</button></div></article>';
     }).join('');
   }
@@ -1099,14 +1214,13 @@ function openRoom(id, opt) {
   var date = opt.date || S.date;
   S.sheet = {
     type: 'room', id: id, date: date, sel: (opt.periods || []).slice(), video: false, err: '', busy: false, confirm: null,
-    f: { school: lastUsed('school', []), unit: lastUsed('unit', S.init.me.dept || ''), purpose: opt.purpose || '', people: opt.people || '', shared: false, repeat: false, days: [wd(date)], until: addDays(date, 28) }
+    f: { school: lastUsed('school', []), unit: lastUsed('unit', S.init.me.dept || ''), purpose: opt.purpose || '', people: opt.people || '', shared: false, more: [], moreOpen: false, repeat: false, days: [wd(date)], until: addDays(date, 28) }
   };
-  if (S.period !== 'all' && !opt.periods && date >= S.init.today && !bookingAt(id, date, S.period)) S.sheet.sel = [S.period];
   var rm = room(id);
   renderSheet();
   loadDay(date).then(function () {
     if (!S.sheet || S.sheet.id !== id) return;
-    S.sheet.sel = S.sheet.sel.filter(function (p) { return bookingsAt(id, date, p).length < slotCap(rm, p); });
+    S.sheet.sel = S.sheet.sel.filter(function (p) { return bookingsAt(id, date, p).length < slotCap(rm); });
     renderSheet();
   }, fail);
 }
@@ -1178,6 +1292,13 @@ var A = {
   },
   repeat: function (el) { S.sheet.f.repeat = el.checked; renderSheet(); },
   shared: function (el) { S.sheet.f.shared = el.checked; S.sheet.err = ''; renderSheet(); },
+  'more-room': function (el) {
+    var f = S.sheet.f, id = el.dataset.id, i = f.more.indexOf(id);
+    if (i >= 0) f.more.splice(i, 1); else f.more.push(id);
+    f.moreOpen = true;
+    S.sheet.err = '';
+    renderSheet();
+  },
   school: function (el) {
     var list = S.sheet.f.school, v = el.dataset.v, i = list.indexOf(v);
     if (i >= 0) list.splice(i, 1); else list.push(v);
@@ -1201,15 +1322,16 @@ var A = {
     sh.busy = true; sh.err = '';
     renderSheet();
     call('createBooking', {
-      roomId: sh.id, date: sh.date, periods: sh.sel, school: f.school, unit: f.unit, purpose: f.purpose, people: f.people,
+      roomIds: [sh.id].concat(f.more), date: sh.date, periods: sh.sel, school: f.school, unit: f.unit, purpose: f.purpose, people: f.people,
       shared: !!f.shared,
       repeat: f.repeat ? { until: f.until, weekdays: f.days } : null,
       skipConflicts: !!el.dataset.skip, ackExisting: !!el.dataset.skip
     }).then(function (r) {
       sh.busy = false;
       if (r.needConfirm) { sh.confirm = r; renderSheet(); return; }
-      var n = r.created > 1 ? r.created + '회 ' : '';
-      toast(r.status === '확정' ? n + '예약이 확정됐어요.' : n + '신청했어요. 관리자 승인을 기다려 주세요.');
+      var n = r.created > 1 ? r.created + '건 ' : '';
+      toast((r.status === '확정' ? n + '예약이 확정됐어요.' : n + '신청했어요. 관리자 승인을 기다려 주세요.') +
+        (r.notified ? ' 먼저 예약한 ' + r.notified + '명에게 알림 메일을 보냈어요.' : ''));
       S.date = sh.date;
       S.sheet = null;
       return refreshAfterWrite().then(render);
@@ -1340,6 +1462,10 @@ document.addEventListener('submit', function (e) {
   var fn = FORMS[e.target.dataset.form];
   if (fn) fn();
 });
+document.addEventListener('toggle', function (e) {
+  var el = e.target;
+  if (el && el.dataset && el.dataset.keep && S.sheet && S.sheet.f) S.sheet.f[el.dataset.keep] = el.open;
+}, true);
 document.addEventListener('keydown', function (e) {
   if (e.key === 'Escape' && S.sheet) A.close();
 });
