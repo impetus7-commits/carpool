@@ -75,12 +75,16 @@ function updateRows_(name, list) {
   if (!list.length) return;
   var sh = sheet_(name);
   var head = headers_(sh);
+  // 여러 줄을 고칠 때도 시트를 한 번 읽고 한 번만 씁니다 (줄마다 읽고 쓰면 반복 예약 일괄 취소가 매우 느려집니다).
+  var lo = Math.min.apply(null, list.map(function (o) { return o._row; }));
+  var hi = Math.max.apply(null, list.map(function (o) { return o._row; }));
+  var range = sh.getRange(lo, 1, hi - lo + 1, head.length);
+  var v = range.getDisplayValues();
   list.forEach(function (o) {
-    var range = sh.getRange(o._row, 1, 1, head.length);
-    var cur = range.getDisplayValues()[0];
-    var next = head.map(function (h, c) { return cell_(h in o ? o[h] : cur[c]); });
-    range.setNumberFormat('@').setValues([next]);
+    var row = v[o._row - lo];
+    head.forEach(function (h, c) { if (h in o) row[c] = o[h]; });
   });
+  range.setNumberFormat('@').setValues(v.map(function (r) { return r.map(cell_); }));
   delete tabCache_[name];
 }
 
@@ -133,9 +137,9 @@ function currentEmail_() {
 function withLock_(fn) {
   var lock = LockService.getScriptLock();
   try {
-    lock.waitLock(20000);
+    lock.waitLock(28000);
   } catch (e) {
-    throw new Error('지금 신청이 몰려 있어요. 잠시 뒤에 다시 시도해 주세요.');
+    throw new Error('다른 작업이 끝나기를 기다리다 시간이 지났어요. 잠시 뒤에 다시 시도해 주세요.');
   }
   try {
     return fn();

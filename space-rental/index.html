@@ -223,6 +223,13 @@ input.in, select.in { width: 100%; border: 1px solid var(--line); background: va
 .cal button.h3 small, .cal button.h4 small { color: inherit; }
 .cal button.today { outline: 2px solid var(--brand); outline-offset: -2px; }
 .cal.mini button, .cal.mini .pad0 { min-height: 30px; padding: 2px 0; font-size: 12px; justify-content: center; }
+.mcal button { background: var(--soft); }
+.mcal button:disabled { opacity: 1; cursor: default; color: var(--sub); background: none; }
+.mcal button.mk { background: var(--mine-bg); box-shadow: inset 0 0 0 1.5px var(--mine); color: var(--mine); }
+.mcal button.mw { background: var(--wait-bg); box-shadow: inset 0 0 0 1.5px var(--wait); color: var(--wait); }
+.mcal button.mk small, .mcal button.mw small { color: inherit; font-weight: 600; }
+.mcal button.old { opacity: .6; }
+.mcal button.pick { outline: 3px solid var(--brand); outline-offset: 1px; }
 .qgrid { display: grid; gap: 16px; }
 .qgrid h4 { margin: 0 0 6px; font: 700 15px var(--display); }
 .heatkey { display: flex; align-items: center; gap: 4px; font-size: 12px; color: var(--sub); margin-top: 10px; }
@@ -318,6 +325,7 @@ var S = {
   days: {}, sheet: null,
   find: { date: '', periods: [], people: '', purpose: '', facilities: [], keyword: '', results: null, busy: false, err: '' },
   mine: null,
+  mineCal: { month: '', day: '' },   // 내 예약 달력: 보고 있는 달, 고른 날짜
   admin: { tab: 'pending', data: null, hist: null, q: '', from: '', to: '', syncing: false },
   pendingCount: 0,
   photos: {}   // 드라이브 파일 ID → 서버가 읽어 준 그림(data: 주소) 또는 'fail'
@@ -1047,6 +1055,7 @@ function viewHelp() {
       '<li>이미 예약이 있는 시간에 신청하려면 <b>함께 사용</b>에 체크합니다. 먼저 있던 예약을 보여 주고 다시 확인을 받습니다.</li>' +
       '<li>함께 사용으로 신청하면 먼저 예약한 분에게 알림 메일이 갑니다.</li></ul>') +
     sec('6. 내 예약 확인·수정·취소', '<ul><li><b>내 예약</b> 메뉴에서 다가오는 예약과 지난 1년의 예약을 봅니다.</li>' +
+      '<li>위쪽 <b>달력</b>에 내 예약이 있는 날이 표시됩니다. 날짜를 누르면 그날의 내 예약이 달력 아래에 나옵니다.</li>' +
       '<li><b>수정</b>: 교시, 사용 학교, 부서, 목적, 인원을 바꿉니다. 날짜나 공간을 바꾸려면 취소하고 다시 신청합니다.</li>' +
       '<li><b>취소</b>: 반복 예약은 "이 날만", "이 날부터 남은 일정", "이 공간의 반복 예약 전체", "함께 신청한 공간 모두" 가운데 고릅니다. 지난 날짜는 그대로 남습니다.</li>' +
       '<li>기존 사용 대장에서 가져온 예약은 여기서 고칠 수 없고, 대장에서 고치면 자동으로 반영됩니다.</li></ul>') +
@@ -1095,6 +1104,40 @@ function groupCard(g, admin) {
     '</div>' + (next.length > 1 ? '<div class="acts"><button type="button" class="btn small danger" data-a="cancel" data-id="' + esc(next[0].id) + '">반복 예약 한꺼번에 취소…</button></div>' : '') +
     '</article>';
 }
+/** 내 예약을 한눈에 보는 달력. 날짜를 누르면 그날의 내 예약이 달력 아래에 나옵니다. */
+function mineCalHtml() {
+  var c = S.mineCal, today = S.init.today;
+  if (!c.month) c.month = today.slice(0, 7) + '-01';
+  var first = toDate(c.month), y = first.getFullYear(), m = first.getMonth(), days = new Date(y, m + 1, 0).getDate();
+  var by = {};
+  S.mine.forEach(function (b) {
+    if (b.status !== '확정' && b.status !== '승인대기') return;
+    (by[b.date] || (by[b.date] = [])).push(b);
+  });
+  var h = '<section class="card pad" style="margin-bottom:14px" aria-label="내 예약 달력">' +
+    '<div class="rangebar" style="margin-top:0"><button type="button" class="btn" data-a="mcal-shift" data-d="-1" aria-label="이전 달">‹</button>' +
+    '<span class="lab">' + y + '년 ' + (m + 1) + '월</span>' +
+    '<button type="button" class="btn" data-a="mcal-shift" data-d="1" aria-label="다음 달">›</button>' +
+    '<button type="button" class="btn" data-a="mcal-shift" data-d="0">오늘</button></div>' +
+    '<div class="cal mcal">' + [1, 2, 3, 4, 5, 6, 0].map(function (d) { return '<div class="dow">' + WD[d] + '</div>'; }).join('');
+  for (var i = 0; i < (first.getDay() + 6) % 7; i++) h += '<div class="pad0"></div>';
+  for (var d = 1; d <= days; d++) {
+    var date = fromDate(new Date(y, m, d)), list = by[date] || [];
+    var wait = list.some(function (b) { return b.status === '승인대기'; });
+    h += '<button type="button" class="' + (list.length ? (wait ? 'mw' : 'mk') : '') + (date === today ? ' today' : '') + (date === c.day ? ' pick' : '') + (date < today ? ' old' : '') +
+      '" data-a="mcal-day" data-d="' + date + '" aria-pressed="' + (date === c.day) + '" aria-label="' + fmt(date) + ', 내 예약 ' + list.length + '건"' + (list.length ? '' : ' disabled') + '>' +
+      '<b>' + d + '</b><small>' + (list.length ? list.length + '건' : '') + '</small></button>';
+  }
+  h += '</div><div class="heatkey"><i style="background:var(--mine-bg);border:1.5px solid var(--mine)"></i> 확정 <i style="background:var(--wait-bg);border:1.5px solid var(--wait);margin-left:8px"></i> 승인 대기 포함 · 날짜를 누르면 그날의 예약이 보여요</div>';
+  if (c.day && by[c.day]) {
+    h += '<div class="dlist" style="margin-top:12px"><p class="eyebrow">' + esc(fmt(c.day)) + ' · ' + by[c.day].length + '건</p>' + by[c.day].map(function (b) {
+      var r = room(b.roomId);
+      return '<div class="drow"><span class="grow"><b>' + esc(r ? r.name : '(삭제된 공간)') + '</b> ' + esc(pnames(b.periods)) +
+        '<br>' + esc([whoText({ school: b.school, unit: b.unit }), b.purpose].filter(Boolean).join(' · ')) + '</span>' + statusBadge(b.status) + bookingActs(b, false) + '</div>';
+    }).join('') + '</div>';
+  }
+  return h + '</section>';
+}
 function viewMine() {
   if (!S.init.me.registered) return '<div class="card empty">등록된 계정만 예약할 수 있어요.</div>';
   if (!S.mine) return '<div class="spin"></div>';
@@ -1103,7 +1146,7 @@ function viewMine() {
   var groups = groupUp(S.mine, true);
   var now = groups.filter(function (g) { return g.items.some(isLive); });
   var past = groups.filter(function (g) { return !g.items.some(isLive); }).reverse();
-  var h = '<p class="eyebrow">내 예약</p><h2 class="title" style="margin-bottom:14px">다가오는 예약 ' + now.length + '건</h2>';
+  var h = '<p class="eyebrow">내 예약</p><h2 class="title" style="margin-bottom:14px">다가오는 예약 ' + now.length + '건</h2>' + mineCalHtml();
   h += now.length ? now.map(function (g) { return groupCard(g, false); }).join('')
     : '<div class="card empty">다가오는 예약이 없어요.<br><button type="button" class="btn primary" style="margin-top:14px" data-a="view" data-v="map">공간 둘러보기</button></div>';
   if (past.length) {
@@ -1392,6 +1435,13 @@ var A = {
       return refreshAfterWrite().then(render);
     }).catch(fail);
   },
+  'mcal-shift': function (el) {
+    var c = S.mineCal, n = +el.dataset.d, d = toDate(c.month || S.init.today);
+    c.month = n ? fromDate(new Date(d.getFullYear(), d.getMonth() + n, 1)) : S.init.today.slice(0, 7) + '-01';
+    c.day = '';
+    render();
+  },
+  'mcal-day': function (el) { S.mineCal.day = S.mineCal.day === el.dataset.d ? '' : el.dataset.d; render(); },
   'sync-now': function () {
     S.admin.syncing = true;
     render();

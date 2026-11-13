@@ -79,20 +79,13 @@ function syncText_(v) {
   return /^[=+\-@]/.test(v) ? "'" + v : v;
 }
 
-/** 실제로 맞추는 일. 반환: {msg, add, change, remove, unmatched} */
-function syncRun_() {
-  var today = today_();
-  var periods = periods_();
-  var slotIds = SYNC_SLOTS_.map(function (name) {
-    var hit = periods.filter(function (p) { return p.name === name; })[0] ||
-      periods.filter(function (p) { return p.name.indexOf(name) === 0 || name.indexOf(p.name) === 0; })[0];
-    if (!hit) throw new Error("[교시] 탭에 '" + name + "' 이(가) 없어요.");
-    return hit.id;
-  });
+/**
+ * 대장 구글시트들을 모두 읽습니다. 시간이 오래 걸리므로 잠금 밖에서 합니다 (읽는 동안 다른 사람의 신청·취소가 막히지 않게).
+ * 하나라도 못 열면 오류를 내어 아무것도 바꾸지 않게 합니다.
+ */
+function syncReadAll_() {
   var sources = syncSources_();
   if (!sources.length) throw new Error("[설정] 탭에 '대장주소1' 같은 줄이 없어요. 대장 구글시트 주소를 적어 주세요.");
-
-  // 1) 대장 읽기 — 하나라도 못 열면 아무것도 바꾸지 않고 멈춤
   var tabs = [];
   sources.forEach(function (src) {
     var ss;
@@ -103,6 +96,19 @@ function syncRun_() {
     }
     var tz = ss.getSpreadsheetTimeZone() || 'Asia/Seoul';
     ss.getSheets().forEach(function (sh) { tabs.push({ title: sh.getName(), grid: syncReadSheet_(sh, tz), school: src.school }); });
+  });
+  return tabs;
+}
+
+/** 읽어 온 대장(tabs)에 [예약] 탭을 맞춥니다. 잠금 안에서 부릅니다. 반환: {msg, add, change, remove, unmatched} */
+function syncRun_(tabs) {
+  var today = today_();
+  var periods = periods_();
+  var slotIds = SYNC_SLOTS_.map(function (name) {
+    var hit = periods.filter(function (p) { return p.name === name; })[0] ||
+      periods.filter(function (p) { return p.name.indexOf(name) === 0 || name.indexOf(p.name) === 0; })[0];
+    if (!hit) throw new Error("[교시] 탭에 '" + name + "' 이(가) 없어요.");
+    return hit.id;
   });
   var rooms = rooms_();
   var match = ledgerMatchRooms_(tabs.map(function (t) { return t.title; }), rooms, syncAliases_());
@@ -192,18 +198,20 @@ function syncRun_() {
 
 /** 대장을 읽어 [예약] 탭을 맞춥니다. 10분마다 자동으로 불리고, 관리 화면의 "지금 가져오기"로도 불립니다. */
 function syncLedger() {
-  return withLock_(function () {
-    var props = PropertiesService.getScriptProperties();
-    try {
-      var res = syncRun_();
-      props.setProperty('LEDGER_SYNC_LAST', nowStr_() + ' · ' + res.msg);
-      console.log(res.msg);
-      return res.msg;
-    } catch (e) {
-      props.setProperty('LEDGER_SYNC_LAST', nowStr_() + ' · 실패: ' + e.message);
-      throw e;
-    }
-  });
+  var props = PropertiesService.getScriptProperties();
+  try {
+    var tabs = syncReadAll_();                                         // 오래 걸리는 읽기: 잠금 밖
+    var res = withLock_(function () {                                  // 비교하고 쓰기: 잠금 안 (짧음)
+      delete tabCache_['예약'];
+      return syncRun_(tabs);
+    });
+    props.setProperty('LEDGER_SYNC_LAST', nowStr_() + ' · ' + res.msg);
+    console.log(res.msg);
+    return res.msg;
+  } catch (e) {
+    props.setProperty('LEDGER_SYNC_LAST', nowStr_() + ' · 실패: ' + e.message);
+    throw e;
+  }
 }
 
 /** 마지막 가져오기 결과 (관리 화면 표시용) */
