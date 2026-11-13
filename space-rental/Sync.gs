@@ -1,12 +1,12 @@
 /**
- * 학교 공간 대여 — 기존 사용 대장(구글시트) 자동 가져오기
+ * 학교 공간 대여 — 기존 사용 대장(구글시트) 가져오기
  *
- * 대장 → [예약] 탭 한 방향입니다. 대장에 적거나 고치거나 지운 내용을 주기적으로 읽어
- * [예약] 탭의 "대장에서 온 예약"을 대장과 같게 맞춥니다. 웹에서 신청한 예약은 건드리지 않습니다.
+ * 대장 → [예약] 탭 한 방향입니다. 관리자가 관리 화면의 [대장 가져오기]에서 "지금 가져오기"를 누르면,
+ * 대장에 적거나 고치거나 지운 내용을 읽어 [예약] 탭의 "대장에서 온 예약"을 대장과 같게 맞춥니다.
+ * 웹에서 신청한 예약은 건드리지 않습니다. 자동으로는 가져오지 않습니다.
  *
  * 준비: [설정] 탭에 줄을 추가합니다 —  항목: 대장주소1, 대장주소2, …   값: 대장 구글시트 주소
- * 시작: 편집기에서 startLedgerSync 실행 (10분마다 자동으로 가져옴)
- * 중지: stopLedgerSync 실행
+ * 예전에 자동 가져오기(10분마다)를 켜 두었다면 다음 차례에 스스로 꺼집니다. 바로 끄려면 stopLedgerSync 실행.
  *
  * - 오늘 이후 날짜만 맞춥니다. 지난 날짜의 예약은 그대로 둡니다.
  * - 대장의 시트 이름과 [공간] 탭의 이름이 같은 곳만 가져옵니다. [공간] 탭은 바꾸지 않습니다.
@@ -196,8 +196,12 @@ function syncRun_(tabs) {
   return { msg: msg, add: diff.add.length, change: diff.change.length, remove: diff.remove.length, unmatched: unmatched };
 }
 
-/** 대장을 읽어 [예약] 탭을 맞춥니다. 10분마다 자동으로 불리고, 관리 화면의 "지금 가져오기"로도 불립니다. */
-function syncLedger() {
+/**
+ * 대장을 읽어 [예약] 탭을 맞춥니다. 관리 화면의 "지금 가져오기"가 부릅니다.
+ * 예전에 만들어 둔 시간 트리거가 부른 경우에는 가져오지 않고 그 트리거를 지웁니다 (이제 수동으로만 가져옵니다).
+ */
+function syncLedger(e) {
+  if (e && e.triggerUid) { stopLedgerSync(); return '자동 가져오기를 껐습니다.'; }
   var props = PropertiesService.getScriptProperties();
   try {
     var tabs = syncReadAll_();                                         // 오래 걸리는 읽기: 잠금 밖
@@ -278,17 +282,10 @@ function fillSchools() {
   });
 }
 
-/** 10분마다 자동으로 가져오기를 시작합니다. 편집기에서 한 번 실행하세요. */
-function startLedgerSync() {
-  stopLedgerSync();
-  ScriptApp.newTrigger('syncLedger').timeBased().everyMinutes(10).create();
-  console.log('자동 가져오기를 시작했습니다 (10분마다). 첫 결과: ' + syncLedger());
-}
-
-/** 자동 가져오기를 멈춥니다. 이미 가져온 예약은 그대로 남습니다. */
+/** 예전에 켜 둔 자동 가져오기(시간 트리거)를 지웁니다. 이미 가져온 예약은 그대로 남습니다. */
 function stopLedgerSync() {
   ScriptApp.getProjectTriggers().forEach(function (t) {
     if (t.getHandlerFunction() === 'syncLedger') ScriptApp.deleteTrigger(t);
   });
-  console.log('자동 가져오기를 멈췄습니다.');
+  console.log('자동 가져오기를 껐습니다. 이제 관리 화면의 [대장 가져오기]에서 직접 가져옵니다.');
 }

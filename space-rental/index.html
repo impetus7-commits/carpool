@@ -61,13 +61,46 @@ h1, h2, h3, p { margin: 0; }
 .nav.inline { display: none; }
 .infobar { background: var(--brand-soft); border-bottom: 1px solid var(--line); font-size: 13px; padding: 6px 16px; }
 .infobar > div { max-width: 1180px; margin: 0 auto; }
-.help h3 { font: 700 17px var(--display); margin: 0; }
-.help details { border-top: 1px solid var(--line); }
-.help details:first-of-type { border-top: 0; }
-.help summary { cursor: pointer; padding: 14px 0; font-weight: 600; }
-.help ol, .help ul { margin: 0 0 14px; padding-left: 22px; }
-.help li { margin-bottom: 6px; }
-.help p { margin-bottom: 10px; }
+.hsec { margin-bottom: 14px; scroll-margin-top: 110px; }
+.hhead { display: flex; gap: 12px; align-items: flex-start; margin-bottom: 12px; }
+.hhead h3 { font: 700 19px var(--display); margin: 0; }
+.hno { flex: none; width: 36px; height: 36px; border-radius: 50%; background: var(--brand); color: var(--brand-ink); display: grid; place-items: center; font: 700 17px var(--display); }
+.hgrid { display: grid; gap: 14px; }
+.hsteps { margin: 0; padding-left: 22px; }
+.hsteps li { margin-bottom: 10px; padding-left: 2px; }
+.hsteps li::marker { font-weight: 700; color: var(--brand); }
+.demo { margin: 0; border: 1.5px dashed var(--line); border-radius: 14px; background: var(--bg); overflow: hidden; }
+.demo figcaption { font-size: 12px; font-weight: 600; letter-spacing: .04em; color: var(--sub); padding: 8px 12px; border-bottom: 1px dashed var(--line); }
+.demo-in { padding: 12px; pointer-events: none; user-select: none; }
+.demo-in .prow { cursor: default; }
+.demo-in .chip { display: inline-flex; align-items: center; }
+.hin { display: flex; align-items: center; color: var(--ink); }
+.hbtn { margin-bottom: 6px; text-align: center; display: grid; place-items: center; }
+.flow { display: flex; flex-direction: column; gap: 6px; margin-top: 14px; }
+.fstep { background: var(--soft); border-radius: 14px; padding: 12px 14px; display: grid; grid-template-columns: 28px 36px 1fr; column-gap: 10px; align-items: center; position: relative; }
+.fstep b { grid-column: 3; }
+.fstep > span:last-child { grid-column: 3; font-size: 13px; color: var(--sub); }
+.fno { grid-row: span 2; width: 28px; height: 28px; border-radius: 50%; background: var(--brand); color: var(--brand-ink); display: grid; place-items: center; font-weight: 700; font-size: 14px; }
+.fic { grid-row: span 2; width: 36px; height: 36px; display: grid; place-items: center; color: var(--brand); }
+.fic svg { width: 28px; height: 28px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.fstep.done { background: var(--brand-soft); grid-template-columns: 36px 1fr; }
+.fstep.done b, .fstep.done > span:last-child { grid-column: 2; }
+.farrow { text-align: center; color: var(--sub); font-size: 20px; line-height: 1; transform: rotate(90deg); }
+.hcal { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; margin-top: 10px; font-size: 13px; text-align: center; }
+.hcal .dow { color: var(--sub); font-size: 12px; background: none; }
+.hcal span { background: var(--soft); border-radius: 6px; padding: 6px 0; }
+.hcal .rp { background: var(--brand); color: var(--brand-ink); font-weight: 600; }
+.hcal .no { background: var(--busy-bg); color: var(--busy); text-decoration: line-through; }
+.hcal .mk { background: var(--mine-bg); box-shadow: inset 0 0 0 1.5px var(--mine); color: var(--mine); font-weight: 600; }
+.hcal .mw { background: var(--wait-bg); box-shadow: inset 0 0 0 1.5px var(--wait); color: var(--wait); font-weight: 600; }
+.hcal .pick { outline: 3px solid var(--brand); outline-offset: 1px; }
+.teams { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 10px; text-align: center; font-size: 13px; }
+.teams b { display: block; font-size: 15px; margin-top: 6px; }
+.teams span { color: var(--sub); font-size: 12px; }
+.tbar { display: flex; gap: 3px; }
+.tbar i { flex: 1; height: 22px; border-radius: 5px; background: var(--soft); border: 1.5px solid var(--line); }
+.tbar i.on { background: var(--wait-bg); border-color: var(--wait); }
+.tbar.full i.on { background: var(--busy-bg); border-color: var(--busy); }
 main { max-width: 1180px; margin: 0 auto; padding: 16px 16px 110px; }
 
 /* ----- 공통 ----- */
@@ -304,6 +337,15 @@ details.more > summary { cursor: pointer; color: var(--sub); padding: 10px 0; fo
   .mapgrid { grid-template-columns: 340px 1fr; align-items: start; }
   .bldg-card { position: sticky; top: 84px; }
   .findgrid { grid-template-columns: 380px 1fr; align-items: start; }
+  .hgrid { grid-template-columns: 1fr 1fr; align-items: start; gap: 24px; }
+  .flow { flex-direction: row; align-items: stretch; }
+  .fstep { flex: 1; grid-template-columns: 28px 1fr; row-gap: 4px; align-content: start; }
+  .fstep .fic { grid-row: auto; grid-column: 2; justify-self: start; }
+  .fstep .fno { grid-row: auto; }
+  .fstep b, .fstep > span:last-child { grid-column: 1 / -1; }
+  .fstep.done { grid-template-columns: 1fr; }
+  .fstep.done b, .fstep.done > span:last-child, .fstep.done .fic { grid-column: 1; }
+  .farrow { transform: none; align-self: center; }
   .sheet { left: auto; top: 0; width: 540px; max-height: none; border-radius: 0; }
   .sheet.small { top: 50%; left: 50%; right: auto; bottom: auto; transform: translate(-50%, -50%); width: 440px; border-radius: 18px; max-height: 86vh; }
   #toast { bottom: 32px; }
@@ -1030,46 +1072,141 @@ function recCard(x, rank) {
     '<button type="button" class="btn small ' + (rank ? 'primary' : '') + '" data-a="rec-open" data-id="' + esc(r.id) + '">' + (rank ? '살펴보고 신청' : '살펴보기') + '</button></div></article>';
 }
 
-/* ---------- 그리기: 사용법 ---------- */
+/* ---------- 그리기: 사용법 (그림과 화면 예시) ---------- */
+var HICON = {
+  cal: '<svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="16" rx="2"/><path d="M8 3v4M16 3v4M4 10h16"/></svg>',
+  bld: '<svg viewBox="0 0 24 24"><path d="M4 21V5l8-3 8 3v16M9 21v-5h6v5M8 8h2M14 8h2M8 12h2M14 12h2"/></svg>',
+  clock: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
+  pen: '<svg viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16v4zM13 7l4 4"/></svg>',
+  ok: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8 12 3 3 5-6"/></svg>',
+  mail: '<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>'
+};
+/** 화면 예시 틀: 실제 화면과 같은 모양이지만 눌리지 않습니다. */
+function demo(caption, inner) {
+  return '<figure class="demo"><figcaption>화면 예시 · ' + caption + '</figcaption><div class="demo-in" inert aria-hidden="true">' + inner + '</div></figure>';
+}
+function helpSec(id, no, title, lead, steps, figure) {
+  return '<section class="card pad hsec" id="help-' + id + '"><div class="hhead"><span class="hno">' + no + '</span><div><h3>' + title + '</h3><p class="sub">' + lead + '</p></div></div>' +
+    '<div class="hgrid"><ol class="hsteps">' + steps.map(function (t) { return '<li>' + t + '</li>'; }).join('') + '</ol>' + figure + '</div></section>';
+}
 function viewHelp() {
-  var st = S.init.settings, sec = function (title, body, open) {
-    return '<details' + (open ? ' open' : '') + '><summary>' + title + '</summary>' + body + '</details>';
+  var st = S.init.settings, admin = S.init.me.admin;
+  var prow = function (cls, name, time, txt, check) {
+    return '<div class="prow ' + cls + '"><span class="box">' + (check ? '✓' : '') + '</span><span class="pn">' + name + '<span class="pt">' + time + '</span></span><span class="ps">' + txt + '</span></div>';
   };
-  return '<p class="eyebrow">사용법</p><h2 class="title" style="margin-bottom:12px">공간 대여 사용 안내</h2><div class="card pad help">' +
-    sec('1. 시작하기', '<ul><li><b>교직원 계정으로 로그인</b>해야 사용할 수 있습니다. 관리자가 등록한 계정만 신청할 수 있고, 등록되지 않은 계정은 현황만 볼 수 있습니다.</li>' +
-      '<li>문의는 관리자' + (st.admin ? ' <b>' + esc(st.admin) + '</b>' : '') + '에게 해 주세요.</li>' +
-      '<li>휴대폰과 컴퓨터에서 같은 주소로 씁니다.</li></ul>', true) +
-    sec('2. 공간 예약하기', '<ol><li><b>공간</b> 메뉴에서 날짜를 고르고, 건물 → 층 → 공간을 누릅니다.</li>' +
-      '<li>공간 소개(사진·수용 인원·시설·특이사항)와 그날의 교시별 예약 현황을 확인합니다.</li>' +
-      '<li>비어 있는 교시를 눌러 고릅니다. 여러 교시를 고를 수 있습니다.</li>' +
-      '<li>① 사용 학교(중·고·법인) ② 사용 부서(개인이면 선생님 성함) ③ 사용 목적 ④ 사용 예상 인원을 적습니다.</li>' +
-      '<li><b>신청하기</b>를 누르면 교직원은 바로 확정되고, 학생은 관리자 승인 뒤에 확정됩니다.</li></ol>' +
-      '<p>배치도의 색: 초록 = 비어 있음, 붉은색 = 사용 중, 노랑 = 승인 대기, 반반 = 일부 교시 예약.</p>') +
-    sec('3. 반복 예약 (일정 기간)', '<ol><li>신청 내용 아래의 <b>일정 기간 동안 반복해서 신청</b>에 체크합니다.</li>' +
-      '<li>반복할 요일과 종료일을 고릅니다. 모두 몇 회인지 바로 보입니다.</li>' +
-      '<li>이미 예약이 있는 날이 있으면 목록을 보여 주고, 그 날을 빼고 신청할지 묻습니다.</li></ol>') +
-    sec('4. 여러 공간을 한 번에 예약', '<ol><li>공간 하나를 열고 교시를 고른 뒤, <b>같은 일정으로 다른 공간도 함께 예약</b>을 펼칩니다.</li>' +
-      '<li>함께 예약할 공간을 누릅니다. 고른 교시에 이미 예약이 있는 공간은 "(예약 있음)"으로 표시됩니다.</li>' +
-      '<li>하루 신청은 한 곳이라도 자리가 없으면 모두 신청되지 않습니다. 반복 신청은 자리가 없는 곳만 빼고 신청할 수 있습니다.</li></ol>') +
-    sec('5. 함께 사용', '<ul><li>일부 공간은 여러 팀이 같은 시간에 쓸 수 있습니다. 교시 칸에 "1/3팀"처럼 표시됩니다.</li>' +
-      '<li>이미 예약이 있는 시간에 신청하려면 <b>함께 사용</b>에 체크합니다. 먼저 있던 예약을 보여 주고 다시 확인을 받습니다.</li>' +
-      '<li>함께 사용으로 신청하면 먼저 예약한 분에게 알림 메일이 갑니다.</li></ul>') +
-    sec('6. 내 예약 확인·수정·취소', '<ul><li><b>내 예약</b> 메뉴에서 다가오는 예약과 지난 1년의 예약을 봅니다.</li>' +
-      '<li>위쪽 <b>달력</b>에 내 예약이 있는 날이 표시됩니다. 날짜를 누르면 그날의 내 예약이 달력 아래에 나옵니다.</li>' +
-      '<li><b>수정</b>: 교시, 사용 학교, 부서, 목적, 인원을 바꿉니다. 날짜나 공간을 바꾸려면 취소하고 다시 신청합니다.</li>' +
-      '<li><b>취소</b>: 반복 예약은 "이 날만", "이 날부터 남은 일정", "이 공간의 반복 예약 전체", "함께 신청한 공간 모두" 가운데 고릅니다. 지난 날짜는 그대로 남습니다.</li>' +
-      '<li>기존 사용 대장에서 가져온 예약은 여기서 고칠 수 없고, 대장에서 고치면 자동으로 반영됩니다.</li></ul>') +
-    sec('7. 공간 추천', '<p><b>추천</b> 메뉴에서 날짜·교시·인원·용도·필요한 시설·검색어를 넣으면, 조건에 맞는 공간을 이유와 함께 보여 줍니다. 아는 것만 넣어도 됩니다.</p>') +
-    sec('8. 일정 요약과 통계', '<ul><li>공간을 열고 <b>일정 요약 보기</b>를 누르면 주간·월간·분기·연도별 사용 현황이 나옵니다.</li>' +
-      '<li>예약 건수, 사용 교시, 평일 이용률과 함께 학교별(중·고·법인)·요일별·내용별 사용 교시를 볼 수 있습니다.</li>' +
-      '<li>막대를 누르면 해당 내역이 펼쳐지고, 날짜를 누르면 그날의 예약 현황으로 갑니다.</li>' +
-      '<li>날짜를 오늘 이전으로 넘기면 지난 내역도 볼 수 있습니다.</li></ul>') +
-    (S.init.me.admin ? sec('9. 관리자', '<ul><li><b>승인 대기</b>: 학생 신청을 승인하거나 사유를 적어 반려합니다.</li>' +
-      '<li><b>겹침</b>: 같은 시간에 허용 수보다 많이 잡힌 예약을 보여 줍니다. 기존 대장 가져오기 결과와 "지금 가져오기"도 여기 있습니다.</li>' +
-      '<li><b>전체 예약</b>: 기간을 정해 모든 예약을 보고 수정·취소합니다.</li>' +
-      '<li><b>기록</b>: 신청·수정·취소·승인·반려와 대장 가져오기 내역을 변경 전후와 함께 봅니다.</li>' +
-      '<li>공간·사용자·교시·설정은 구글시트에서 고치면 바로 반영됩니다. 함께 쓸 수 있는 팀 수는 [공간] 탭의 <b>동시예약수</b>로 정합니다.</li></ul>') : '') +
-    '</div>';
+  var chip = function (t, on) { return '<span class="chip ' + (on ? 'on' : '') + '">' + (on ? '✓ ' : '') + t + '</span>'; };
+  var roomCard = function (cls, name, cap, state) {
+    return '<div class="room ' + cls + '"><span class="rn">' + name + '</span><span class="rc">' + cap + '</span><span class="st">' + state + '</span></div>';
+  };
+  var miniCal = function (marks, pick) {   // 4주짜리 작은 달력: marks = {날짜: 'mk' | 'mw' | 'h2' …}
+    var h = '<div class="hcal">' + ['월', '화', '수', '목', '금', '토', '일'].map(function (d) { return '<span class="dow">' + d + '</span>'; }).join('');
+    for (var d = 2; d <= 29; d++) h += '<span class="' + (marks[d] || '') + (d === pick ? ' pick' : '') + '">' + d + '</span>';
+    return h + '</div>';
+  };
+  var nav = [['flow', '예약 4단계'], ['pick', '공간 고르기'], ['book', '신청하기'], ['repeat', '반복 예약'], ['multi', '여러 공간'], ['share', '함께 사용'], ['mine', '내 예약'], ['find', '추천'], ['stat', '통계']];
+  if (admin) nav.push(['admin', '관리자']);
+
+  var h = '<p class="eyebrow">사용법</p><h2 class="title" style="margin-bottom:6px">공간 대여 사용 안내</h2>' +
+    '<p class="sub" style="margin-bottom:12px">교직원 계정으로 로그인해야 사용할 수 있습니다.' + (st.admin ? ' 문의: 관리자 <b>' + esc(st.admin) + '</b>' : '') + '</p>' +
+    '<div class="chips" style="margin-bottom:14px">' + nav.map(function (n) {
+      return '<button type="button" class="chip" data-a="help-go" data-id="' + n[0] + '">' + n[1] + '</button>';
+    }).join('') + '</div>';
+
+  // 한눈에 보는 4단계
+  var steps = [['cal', '날짜 고르기', '공간 메뉴에서 사용할 날짜를 고릅니다'], ['bld', '공간 고르기', '건물 → 층 → 공간을 누릅니다'],
+    ['clock', '교시 고르기', '비어 있는 교시를 눌러 고릅니다'], ['pen', '내용 적고 신청', '학교·부서·목적·인원을 적습니다']];
+  h += '<section class="card pad hsec" id="help-flow"><h3 style="font:700 19px var(--display);margin:0 0 4px">한눈에 보는 예약 4단계</h3>' +
+    '<p class="sub">교직원은 신청하면 바로 확정되고, 학생은 관리자 승인 뒤에 확정됩니다.</p><div class="flow">' +
+    steps.map(function (x, i) {
+      return '<div class="fstep"><span class="fno">' + (i + 1) + '</span><span class="fic">' + HICON[x[0]] + '</span><b>' + x[1] + '</b><span>' + x[2] + '</span></div>';
+    }).join('<span class="farrow" aria-hidden="true">›</span>') +
+    '<span class="farrow" aria-hidden="true">›</span><div class="fstep done"><span class="fic">' + HICON.ok + '</span><b>예약 완료</b><span>내 예약에서 확인·수정·취소</span></div></div></section>';
+
+  h += helpSec('pick', 1, '공간 고르기', '건물 단면에서 층을 누르면 그 층의 공간이 복도 순서대로 나옵니다.', [
+    '<b>공간</b> 메뉴에서 날짜를 고릅니다. 교시를 고르면 그 교시의 상태가, <b>하루 전체</b>를 고르면 하루 요약이 보입니다.',
+    '건물 이름을 고르고 <b>층</b>을 누릅니다.',
+    '공간 칸의 <b>색</b>으로 비어 있는지 확인하고, 공간을 눌러 소개와 예약 현황을 엽니다.'
+  ], demo('층 배치도와 색', '<div class="rooms" style="padding:0">' +
+      roomCard('free', '세미나실 1', '정원 20명', '비어 있음') + roomCard('busy', '세미나실 2', '정원 16명', '사용 중 · 연구부') +
+      roomCard('wait', '컴퓨터실', '정원 32명', '승인 대기') + roomCard('part', '도서관', '정원 60명', '2개 교시 예약') + '</div>' +
+      '<div class="legend"><span><i class="dot free"></i>비어 있음</span><span><i class="dot busy"></i>사용 중</span><span><i class="dot wait"></i>승인 대기</span><span><i class="dot part"></i>일부 교시 예약</span><span><i class="dot off"></i>신청 불가</span></div>'));
+
+  h += helpSec('book', 2, '교시 고르고 신청하기', '공간을 열면 소개(사진·수용 인원·시설·특이사항)와 그날의 교시별 현황이 나옵니다.', [
+    '<b>비어 있는 교시</b>를 눌러 고릅니다. 여러 교시를 고를 수 있습니다. 처음에는 아무 교시도 골라져 있지 않습니다.',
+    '<b>① 사용 학교</b>(중·고·법인, 여러 개 가능) <b>② 사용 부서</b>(개인이면 선생님 성함) <b>③ 사용 목적</b> <b>④ 사용 예상 인원</b>을 적습니다.',
+    '맨 아래 <b>신청하기</b>를 누릅니다. 지난번에 적은 학교와 부서는 다음 신청 때 미리 채워집니다.'
+  ], demo('교시 고르기와 신청 내용', prow('busy', '4교시', '11:40~12:30', '사용 중 · [고] 수학과 · 교과 협의회') + prow('sel', '5교시', '13:30~14:20', '선택함', true) +
+      prow('sel', '6교시', '14:30~15:20', '선택함', true) + prow('free', '7교시', '15:30~16:20', '비어 있음') +
+      '<label class="f">1) 사용 학교</label><div class="chips">' + chip('중') + chip('고', true) + chip('법인') + '</div>' +
+      '<label class="f">2) 사용 부서 (개인이면 선생님 성함)</label><div class="in hin">교육과정부</div>' +
+      '<label class="f">3) 사용 목적</label><div class="in hin">교육과정 설명회 준비</div>' +
+      '<label class="f">4) 사용 예상 인원</label><div class="in hin">12</div>' +
+      '<div class="btn primary wide" style="margin-top:12px;text-align:center">5교시, 6교시 신청하기</div>'));
+
+  h += helpSec('repeat', 3, '반복 예약 (일정 기간)', '매주 같은 요일·같은 교시에 쓰는 경우 한 번에 신청합니다.', [
+    '신청 내용 아래 <b>일정 기간 동안 반복해서 신청</b>에 체크합니다.',
+    '<b>반복할 요일</b>과 <b>종료일</b>을 고르면 모두 몇 회인지 바로 보입니다.',
+    '이미 예약이 있는 날은 목록으로 보여 주고, <b>그 날만 빼고</b> 신청할지 묻습니다.'
+  ], demo('매주 화·목 반복', '<label class="f" style="margin-top:0">반복할 요일</label><div class="chips days">' + chip('월') + chip('화', true) + chip('수') + chip('목', true) + chip('금') + '</div>' +
+      miniCal({ 3: 'rp', 5: 'rp', 10: 'rp', 12: 'no', 17: 'rp', 19: 'rp', 24: 'rp', 26: 'rp' }) +
+      '<p class="sub" style="margin:8px 0 0">■ 신청되는 날 7회 · <span style="color:var(--busy)">■ 이미 예약이 있어 빠지는 날 1회</span></p>'));
+
+  h += helpSec('multi', 4, '여러 공간을 한 번에 예약', '같은 날짜·교시(반복 포함)로 여러 공간을 함께 신청합니다.', [
+    '공간 하나를 열고 교시를 고릅니다.',
+    '<b>같은 일정으로 다른 공간도 함께 예약</b>을 펼쳐 공간을 고릅니다. 고른 교시에 이미 예약이 있는 공간은 "(예약 있음)"으로 표시됩니다.',
+    '하루 신청은 한 곳이라도 자리가 없으면 <b>모두 신청되지 않습니다</b>. 반복 신청은 자리가 없는 곳만 빼고 신청할 수 있습니다.'
+  ], demo('함께 예약할 공간 고르기', '<p class="eyebrow" style="margin:0 0 6px">본관 2층</p><div class="chips">' + chip('세미나실 1', true) + chip('컴퓨터실') +
+      '<span class="chip">진로상담실 <small style="opacity:.75">(예약 있음)</small></span></div>' +
+      '<p class="eyebrow" style="margin:10px 0 6px">창의관 2층</p><div class="chips">' + chip('토론실', true) + chip('온라인 스튜디오') + '</div>' +
+      '<div class="btn primary wide" style="margin-top:12px;text-align:center">공간 3곳 · 5교시 신청하기</div>'));
+
+  h += helpSec('share', 5, '함께 사용', '일부 공간은 여러 팀이 같은 시간에 쓸 수 있습니다. 몇 팀까지인지는 공간마다 정해져 있습니다.', [
+    '교시 칸에 <b>"1/3팀"</b>처럼 지금 몇 팀이 예약했는지 보입니다.',
+    '이미 예약이 있는 시간에 신청하려면 <b>함께 사용</b>에 체크합니다. 체크하지 않으면 비어 있는 시간에만 신청됩니다.',
+    '먼저 있던 예약을 보여 주고 다시 확인을 받습니다. 신청하면 <b>먼저 예약한 분에게 알림 메일</b>이 갑니다.'
+  ], demo('3팀까지 함께 쓰는 공간', '<div class="teams"><div><div class="tbar"><i class="on"></i><i></i><i></i></div><b>1/3팀</b><span>함께 사용 가능</span></div>' +
+      '<div><div class="tbar"><i class="on"></i><i class="on"></i><i></i></div><b>2/3팀</b><span>함께 사용 가능</span></div>' +
+      '<div><div class="tbar full"><i class="on"></i><i class="on"></i><i class="on"></i></div><b>3/3팀</b><span>꽉 참 · 신청 불가</span></div></div>' +
+      prow('shared', '3교시', '10:10~11:00', '2/3팀 · 함께 사용 가능 — [고] 1학년 · 배구 / [중] 2학년 · 농구') +
+      '<div class="notice" style="margin:10px 0 0;display:flex;gap:10px;align-items:center"><span class="fic" style="flex:none">' + HICON.mail + '</span><span>함께 사용으로 신청하면 먼저 예약한 분에게 알림 메일이 갑니다.</span></div>'));
+
+  h += helpSec('mine', 6, '내 예약 확인·수정·취소', '내 예약 메뉴에서 달력과 목록으로 한눈에 봅니다.', [
+    '<b>달력</b>에 내 예약이 있는 날이 표시됩니다. 날짜를 누르면 그날의 예약이 아래에 나옵니다.',
+    '<b>수정</b>: 교시·학교·부서·목적·인원을 바꿉니다. 날짜나 공간을 바꾸려면 취소하고 다시 신청합니다.',
+    '<b>취소</b>: 반복 예약은 이 날만 / 이 날부터 / 이 공간의 반복 전체 / 함께 신청한 공간 모두 가운데 고릅니다. 지난 날짜는 그대로 남습니다.'
+  ], demo('내 예약 달력과 취소 선택', miniCal({ 5: 'mk', 12: 'mk', 13: 'mw', 19: 'mk', 26: 'mk' }, 12) +
+      '<p class="sub" style="margin:8px 0 10px">■ 확정 · <span style="color:var(--wait)">■ 승인 대기 포함</span></p>' +
+      '<div class="btn danger wide hbtn">이 날만 취소 (1건)</div><div class="btn danger wide hbtn">이 공간의 반복 예약 전체 취소 (4건)</div>'));
+
+  h += helpSec('find', 7, '공간 추천', '어떤 공간이 맞는지 모를 때 조건을 넣으면 이유와 함께 추천합니다.', [
+    '<b>추천</b> 메뉴에서 날짜·교시·인원·용도·필요한 시설·검색어 가운데 아는 것만 넣습니다.',
+    '조건에 맞는 공간이 순서대로 나오고, <b>왜 추천하는지</b>가 함께 적힙니다.',
+    '<b>살펴보고 신청</b>을 누르면 그 공간이 넣은 날짜·교시로 열립니다.'
+  ], demo('추천 결과', '<div class="rec" style="margin:0;padding:0;display:grid"><div class="rank">1</div><div><p class="eyebrow">본관 2층 · 정원 16명</p><h3 style="font-size:17px;font-weight:600;margin:0">세미나실 2</h3>' +
+      '<ul class="why"><li class="y">5교시 비어 있음</li><li class="y">14명에게 알맞은 크기 (정원 16명)</li><li class="y">전자칠판 있음</li></ul></div></div>'));
+
+  h += helpSec('stat', 8, '일정 요약과 통계', '공간마다 주간·월간·분기·연도별로 얼마나 쓰였는지 봅니다.', [
+    '공간을 열고 <b>일정 요약 보기</b>를 누른 뒤 주간·월간·분기·연도를 고릅니다.',
+    '예약 건수, 사용 교시, 평일 이용률과 <b>학교별(중·고·법인)</b>·요일별·내용별 사용 교시가 나옵니다.',
+    '<b>막대를 누르면</b> 해당 내역이 펼쳐지고, 날짜를 누르면 그날의 예약 현황으로 갑니다. 지난 기간도 볼 수 있습니다.'
+  ], demo('월간 요약', '<div class="stats" style="margin-top:0"><div class="stat"><b>13건</b><span>예약</span></div><div class="stat"><b>67</b><span>사용 교시</span></div><div class="stat"><b>29%</b><span>평일 이용률</span></div></div>' +
+      '<p class="eyebrow" style="margin:6px 0">학교별 사용 교시</p><ul class="bars">' +
+      [['고', 48, 100], ['중', 15, 31], ['법인', 4, 8]].map(function (x) {
+        return '<li><div class="barbtn"><span class="bar"><i style="width:' + x[2] + '%"></i><span>' + x[0] + '</span></span><em>' + x[1] + '</em></div></li>';
+      }).join('') + '</ul>'));
+
+  if (admin) {
+    h += helpSec('admin', 9, '관리자', '관리 메뉴의 탭에서 처리합니다. 숫자가 붙은 탭은 확인할 일이 있다는 뜻입니다.', [
+      '<b>승인 대기</b>: 학생 신청을 승인하거나 사유를 적어 반려합니다. 반복·일괄 신청은 한 번에 처리합니다.',
+      '<b>겹침</b>: 같은 시간에 허용 수보다 많이 잡힌 예약입니다. 한쪽을 취소하거나 대장을 고칩니다.',
+      '<b>전체 예약</b>·<b>기록</b>: 기간을 정해 모든 예약을 보고, 누가 무엇을 바꿨는지 변경 전후와 함께 확인합니다.',
+      '<b>대장 가져오기</b>: 기존 사용 대장이 바뀌었을 때 <b>지금 가져오기</b>를 누릅니다. 자동으로는 가져오지 않습니다.',
+      '공간·사용자·교시·설정은 구글시트에서 고치면 바로 반영됩니다. 함께 쓸 수 있는 팀 수는 [공간] 탭의 <b>동시예약수</b>입니다.'
+    ], demo('관리 메뉴의 탭', '<div class="chips">' + chip('승인 대기 2', true) + chip('겹침 1') + chip('전체 예약') + chip('기록') + chip('대장 가져오기') + '</div>' +
+        '<div class="item" style="padding:12px 0 0;margin:0"><p class="eyebrow">본관 4층 · 반복 3회</p><h3 style="font-size:16px;font-weight:600;margin:0">다목적실 · 방과후</h3>' +
+        '<p class="meta">최학생 (1학년 5반) · [고] 댄스 동아리 · 연습 · 15명</p><div class="acts"><span class="btn small primary">3건 모두 승인</span><span class="btn small danger">반려</span></div></div>'));
+  }
+  return h;
 }
 
 /* ---------- 그리기: 내 예약 ---------- */
@@ -1160,6 +1297,7 @@ function viewAdmin() {
   var a = S.admin;
   var nPend = a.data ? groupUp(a.data.pending).length : 0, nClash = a.data ? a.data.clashes.length : 0;
   var tabs = [['pending', '승인 대기' + (nPend ? ' ' + nPend : '')], ['clash', '겹침' + (nClash ? ' ' + nClash : '')], ['list', '전체 예약'], ['hist', '기록']];
+  if (S.init.ledgerOn) tabs.push(['ledger', '대장 가져오기']);
   var h = '<p class="eyebrow">관리</p><h2 class="title" style="margin-bottom:12px">예약 관리</h2><div class="tabs">' + tabs.map(function (t) {
     return '<button type="button" class="chip ' + (a.tab === t[0] ? 'on' : '') + '" data-a="atab" data-t="' + t[0] + '" aria-pressed="' + (a.tab === t[0]) + '">' + esc(t[1]) + '</button>';
   }).join('') + (S.init.sheetUrl ? '<a class="chip" href="' + esc(S.init.sheetUrl) + '" target="_blank" rel="noopener" style="text-decoration:none;color:inherit;display:inline-flex;align-items:center">구글시트 열기 ↗</a>' : '') + '</div>';
@@ -1176,11 +1314,18 @@ function viewAdmin() {
     }).join('') + '</div><p class="sub" style="margin-top:10px">최근 기록부터 보여요. 전체 기록은 구글시트의 [기록] 탭에 있어요.</p>';
   }
   if (!a.data) return h + '<div class="spin"></div>';
+  if (a.tab === 'ledger') {
+    var last = a.data.sync || '', failed = last.indexOf('실패') >= 0;
+    return h + '<section class="card pad"><p class="eyebrow">기존 사용 대장</p><h3 class="title" style="font-size:19px">대장 가져오기</h3>' +
+      '<p class="sub" style="margin:6px 0 14px">기존 사용 대장(구글시트)에 적거나 고치거나 지운 내용을 지금 읽어 와 예약에 반영합니다. 자동으로는 가져오지 않으니, 대장이 바뀌었을 때 눌러 주세요.</p>' +
+      '<button type="button" class="btn primary wide" data-a="sync-now"' + (a.syncing ? ' disabled' : '') + '>' + (a.syncing ? '가져오는 중… (1분쯤 걸릴 수 있어요)' : '지금 가져오기') + '</button>' +
+      '<div class="notice ' + (failed ? 'warn' : '') + '" style="margin:14px 0 0"><b>마지막 결과</b><br>' + esc(last || '아직 가져온 적이 없어요.') + '</div>' +
+      '<ul class="sub" style="margin:14px 0 0;padding-left:20px"><li>오늘 이후 날짜만 맞추고, 지난 날짜와 웹에서 신청한 예약은 그대로 둡니다.</li>' +
+      '<li>[공간] 탭과 이름이 같은 대장 시트만 가져옵니다. 짝이 없는 시트는 결과에 이름이 나옵니다.</li>' +
+      '<li>가져온 뒤 웹 예약과 겹치는 것이 있으면 <b>겹침</b> 탭에 나옵니다.</li>' +
+      '<li>바뀐 내용은 <b>기록</b> 탭에 대장추가·대장변경·대장삭제로 남습니다.</li></ul></section>';
+  }
   if (a.tab === 'clash') {
-    if (a.data.ledgerOn) {
-      h += '<div class="notice"><b>기존 대장 자동 가져오기</b> · ' + esc(a.data.sync || '아직 가져온 적이 없어요') +
-        ' <button type="button" class="btn small" style="margin-left:6px" data-a="sync-now"' + (a.syncing ? ' disabled' : '') + '>' + (a.syncing ? '가져오는 중…' : '지금 가져오기') + '</button></div>';
-    }
     if (!a.data.clashes.length) return h + '<div class="card empty">같은 시간에 겹친 예약이 없어요.</div>';
     h += '<p class="sub" style="margin-bottom:10px">같은 공간·같은 교시에 예약이 두 건 있어요. 대장에 나중에 적힌 내용이 웹 예약과 겹친 경우예요. 한쪽을 취소하거나 대장을 고쳐 주세요.</p>';
     return h + a.data.clashes.map(function (c) {
@@ -1442,6 +1587,10 @@ var A = {
     render();
   },
   'mcal-day': function (el) { S.mineCal.day = S.mineCal.day === el.dataset.d ? '' : el.dataset.d; render(); },
+  'help-go': function (el) {
+    var t = document.getElementById('help-' + el.dataset.id);
+    if (t) t.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  },
   'sync-now': function () {
     S.admin.syncing = true;
     render();
@@ -1456,6 +1605,7 @@ var A = {
     render();
     if (S.admin.tab === 'hist' && !S.admin.hist) loadHist().then(render, fail);
     else if (!S.admin.data) loadAdmin().then(render, fail);
+    else if (S.admin.tab === 'ledger') loadAdmin().then(render, fail);   // 마지막 결과를 새로 읽음
   },
   fchip: function (el) {
     var f = S.find, k = el.dataset.k, v = el.dataset.v;
