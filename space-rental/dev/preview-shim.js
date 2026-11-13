@@ -35,7 +35,7 @@
 
   var server = { getInit: getInit, getDay: getDay, recommend: recommend, createBooking: createBooking,
     updateBooking: updateBooking, cancelBooking: cancelBooking, myBookings: myBookings,
-    adminBookings: adminBookings, decide: decide, getHistory: getHistory, getPhoto: getPhoto, getRoomRange: getRoomRange, runLedgerSync: runLedgerSync };
+    adminBookings: adminBookings, getHistory: getHistory, getPhoto: getPhoto, getRoomRange: getRoomRange, runLedgerSync: runLedgerSync };
 
   function runner(ok, bad) {
     var r = {

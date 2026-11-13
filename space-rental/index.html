@@ -368,7 +368,7 @@ var S = {
   find: { date: '', periods: [], people: '', purpose: '', facilities: [], keyword: '', results: null, busy: false, err: '' },
   mine: null,
   mineCal: { month: '', day: '' },   // 내 예약 달력: 보고 있는 달, 고른 날짜
-  admin: { tab: 'pending', data: null, hist: null, q: '', from: '', to: '', syncing: false },
+  admin: { tab: 'list', data: null, hist: null, q: '', from: '', to: '', syncing: false },
   pendingCount: 0,
   photos: {}   // 드라이브 파일 ID → 서버가 읽어 준 그림(data: 주소) 또는 'fail'
 };
@@ -508,8 +508,8 @@ function roomState(r) {
     var cap = slotCap(r), cnt = bookingsAt(r.id, S.date, S.period).length;
     if (cap > 1 && cnt < cap) return { k: 'part', t: cnt + '/' + cap + '팀 사용 중 · 함께 사용 가능' };
     if (cap > 1) return { k: 'busy', t: cap + '팀 사용 중 (꽉 참)' };
-    if (b.mine) return { k: 'mine', t: b.status === '확정' ? '내 예약' : '내 신청 (승인 대기)' };
-    return b.status === '확정' ? { k: 'busy', t: '사용 중' + (whoText(b) ? ' · ' + whoText(b) : '') } : { k: 'wait', t: '승인 대기' };
+    if (b.mine) return { k: 'mine', t: '내 예약' };
+    return { k: 'busy', t: '사용 중' + (whoText(b) ? ' · ' + whoText(b) : '') };
   }
   var n = ps.filter(function (p) { return bookingAt(r.id, S.date, p.id); }).length;
   if (!n) return { k: 'free', t: '종일 비어 있음' };
@@ -535,7 +535,7 @@ function loadAdmin() {
     S.admin.data = d;
     S.admin.from = d.from;
     S.admin.to = d.to;
-    S.pendingCount = groupUp(d.pending).length + d.clashes.length;
+    S.pendingCount = d.clashes.length;
   });
 }
 function loadHist() { return call('getHistory', S.admin.q).then(function (h) { S.admin.hist = h; }); }
@@ -563,7 +563,7 @@ function navHtml(cls) {
   if (S.init.me.admin) items.push(['admin', '관리']);
   items.push(['help', '사용법']);
   return '<nav class="nav ' + cls + '" aria-label="메뉴">' + items.map(function (it) {
-    var n = it[0] === 'admin' && S.pendingCount ? '<span class="n" aria-label="확인할 일 ' + S.pendingCount + '건">' + S.pendingCount + '</span>' : '';
+    var n = it[0] === 'admin' && S.pendingCount ? '<span class="n" aria-label="겹친 예약 ' + S.pendingCount + '건">' + S.pendingCount + '</span>' : '';
     return '<button type="button" data-a="view" data-v="' + it[0] + '" class="' + (S.view === it[0] ? 'on' : '') + '"' +
       (S.view === it[0] ? ' aria-current="page"' : '') + '>' + ICON[it[0]] + '<span>' + it[1] + '</span>' + n + '</button>';
   }).join('') + '</nav>';
@@ -626,7 +626,7 @@ function viewMap() {
     '<p class="sub">' + (S.date < S.init.today ? '지난 날짜의 사용 내역을 보고 있어요. 공간을 누르면 그날의 교시별 내역이 보여요.' : '공간을 누르면 소개를 보고 신청할 수 있어요.') + '</p>' +
     '<div class="plan"><div class="rooms">' + list.map(roomCell).join('') + '</div><div class="corridor">복 도</div></div>' +
     '<div class="legend"><span><i class="dot free"></i>비어 있음</span><span><i class="dot busy"></i>사용 중</span>' +
-    '<span><i class="dot wait"></i>승인 대기</span><span><i class="dot part"></i>일부 교시 예약</span><span><i class="dot off"></i>신청 불가</span></div>' +
+    '<span><i class="dot part"></i>일부 교시 예약</span><span><i class="dot off"></i>신청 불가</span></div>' +
     '</section></div>';
   return h;
 }
@@ -656,8 +656,8 @@ function renderSheet() {
   var top = old ? old.scrollTop : 0;
   if (!S.sheet) { root.innerHTML = ''; document.body.style.overflow = ''; return; }
   var sh = S.sheet;
-  var inner = sh.type === 'room' ? sheetRoom(sh) : sh.type === 'sched' ? sheetSched(sh) : sh.type === 'edit' ? sheetEdit(sh) : sh.type === 'cancel' ? sheetCancel(sh) : sheetReject(sh);
-  root.innerHTML = '<div class="scrim" data-a="close"></div><div class="sheet ' + (sh.type === 'cancel' || sh.type === 'reject' ? 'small' : '') +
+  var inner = sh.type === 'room' ? sheetRoom(sh) : sh.type === 'sched' ? sheetSched(sh) : sh.type === 'edit' ? sheetEdit(sh) : sheetCancel(sh);
+  root.innerHTML = '<div class="scrim" data-a="close"></div><div class="sheet ' + (sh.type === 'cancel' ? 'small' : '') +
     '" role="dialog" aria-modal="true" aria-labelledby="sheet-title">' + inner + '</div>';
   document.body.style.overflow = 'hidden';
   var body = $('.sheet-body', root);
@@ -677,12 +677,12 @@ function periodRows(roomId, date, sel, ownId) {
     var b = list[0];
     var k = full ? (b.status === '확정' ? 'busy' : 'wait') : on ? 'sel' : list.length ? 'shared' : 'free';
     var each = list.map(function (x) {
-      return [x.mine ? '내 예약' : '', whoText(x), x.purpose].filter(Boolean).join(' · ') + (x.status === '확정' ? '' : ' (승인 대기)');
+      return [x.mine ? '내 예약' : '', whoText(x), x.purpose].filter(Boolean).join(' · ');
     }).filter(Boolean);
     var txt;
     if (!list.length) txt = on ? '선택함' : '비어 있음';
     else if (cap > 1) txt = list.length + '/' + cap + '팀' + (full ? ' (꽉 참)' : on ? ' · 선택함' : ' · 함께 사용 가능') + (each.length ? ' — ' + each.join(' / ') : '');
-    else txt = (b.status === '확정' ? '사용 중' : '승인 대기') + (each[0] ? ' · ' + each[0].replace(' (승인 대기)', '') : '');
+    else txt = '사용 중' + (each[0] ? ' · ' + each[0] : '');
     return '<button type="button" class="prow ' + k + '" ' + (full ? 'disabled' : 'data-a="pick" data-p="' + esc(p.id) + '" aria-pressed="' + on + '"') + '>' +
       '<span class="box" aria-hidden="true">' + (on ? '✓' : '') + '</span>' +
       '<span class="pn">' + esc(p.name) + '<span class="pt">' + esc(p.start) + (p.end ? '~' + esc(p.end) : '') + '</span></span>' +
@@ -779,7 +779,6 @@ function sheetRoom(sh) {
         '<div class="grow"><label class="f" for="f-until">종료일</label><input class="in" id="f-until" type="date" data-f="until" data-rerender="1" min="' + sh.date + '" value="' + esc(f.until) + '"></div></div>' +
         '<p class="sub" style="margin-top:10px">' + (ds.length ? '모두 <b>' + ds.length + '회</b> · ' + esc(fmtShort(ds[0])) + ' ~ ' + esc(fmtShort(ds[ds.length - 1])) : '요일과 종료일을 골라 주세요.') + '</p></div>';
     }
-    if (S.init.me.role === '학생') h += '<p class="sub" style="margin-top:12px">학생 신청은 관리자 승인 뒤에 확정돼요.</p>';
     if (sh.err) h += '<div class="err" role="alert">' + esc(sh.err) + '</div>';
     h += '<div class="sticky-go"><button type="button" class="btn primary wide" data-a="submit" ' + (sh.busy ? 'disabled' : '') + '>' +
       (sh.busy ? '신청하는 중…' : (f.more.length ? '공간 ' + (f.more.length + 1) + '곳 · ' : '') + pnames(sh.sel) + ' 신청하기') + '</button></div>';
@@ -888,7 +887,7 @@ function sheetSched(sh) {
       return '<tr><th class="pcol" scope="row">' + esc(p.name) + '</th>' + days.map(function (d) {
         var b = idx[d] && idx[d][p.id];
         if (!b) return '<td></td>';
-        var t = b.purpose || (b.status === '확정' ? '사용 중' : '승인 대기');
+        var t = b.purpose || '사용 중';
         return '<td class="' + slotClass(b) + '" title="' + esc(t + (b.name ? ' · ' + b.name : '')) + '"><div>' + esc(t) + '</div></td>';
       }).join('') + '</tr>';
     }).join('') + '</tbody></table><p class="sub" style="margin-top:8px">요일을 누르면 그날의 예약 현황으로 가요.</p>';
@@ -930,7 +929,7 @@ function sheetSched(sh) {
       hits.slice(0, MAX).map(function (b) {
         var who = whoText(b) || b.name;
         return '<button type="button" class="drow" data-a="sched-day" data-d="' + b.date + '"><span class="grow"><b>' + esc(fmtShort(b.date)) + '</b> ' + esc(pnames(b.periods)) +
-          '<br>' + esc([who, b.purpose].filter(Boolean).join(' · ') || (b.status === '확정' ? '사용 중' : '승인 대기')) + '</span>' + statusBadge(b.status) + '</button>';
+          '<br>' + esc([who, b.purpose].filter(Boolean).join(' · ') || '사용 중') + '</span>' + statusBadge(b.status) + '</button>';
       }).join('') + (hits.length > MAX ? '<p class="sub">이 밖에 ' + (hits.length - MAX) + '건이 더 있어요. 기간을 좁혀 보세요.</p>' : '') + '</div>';
   };
   var barBtn = function (k, v, label, n, max) {
@@ -982,7 +981,6 @@ function sheetEdit(sh) {
     '<label class="f" for="f-unit">2) 사용 부서 (개인이면 선생님 성함)</label><input class="in" id="f-unit" data-f="unit" maxlength="40" value="' + esc(sh.f.unit) + '">' +
     '<label class="f" for="f-purpose">3) 사용 목적</label><input class="in" id="f-purpose" data-f="purpose" maxlength="100" value="' + esc(sh.f.purpose) + '">' +
     '<label class="f" for="f-people">4) 사용 예상 인원' + (r && r.capacity ? ' (정원 ' + r.capacity + '명)' : '') + '</label><input class="in" id="f-people" data-f="people" type="number" inputmode="numeric" min="1" value="' + esc(sh.f.people || '') + '">';
-  if (b.role === '학생' && !S.init.me.admin) h += '<p class="sub" style="margin-top:12px">교시를 바꾸면 다시 관리자 승인을 받아야 해요.</p>';
   if (sh.err) h += '<div class="err" role="alert">' + esc(sh.err) + '</div>';
   h += '<div class="sticky-go"><button type="button" class="btn primary wide" data-a="save" ' + (sh.busy ? 'disabled' : '') + '>' + (sh.busy ? '저장하는 중…' : '수정 저장') + '</button></div>';
   return h + '</div>';
@@ -991,7 +989,7 @@ function sheetEdit(sh) {
 function groupMates(b) {
   if (!b.groupId) return [b];
   var seen = {}, out = [];
-  var pools = [S.mine || [], S.admin.data ? S.admin.data.list : [], S.admin.data ? S.admin.data.pending : []];
+  var pools = [S.mine || [], S.admin.data ? S.admin.data.list : []];
   pools.forEach(function (list) {
     list.forEach(function (x) { if (x.groupId === b.groupId && !seen[x.id]) { seen[x.id] = true; out.push(x); } });
   });
@@ -1016,17 +1014,6 @@ function sheetCancel(sh) {
   if (b.groupId && roomsN > 1) h += btn('group', '함께 신청한 공간 ' + roomsN + '곳 모두 취소 (' + live.length + '건)');
   return h + '<button type="button" class="btn wide" data-a="close">그만두기</button></div>';
 }
-function sheetReject(sh) {
-  var g = sh.items, b = g[0], r = room(b.roomId);
-  var h = sheetHead('신청 반려', (r ? r.name : '') + (g.length > 1 ? ' · ' + g.length + '회' : ' · ' + fmtShort(b.date))) + '<div class="sheet-body">' +
-    '<p>' + esc(b.name) + ' · ' + esc(b.purpose) + '</p>' +
-    '<label class="f" for="f-reason">반려 사유 (신청자에게 보여요)</label><input class="in" id="f-reason" data-f="reason" maxlength="100" value="' + esc(sh.f.reason) + '" placeholder="예: 정규 수업과 겹침">';
-  if (sh.err) h += '<div class="err" role="alert">' + esc(sh.err) + '</div>';
-  return h + '<div class="row" style="margin-top:14px"><button type="button" class="btn grow" data-a="close">그만두기</button>' +
-    '<button type="button" class="btn danger grow" data-a="reject-go" ' + (sh.busy ? 'disabled' : '') + '>반려</button></div></div>';
-}
-
-/* ---------- 그리기: 추천 ---------- */
 function viewFind() {
   var f = S.find;
   var chipSet = function (key, list) {
@@ -1117,7 +1104,7 @@ function viewHelp() {
   var steps = [['cal', '날짜 고르기', '공간 메뉴에서 사용할 날짜를 고릅니다'], ['bld', '공간 고르기', '건물 → 층 → 공간을 누릅니다'],
     ['clock', '교시 고르기', '비어 있는 교시를 눌러 고릅니다'], ['pen', '내용 적고 신청', '학교·부서·목적·인원을 적습니다']];
   h += '<section class="card pad hsec" id="help-flow"><h3 style="font:700 19px var(--display);margin:0 0 4px">한눈에 보는 예약 4단계</h3>' +
-    '<p class="sub">교직원은 신청하면 바로 확정되고, 학생은 관리자 승인 뒤에 확정됩니다.</p><div class="flow">' +
+    '<p class="sub">신청하면 바로 확정됩니다.</p><div class="flow">' +
     steps.map(function (x, i) {
       return '<div class="fstep"><span class="fno">' + (i + 1) + '</span><span class="fic">' + HICON[x[0]] + '</span><b>' + x[1] + '</b><span>' + x[2] + '</span></div>';
     }).join('<span class="farrow" aria-hidden="true">›</span>') +
@@ -1129,8 +1116,8 @@ function viewHelp() {
     '공간 칸의 <b>색</b>으로 비어 있는지 확인하고, 공간을 눌러 소개와 예약 현황을 엽니다.'
   ], demo('층 배치도와 색', '<div class="rooms" style="padding:0">' +
       roomCard('free', '세미나실 1', '정원 20명', '비어 있음') + roomCard('busy', '세미나실 2', '정원 16명', '사용 중 · 연구부') +
-      roomCard('wait', '컴퓨터실', '정원 32명', '승인 대기') + roomCard('part', '도서관', '정원 60명', '2개 교시 예약') + '</div>' +
-      '<div class="legend"><span><i class="dot free"></i>비어 있음</span><span><i class="dot busy"></i>사용 중</span><span><i class="dot wait"></i>승인 대기</span><span><i class="dot part"></i>일부 교시 예약</span><span><i class="dot off"></i>신청 불가</span></div>'));
+      roomCard('mine', '컴퓨터실', '정원 32명', '내 예약') + roomCard('part', '도서관', '정원 60명', '2개 교시 예약') + '</div>' +
+      '<div class="legend"><span><i class="dot free"></i>비어 있음</span><span><i class="dot busy"></i>사용 중</span><span><i class="dot part"></i>일부 교시 예약</span><span><i class="dot off"></i>신청 불가</span></div>'));
 
   h += helpSec('book', 2, '교시 고르고 신청하기', '공간을 열면 소개(사진·수용 인원·시설·특이사항)와 그날의 교시별 현황이 나옵니다.', [
     '<b>비어 있는 교시</b>를 눌러 고릅니다. 여러 교시를 고를 수 있습니다. 처음에는 아무 교시도 골라져 있지 않습니다.',
@@ -1175,8 +1162,8 @@ function viewHelp() {
     '<b>달력</b>에 내 예약이 있는 날이 표시됩니다. 날짜를 누르면 그날의 예약이 아래에 나옵니다.',
     '<b>수정</b>: 교시·학교·부서·목적·인원을 바꿉니다. 날짜나 공간을 바꾸려면 취소하고 다시 신청합니다.',
     '<b>취소</b>: 반복 예약은 이 날만 / 이 날부터 / 이 공간의 반복 전체 / 함께 신청한 공간 모두 가운데 고릅니다. 지난 날짜는 그대로 남습니다.'
-  ], demo('내 예약 달력과 취소 선택', miniCal({ 5: 'mk', 12: 'mk', 13: 'mw', 19: 'mk', 26: 'mk' }, 12) +
-      '<p class="sub" style="margin:8px 0 10px">■ 확정 · <span style="color:var(--wait)">■ 승인 대기 포함</span></p>' +
+  ], demo('내 예약 달력과 취소 선택', miniCal({ 5: 'mk', 12: 'mk', 13: 'mk', 19: 'mk', 26: 'mk' }, 12) +
+      '<p class="sub" style="margin:8px 0 10px">■ 내 예약이 있는 날</p>' +
       '<div class="btn danger wide hbtn">이 날만 취소 (1건)</div><div class="btn danger wide hbtn">이 공간의 반복 예약 전체 취소 (4건)</div>'));
 
   h += helpSec('find', 7, '공간 추천', '어떤 공간이 맞는지 모를 때 조건을 넣으면 이유와 함께 추천합니다.', [
@@ -1198,14 +1185,12 @@ function viewHelp() {
 
   if (admin) {
     h += helpSec('admin', 9, '관리자', '관리 메뉴의 탭에서 처리합니다. 숫자가 붙은 탭은 확인할 일이 있다는 뜻입니다.', [
-      '<b>승인 대기</b>: 학생 신청을 승인하거나 사유를 적어 반려합니다. 반복·일괄 신청은 한 번에 처리합니다.',
       '<b>겹침</b>: 같은 시간에 허용 수보다 많이 잡힌 예약입니다. 한쪽을 취소하거나 대장을 고칩니다.',
       '<b>전체 예약</b>·<b>기록</b>: 기간을 정해 모든 예약을 보고, 누가 무엇을 바꿨는지 변경 전후와 함께 확인합니다.',
       '<b>대장 가져오기</b>: 기존 사용 대장이 바뀌었을 때 <b>지금 가져오기</b>를 누릅니다. 자동으로는 가져오지 않습니다.',
       '공간·사용자·교시·설정은 구글시트에서 고치면 바로 반영됩니다. 함께 쓸 수 있는 팀 수는 [공간] 탭의 <b>동시예약수</b>입니다.'
-    ], demo('관리 메뉴의 탭', '<div class="chips">' + chip('승인 대기 2', true) + chip('겹침 1') + chip('전체 예약') + chip('기록') + chip('대장 가져오기') + '</div>' +
-        '<div class="item" style="padding:12px 0 0;margin:0"><p class="eyebrow">본관 4층 · 반복 3회</p><h3 style="font-size:16px;font-weight:600;margin:0">다목적실 · 방과후</h3>' +
-        '<p class="meta">최학생 (1학년 5반) · [고] 댄스 동아리 · 연습 · 15명</p><div class="acts"><span class="btn small primary">3건 모두 승인</span><span class="btn small danger">반려</span></div></div>'));
+    ], demo('관리 메뉴의 탭', '<div class="chips">' + chip('전체 예약', true) + chip('겹침 1') + chip('기록') + chip('대장 가져오기') + '</div>' +
+        '<div class="drow" style="border-top:0"><span class="grow"><b>11/13(금)</b> 5교시, 6교시<br>세미나실 1 · 홍길동 · [고] 교육과정부 · 설명회 준비 · 12명</span><span class="badge ok">확정</span><span class="btn small">수정</span><span class="btn small danger">취소</span></div>'));
   }
   return h;
 }
@@ -1261,12 +1246,11 @@ function mineCalHtml() {
   for (var i = 0; i < (first.getDay() + 6) % 7; i++) h += '<div class="pad0"></div>';
   for (var d = 1; d <= days; d++) {
     var date = fromDate(new Date(y, m, d)), list = by[date] || [];
-    var wait = list.some(function (b) { return b.status === '승인대기'; });
-    h += '<button type="button" class="' + (list.length ? (wait ? 'mw' : 'mk') : '') + (date === today ? ' today' : '') + (date === c.day ? ' pick' : '') + (date < today ? ' old' : '') +
+    h += '<button type="button" class="' + (list.length ? 'mk' : '') + (date === today ? ' today' : '') + (date === c.day ? ' pick' : '') + (date < today ? ' old' : '') +
       '" data-a="mcal-day" data-d="' + date + '" aria-pressed="' + (date === c.day) + '" aria-label="' + fmt(date) + ', 내 예약 ' + list.length + '건"' + (list.length ? '' : ' disabled') + '>' +
       '<b>' + d + '</b><small>' + (list.length ? list.length + '건' : '') + '</small></button>';
   }
-  h += '</div><div class="heatkey"><i style="background:var(--mine-bg);border:1.5px solid var(--mine)"></i> 확정 <i style="background:var(--wait-bg);border:1.5px solid var(--wait);margin-left:8px"></i> 승인 대기 포함 · 날짜를 누르면 그날의 예약이 보여요</div>';
+  h += '</div><div class="heatkey"><i style="background:var(--mine-bg);border:1.5px solid var(--mine)"></i> 내 예약이 있는 날 · 날짜를 누르면 그날의 예약이 보여요</div>';
   if (c.day && by[c.day]) {
     h += '<div class="dlist" style="margin-top:12px"><p class="eyebrow">' + esc(fmt(c.day)) + ' · ' + by[c.day].length + '건</p>' + by[c.day].map(function (b) {
       var r = room(b.roomId);
@@ -1296,8 +1280,8 @@ function viewMine() {
 /* ---------- 그리기: 관리 ---------- */
 function viewAdmin() {
   var a = S.admin;
-  var nPend = a.data ? groupUp(a.data.pending).length : 0, nClash = a.data ? a.data.clashes.length : 0;
-  var tabs = [['pending', '승인 대기' + (nPend ? ' ' + nPend : '')], ['clash', '겹침' + (nClash ? ' ' + nClash : '')], ['list', '전체 예약'], ['hist', '기록']];
+  var nClash = a.data ? a.data.clashes.length : 0;
+  var tabs = [['list', '전체 예약'], ['clash', '겹침' + (nClash ? ' ' + nClash : '')], ['hist', '기록']];
   if (S.init.ledgerOn) tabs.push(['ledger', '대장 가져오기']);
   var h = '<p class="eyebrow">관리</p><h2 class="title" style="margin-bottom:12px">예약 관리</h2><div class="tabs">' + tabs.map(function (t) {
     return '<button type="button" class="chip ' + (a.tab === t[0] ? 'on' : '') + '" data-a="atab" data-t="' + t[0] + '" aria-pressed="' + (a.tab === t[0]) + '">' + esc(t[1]) + '</button>';
@@ -1342,22 +1326,6 @@ function viewAdmin() {
         '<div style="margin-top:8px">' + line(c.a) + line(c.b) + '</div></article>';
     }).join('');
   }
-  if (a.tab === 'pending') {
-    var gs = groupUp(a.data.pending);
-    if (!gs.length) return h + '<div class="card empty">승인을 기다리는 신청이 없어요.</div>';
-    return h + gs.map(function (g) {
-      var b = g.items[0], r = room(b.roomId);
-      var uniq = function (arr) { return arr.filter(function (x, i) { return arr.indexOf(x) === i; }); };
-      var rn = uniq(g.items.map(function (x) { var rr = room(x.roomId); return rr ? rr.name : '(삭제된 공간)'; }));
-      return '<article class="card item"><p class="eyebrow">' + esc(rn.length > 1 ? '공간 ' + rn.length + '곳' : r ? roomLabel(r) : '') + ' · 신청 ' + esc(b.createdAt) + '</p>' +
-        '<h3>' + esc(rn.join(', ')) + ' · ' + esc(pnames(b.periods)) + '</h3>' +
-        '<p class="meta"><b style="color:var(--ink)">' + esc(b.name) + '</b>' + (b.dept ? ' (' + esc(b.dept) + ')' : '') + ' · ' + esc(b.email) + '</p>' +
-        '<p class="meta">' + esc(whoText({ school: b.school, unit: b.unit }) ? whoText({ school: b.school, unit: b.unit }) + ' · ' : '') + esc(b.purpose) + ppl(b.people) + (b.shared ? ' · 함께 사용' : '') + '</p>' +
-        '<p class="meta">' + (g.items.length > 1 ? '모두 ' + g.items.length + '건: ' : '') + uniq(g.items.map(function (x) { return fmtShort(x.date); })).map(esc).join(', ') + '</p>' +
-        '<div class="acts"><button type="button" class="btn small primary" data-a="approve" data-id="' + esc(b.id) + '">' + (g.items.length > 1 ? g.items.length + '건 모두 승인' : '승인') + '</button>' +
-        '<button type="button" class="btn small danger" data-a="reject" data-id="' + esc(b.id) + '">반려</button></div></article>';
-    }).join('');
-  }
   h += '<form class="row" data-form="range" style="margin-bottom:12px;flex-wrap:wrap"><input class="in grow" type="date" data-admin="from" value="' + esc(a.from) + '" aria-label="시작일">' +
     '<span>~</span><input class="in grow" type="date" data-admin="to" value="' + esc(a.to) + '" aria-label="종료일"><button class="btn">보기</button></form>';
   if (!a.data.list.length) return h + '<div class="card empty">이 기간에는 예약이 없어요.</div>';
@@ -1374,7 +1342,7 @@ function viewAdmin() {
 function findBooking(id) {
   var clash = [];
   if (S.admin.data) S.admin.data.clashes.forEach(function (c) { clash.push(c.a, c.b); });
-  var pools = [S.mine || [], S.admin.data ? S.admin.data.list : [], S.admin.data ? S.admin.data.pending : [], clash];
+  var pools = [S.mine || [], S.admin.data ? S.admin.data.list : [], clash];
   for (var i = 0; i < pools.length; i++) {
     for (var j = 0; j < pools[i].length; j++) if (pools[i][j].id === id) return pools[i][j];
   }
@@ -1519,7 +1487,7 @@ var A = {
       sh.busy = false;
       if (r.needConfirm) { sh.confirm = r; renderSheet(); return; }
       var n = r.created > 1 ? r.created + '건 ' : '';
-      toast((r.status === '확정' ? n + '예약이 확정됐어요.' : n + '신청했어요. 관리자 승인을 기다려 주세요.') +
+      toast(n + '예약이 확정됐어요.' +
         (r.notified ? ' 먼저 예약한 ' + r.notified + '명에게 알림 메일을 보냈어요.' : ''));
       S.date = sh.date;
       S.sheet = null;
@@ -1538,7 +1506,7 @@ var A = {
     sh.busy = true; sh.err = '';
     renderSheet();
     call('updateBooking', sh.b.id, { periods: sh.sel, school: sh.f.school, unit: sh.f.unit, purpose: sh.f.purpose, people: sh.f.people }).then(function (r) {
-      toast(r.status === '승인대기' && sh.b.status === '확정' ? '수정했어요. 교시가 바뀌어 다시 승인을 기다려요.' : '수정했어요.');
+      toast('수정했어요.');
       S.sheet = null;
       return refreshAfterWrite().then(render);
     }).catch(fail);
@@ -1557,30 +1525,7 @@ var A = {
       return refreshAfterWrite().then(render);
     }).catch(fail);
   },
-  approve: function (el) {
-    el.disabled = true;
-    call('decide', el.dataset.id, true, '', 'group').then(function (r) {
-      toast(r.done > 1 ? r.done + '건을 승인했어요.' : '승인했어요.');
-      return refreshAfterWrite().then(render);
-    }).catch(function (e) { toast(e.message); el.disabled = false; });
-  },
-  reject: function (el) {
-    var b = findBooking(el.dataset.id);
-    if (!b) return;
-    var items = S.admin.data.pending.filter(function (x) { return (x.groupId || x.id) === (b.groupId || b.id); });
-    S.sheet = { type: 'reject', items: items, err: '', busy: false, f: { reason: '' } };
-    renderSheet();
-  },
-  'reject-go': function () {
-    var sh = S.sheet;
-    sh.busy = true;
-    renderSheet();
-    call('decide', sh.items[0].id, false, sh.f.reason, 'group').then(function () {
-      toast('반려했어요.');
-      S.sheet = null;
-      return refreshAfterWrite().then(render);
-    }).catch(fail);
-  },
+
   'mcal-shift': function (el) {
     var c = S.mineCal, n = +el.dataset.d, d = toDate(c.month || S.init.today);
     c.month = n ? fromDate(new Date(d.getFullYear(), d.getMonth() + n, 1)) : S.init.today.slice(0, 7) + '-01';

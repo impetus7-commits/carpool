@@ -3,7 +3,7 @@
  *
  * 화면에서 부르는 함수:
  *   getInit, getDay, recommend, createBooking, updateBooking, cancelBooking,
- *   myBookings, adminBookings, decide, getHistory, getPhoto, getRoomRange, runLedgerSync
+ *   myBookings, adminBookings, getHistory, getPhoto, getRoomRange, runLedgerSync
  *
  * 데이터는 Store.gs 의 readTab_/appendRows_/updateRows_ 로만 읽고 씁니다.
  * 모든 쓰기는 withLock_ 안에서 처리하고 [기록] 탭에 남깁니다.
@@ -184,7 +184,7 @@ function getInit() {
   return out;
 }
 
-/** 하루치 살아 있는 예약 (확정·승인대기) */
+/** 하루치 살아 있는 예약 (확정) */
 function getDay(date) {
   if (!isDate_(date)) throw new Error('날짜가 올바르지 않아요.');
   var me = me_();
@@ -416,7 +416,7 @@ function createBooking(data) {
       return { needConfirm: true, conflicts: conflicts, existing: existing, okCount: plan.length, many: many };
     }
 
-    var status = me.role === '학생' ? '승인대기' : '확정';
+    var status = '확정';   // 승인 절차 없이 신청하면 바로 확정
     var now = nowStr_();
     var ctx = { rooms: rooms, periods: periods };
     var groupId = plan.length > 1 ? 'G' + newId_() : '';
@@ -497,7 +497,7 @@ function requireOwner_(b, me, today) {
   if (b.date < today) throw new Error('지난 예약은 바꿀 수 없어요.');
 }
 
-/** 예약 수정: 교시·목적·인원. 학생이 교시를 바꾸면 다시 승인 대기가 됩니다. */
+/** 예약 수정: 교시·사용 학교·부서·목적·인원 */
 function updateBooking(id, data) {
   data = data || {};
   return withLock_(function () {
@@ -518,17 +518,12 @@ function updateBooking(id, data) {
     if (full.length) throw new Error(periodNames_(full, periods) + '에 이미 다른 예약이 있어요.');
 
     var before = JSON.parse(JSON.stringify(b));
-    var moved = input.periods.join(',') !== b.periods.join(',');
     b.periods = input.periods;
     b.purpose = input.purpose;
     b.people = input.people;
     b.school = input.school;
     b.unit = input.unit;
     b.updatedAt = nowStr_();
-    if (moved && b.role === '학생' && !me.admin) {
-      b.status = '승인대기';
-      b.handler = '';
-    }
     updateRows_('예약', [bookingRow_(b)]);
     appendRows_('기록', [logRow_(me, '수정', before, b, { rooms: rooms, periods: periods })]);
     return { status: b.status };
@@ -576,7 +571,7 @@ function cancelBooking(id, scope) {
 
 /* ---------- 관리자 API ---------- */
 
-/** 승인 대기 전체와, 기간 안의 모든 예약 */
+/** 겹친 예약과, 기간 안의 모든 예약 */
 function adminBookings(q) {
   var me = requireAdmin_();
   q = q || {};
@@ -600,36 +595,31 @@ function adminBookings(q) {
     clashes: findClashes_(all, today, capOf).map(function (c) {
       return { roomId: c.roomId, date: c.date, periods: c.periods, a: withEmail(c.a), b: withEmail(c.b) };
     }),
-    pending: all.filter(function (b) { return b.status === '승인대기'; }).map(withEmail),
     list: all.filter(function (b) { return b.date >= from && b.date <= to; }).map(withEmail)
   };
 }
 
-/** 승인·반려. scope = 'one' | 'group' (같은 반복 예약의 승인 대기 전체) */
-function decide(id, approve, reason, scope) {
+/**
+ * 승인 대기 기능을 없애기 전에 들어온 '승인대기' 예약을 모두 '확정'으로 바꿉니다.
+ * 편집기에서 한 번 실행하세요. 바뀐 예약은 [기록] 탭에 '확정전환'으로 남습니다.
+ */
+function confirmPending() {
   return withLock_(function () {
-    var me = requireAdmin_();
-    var all = bookings_();
-    var b = findBooking_(all, id);
-    if (b.status !== '승인대기') throw new Error('승인 대기 중인 예약이 아니에요. (현재: ' + b.status + ')');
-    var targets = [b];
-    if (scope === 'group' && b.groupId) {
-      targets = all.filter(function (x) { return x.groupId === b.groupId && x.status === '승인대기'; });
-    }
+    var all = bookings_().filter(function (b) { return b.status === '승인대기'; });
+    if (!all.length) { console.log('승인 대기 중인 예약이 없습니다.'); return 0; }
+    var who = { email: String(Session.getEffectiveUser().getEmail() || ''), name: '승인 대기 정리' };
     var ctx = { rooms: rooms_(), periods: periods_() };
     var now = nowStr_();
-    var memo = String(reason || '').trim().slice(0, 100);
-    var logs = targets.map(function (x) {
+    var logs = all.map(function (x) {
       var before = JSON.parse(JSON.stringify(x));
-      x.status = approve ? '확정' : '반려';
+      x.status = '확정';
       x.updatedAt = now;
-      x.handler = me.name;
-      if (memo) x.memo = memo;
-      return logRow_(me, approve ? '승인' : '반려', before, x, ctx);
+      return logRow_(who, '확정전환', before, x, ctx);
     });
-    updateRows_('예약', targets.map(bookingRow_));
+    updateRows_('예약', all.map(bookingRow_));
     appendRows_('기록', logs);
-    return { done: targets.length };
+    console.log('승인 대기 예약 ' + all.length + '건을 확정으로 바꿨습니다.');
+    return all.length;
   });
 }
 

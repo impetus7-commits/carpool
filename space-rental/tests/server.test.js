@@ -44,32 +44,30 @@ test('교직원 신청은 즉시 확정되고 기록이 남는다', () => {
   assert.match(h[0].room, /본관 2층 세미나실 1/);
 });
 
-test('학생 신청은 승인 대기, 관리자가 승인하면 확정', () => {
+test('학생 신청도 승인 없이 바로 확정된다', () => {
   const s = server(STUDENT);
-  assert.equal(s.createBooking(base()).status, '승인대기');
-  const id = plain(s.myBookings())[0].id;
-  assert.throws(() => s.decide(id, true, '', 'one'), /관리자만/);
-  s.MOCK.user = ADMIN;
-  assert.equal(plain(s.adminBookings({})).pending.length, 1);
-  s.decide(id, true, '', 'one');
+  assert.equal(s.createBooking(base()).status, '확정');
   assert.equal(plain(s.getDay('2026-11-13'))[0].status, '확정');
-  assert.deepEqual(plain(s.getHistory('')).map((x) => x.action), ['승인', '신청']);
-});
-
-test('반려하면 사유가 남고 그 시간은 다시 비워진다', () => {
-  const s = server(STUDENT);
-  s.createBooking(base());
-  const id = plain(s.myBookings())[0].id;
+  assert.equal(typeof s.decide, 'undefined', '승인·반려 기능은 없다');
   s.MOCK.user = ADMIN;
-  s.decide(id, false, '수업과 겹침', 'one');
-  assert.equal(plain(s.getDay('2026-11-13')).length, 0);
-  s.MOCK.user = STUDENT;
-  const mine = plain(s.myBookings())[0];
-  assert.equal(mine.status, '반려');
-  assert.equal(mine.memo, '수업과 겹침');
+  assert.equal(plain(s.adminBookings({})).pending, undefined);
 });
 
-test('겹치는 교시는 신청할 수 없다 (승인 대기도 자리를 잡는다)', () => {
+test('예전 승인대기 예약은 confirmPending 으로 한 번에 확정한다 (그동안에도 자리는 잡는다)', () => {
+  const s = server(TEACHER);
+  s.createBooking(base());
+  s.createBooking(base({ periods: ['P1'] }));
+  s.MOCK.db['예약'].forEach((r) => { r['상태'] = '승인대기'; });
+  s.MOCK.user = STUDENT;
+  assert.throws(() => s.createBooking(base({ periods: ['P6'] })), /6교시에 이미 예약/);
+  s.MOCK.user = ADMIN;
+  assert.equal(s.confirmPending(), 2);
+  assert.deepEqual(plain(s.getDay('2026-11-13')).map((b) => b.status), ['확정', '확정']);
+  assert.equal(plain(s.getHistory('확정전환')).length, 2);
+  assert.equal(s.confirmPending(), 0);
+});
+
+test('겹치는 교시는 신청할 수 없다', () => {
   const s = server(STUDENT);
   s.createBooking(base());
   s.MOCK.user = TEACHER;
@@ -121,22 +119,10 @@ test('반복 예약 검증: 요일 없음, 종료일 오류, 횟수 초과', () 
   assert.throws(() => s.createBooking(base({ repeat: { until: '2027-05-01', weekdays: [1, 2, 3, 4, 5] } })), /80회까지만/);
 });
 
-test('학생 반복 신청은 관리자가 한 번에 승인할 수 있다', () => {
-  const s = server(STUDENT);
-  s.createBooking(base({ date: '2026-11-13', repeat: { until: '2026-11-27', weekdays: [5] } }));
-  s.MOCK.user = ADMIN;
-  const pending = plain(s.adminBookings({})).pending;
-  assert.equal(pending.length, 3);
-  assert.equal(s.decide(pending[0].id, true, '', 'group').done, 3);
-  assert.equal(plain(s.adminBookings({})).pending.length, 0);
-});
-
-test('수정·취소는 본인과 관리자만, 학생이 교시를 바꾸면 다시 승인 대기', () => {
+test('수정·취소는 본인과 관리자만, 모든 변경은 기록에 남는다', () => {
   const s = server(STUDENT);
   s.createBooking(base());
   const id = plain(s.myBookings())[0].id;
-  s.MOCK.user = ADMIN;
-  s.decide(id, true, '', 'one');
 
   s.MOCK.user = STUDENT2;
   assert.throws(() => s.updateBooking(id, base()), /본인이 신청한/);
@@ -144,14 +130,14 @@ test('수정·취소는 본인과 관리자만, 학생이 교시를 바꾸면 �
 
   s.MOCK.user = STUDENT;
   assert.equal(s.updateBooking(id, base({ purpose: '발표 연습' })).status, '확정');
-  assert.equal(s.updateBooking(id, base({ periods: ['P7'] })).status, '승인대기');
+  assert.equal(s.updateBooking(id, base({ periods: ['P7'] })).status, '확정', '교시를 바꿔도 확정 그대로');
   s.cancelBooking(id, 'one');
   assert.throws(() => s.cancelBooking(id, 'one'), /이미 취소/);
   assert.equal(plain(s.getDay('2026-11-13')).length, 0);
 
   s.MOCK.user = ADMIN;
   const h = plain(s.getHistory(''));
-  assert.deepEqual(h.map((x) => x.action), ['취소', '수정', '수정', '승인', '신청']);
+  assert.deepEqual(h.map((x) => x.action), ['취소', '수정', '수정', '신청']);
   assert.equal(JSON.parse(h[1].before)['교시'], 'P5,P6');
   assert.equal(JSON.parse(h[1].after)['교시'], 'P7');
   assert.equal(plain(s.getHistory('발표')).length >= 1, true);
@@ -479,4 +465,13 @@ test('대장 가져오기: 이름이 다른 곳은 정해 둔 짝으로 찾는�
   // [설정] 탭에서 더한 짝, 그리고 정해 둔 공간이 없으면 원래 이름으로 찾기
   const m2 = plain(s.ledgerMatchRooms_(['동진실', '스쿨캠핑'], [{ id: 'R3', name: '세미나실' }, { id: 'R9', name: '스쿨캠핑' }], { '동진실': '세미나실', '스쿨캠핑': '작은정원' }));
   assert.deepEqual(m2.map((x) => x.room && x.room.id), ['R3', 'R9']);
+});
+
+test('화면(index.html)의 스크립트에 문법 오류가 없다', () => {
+  const fs = require('fs');
+  const html = fs.readFileSync(require('path').join(__dirname, '..', 'index.html'), 'utf8');
+  const start = html.indexOf("<script>\n'use strict'");
+  assert.ok(start > 0);
+  const src = html.slice(start + 8, html.indexOf('</script>', start));
+  assert.doesNotThrow(() => new Function(src));
 });

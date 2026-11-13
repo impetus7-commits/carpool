@@ -70,3 +70,6 @@ function sheetUrl_() { return '#'; }
 function ledgerStatus_() { return MOCK.syncStatus || ''; }
 function syncLedger() { MOCK.syncStatus = nowStr_() + ' · 변경 없음'; return '변경 없음'; }
 function photoData_(id) { return 'data:image/gif;base64,R0lGODlhAQABAAAAACw='; }
+
+// 편집기에서 직접 실행하는 함수(confirmPending 등)가 쓰는 실행 계정
+var Session = { getEffectiveUser: function () { return { getEmail: function () { return MOCK.user; } }; } };
