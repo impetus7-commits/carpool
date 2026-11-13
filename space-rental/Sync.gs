@@ -117,7 +117,7 @@ function syncRun_(tabs) {
   tabs.forEach(function (t, i) {
     if (!match[i].room) { unmatched.push(t.title); return; }
     ledgerBookings_(ledgerRows_(t.grid, today), match[i].room.id, slotIds).forEach(function (b) {
-      b.school = inferSchool_(b.purpose) || t.school;   // 적힌 글로 학교를 짐작하고, 모르면 그 대장의 기본 학교
+      b.school = inferSchool_(b.purpose) || t.school || SCHOOL_DEFAULT_;   // 적힌 글로 정하고, 표시가 없으면 대장의 기본 학교, 그것도 없으면 고등학교
       desired.push(b);
     });
   });
@@ -240,7 +240,7 @@ function checkLedgerSync() {
  * [예약] 탭에서 사용학교가 비어 있는 줄을 채웁니다. 편집기에서 한 번 실행하세요. (지난 날짜의 줄도 채웁니다)
  * 1) 사용 목적·사용 부서에 적힌 글로 짐작합니다. 예: "중학교 법교육" → 중, "동아리(고)" → 고
  * 2) 글로 알 수 없는 대장 예약은, 그 공간이 속한 대장의 기본 학교([설정] 탭의 대장학교1 …)를 넣습니다.
- * 그래도 알 수 없는 줄은 비워 둡니다. 이미 값이 있는 줄은 건드리지 않습니다.
+ * 3) 중학교·법인 표시가 없는 줄은 고등학교로 넣습니다. 이미 값이 있는 줄은 건드리지 않습니다.
  */
 function fillSchools() {
   return withLock_(function () {
@@ -263,18 +263,20 @@ function fillSchools() {
     }
 
     var v = sh.getRange(2, 1, last - 1, cols.length).getDisplayValues();
-    var out = [], count = { '중': 0, '고': 0, '법인': 0 }, filled = 0, left = 0;
+    var out = [], count = { '중': 0, '고': 0, '법인': 0 }, filled = 0;
     v.forEach(function (r) {
       var cur = String(r[c('사용학교')]).trim();
       if (r.join('').trim() === '' || cur) { out.push([cur]); return; }
       var guess = inferSchool_(r[c('목적')] + ' ' + (c('사용부서') >= 0 ? r[c('사용부서')] : ''));
       if (!guess && String(r[c('비고')]).trim() === SYNC_MEMO_) guess = byRoom[r[c('공간ID')]] || '';
-      if (guess) { filled++; guess.split(',').forEach(function (x) { count[x]++; }); } else left++;
+      if (!guess) guess = SCHOOL_DEFAULT_;   // 중학교·법인 표시가 없으면 고등학교
+      filled++;
+      guess.split(',').forEach(function (x) { count[x]++; });
       out.push([guess]);
     });
     sh.getRange(2, c('사용학교') + 1, out.length, 1).setNumberFormat('@').setValues(out);
     delete tabCache_['예약'];
-    var msg = '사용학교를 ' + filled + '줄 채웠습니다 (중 ' + count['중'] + ', 고 ' + count['고'] + ', 법인 ' + count['법인'] + '). 알 수 없어 비워 둔 줄 ' + left + '개.';
+    var msg = '사용학교를 ' + filled + '줄 채웠습니다 (중 ' + count['중'] + ', 고 ' + count['고'] + ', 법인 ' + count['법인'] + '). 중학교·법인 표시가 없는 줄은 고등학교로 넣었습니다.';
     appendRows_('기록', [{ '일시': nowStr_(), '이메일': String(Session.getEffectiveUser().getEmail() || ''), '이름': '학교 구분 채우기', '동작': '학교채움',
       '예약ID': '', '공간': '', '날짜': '', '내용': msg, '변경전': '', '변경후': '' }]);
     console.log(msg);

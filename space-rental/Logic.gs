@@ -301,17 +301,23 @@ function ledgerDiff_(existing, desired) {
 }
 
 /**
- * 적힌 글에서 사용 학교(중·고·법인)를 짐작합니다. 알 수 없으면 ''.
+ * 적힌 글에서 사용 학교(중·고·법인) 표시를 찾습니다. 표시가 없으면 '' (schoolFor_ 는 이때 고등학교로 봅니다).
  * 예: "중학교 법교육" → 중, "동아리(고)" → 고, "중3 리허설" → 중, "고/수업(음악과)" → 고, "중+고 합동" → 중,고
  * "중간고사", "집중", "고사" 처럼 낱말 속에 들어 있는 글자는 세지 않습니다.
  */
+var SCHOOL_DEFAULT_ = '고';   // 글에 중학교·법인 표시가 없으면 고등학교로 봅니다
+
+/** 적힌 글로 학교를 정합니다. 표시가 없으면 고등학교. */
+function schoolFor_(text) { return inferSchool_(text) || SCHOOL_DEFAULT_; }
+
 function inferSchool_(text) {
   var t = ' ' + String(text == null ? '' : text) + ' ';
   var solo = function (ch) {   // 앞뒤가 띄어쓰기·기호·숫자인 한 글자
     return new RegExp('[\\s(\\[,·/+*~]' + ch + '(?=[\\s\\d/\\-+):(\\],·~]|$)').test(t);
   };
   var out = [];
-  if (/중학교|중등/.test(t) || solo('중')) out.push('중');
+  // 중학교 표시: "중학교", "중1·중2·중3", "(중)", 따로 떨어진 "중" (예: "중 영화 상영", "중/수업")
+  if (/중학교|중등|중[1-3]/.test(t) || solo('중')) out.push('중');
   if (/고등학교|고교/.test(t) || solo('고')) out.push('고');
   if (/법인/.test(t)) out.push('법인');
   return out.join(',');

@@ -454,6 +454,16 @@ test('학교 구분 짐작과 화면 설정(관리자 이름)', () => {
   assert.equal(s.inferSchool_('고 중간고사'), '고');
   assert.equal(s.inferSchool_('중간고사 집중 대비'), '');
   assert.equal(s.inferSchool_('법인 이사회'), '법인');
+  assert.equal(s.schoolFor_('진학기획부'), '고', '중학교·법인 표시가 없으면 고등학교');
+  assert.equal(s.schoolFor_('중학교 VR체험'), '중');
+  // 중학교 표시: 중1·중2·중3, '중 ', (중)
+  ['중1학년 진로특강', '중2 특강', '중3금융교육', '휘경여중3학년 발표', '중 영화 상영', '(중)1학년 6반 학급 단합활동', '동아리(중)', '댄스부(휘쓸) 중'].forEach((x) => {
+    assert.equal(s.schoolFor_(x), '중', x);
+  });
+  // 중학교로 구별하기 어려운 것은 고등학교
+  ['문화예술수업', '중간고사 감독', '집중 이수', '토론대회', '한일음식교류(휘경*금강)', '대수(김은영)', '동아리(창체부)'].forEach((x) => {
+    assert.equal(s.schoolFor_(x), '고', x);
+  });
   assert.equal(plain(s.getInit()).settings.admin, '');
   s.mockReset_();
   s.MOCK.db['설정'].forEach((r) => { if (r['항목'] === '관리자') r['값'] = '홍길동T'; });

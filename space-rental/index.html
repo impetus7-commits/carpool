@@ -948,13 +948,14 @@ function sheetSched(sh) {
     }).join('') + '</ul>';
   }
   // 학교별 사용 교시: 여러 학교를 고른 예약은 각 학교에 모두 셉니다.
-  var bySchool = {}, schoolOf = function (b) { return b.school ? b.school.split(',') : ['미분류']; };
+  // 학교 구분이 비어 있는 예약(예전 대장 내역 등)은 고등학교로 셉니다.
+  var bySchool = {}, schoolOf = function (b) { return b.school ? b.school.split(',') : ['고']; };
   list.forEach(function (b) { schoolOf(b).forEach(function (k) { bySchool[k] = (bySchool[k] || 0) + b.periods.length; }); });
-  var sKeys = SCHOOLS.concat(['미분류']).filter(function (k) { return bySchool[k]; });
+  var sKeys = SCHOOLS.filter(function (k) { return bySchool[k]; });
   if (sKeys.length) {
     var sm = Math.max.apply(null, sKeys.map(function (k) { return bySchool[k]; }));
     h += '<h3 class="sec">학교별 사용 교시</h3><p class="sub">학교를 누르면 해당 내역이 펼쳐져요.</p><ul class="bars">' + sKeys.map(function (k) {
-      return '<li>' + barBtn('school', k, k === '미분류' ? '미분류 (학교 구분 없음)' : k, bySchool[k], sm) +
+      return '<li>' + barBtn('school', k, k, bySchool[k], sm) +
         detail('school', k, k, function (b) { return schoolOf(b).indexOf(k) >= 0; }) + '</li>';
     }).join('') + '</ul>';
   }
