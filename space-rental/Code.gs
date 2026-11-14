@@ -2,8 +2,12 @@
  * 학교 공간 대여 — 웹앱 서버 (구글시트에 묶인 앱스크립트)
  *
  * 화면에서 부르는 함수:
- *   getInit, getDay, recommend, createBooking, updateBooking, cancelBooking,
- *   myBookings, adminBookings, getHistory, getPhoto, getRoomRange, getStats, runLedgerSync
+ *   getInit, getDay, getRoomRange, recommend, myBookings, searchBookings, getPhoto,
+ *   createBooking, updateBooking, cancelBooking,
+ *   adminLogin, adminLogout, adminBookings, getStats, getHistory, runLedgerSync
+ *
+ * 로그인 없이 누구나 씁니다. 화면이 모든 호출의 첫 인자로 who = {device, token} 을 보냅니다.
+ * 관리 기능은 관리자 비밀번호로 로그인한 경우(token)에만 됩니다.
  *
  * 데이터는 Store.gs 의 readTab_/appendRows_/updateRows_ 로만 읽고 씁니다.
  * 모든 쓰기는 withLock_ 안에서 처리하고 [기록] 탭에 남깁니다.
@@ -28,26 +32,70 @@ function settings_() {
     notice: s['안내문'] || '',
     maxDays: Math.max(1, parseInt(s['예약가능일수'], 10) || 60),
     repeatMaxDays: Math.max(1, parseInt(s['반복예약최대일수'], 10) || 200),
-    admin: s['관리자'] || '',                                         // 화면 위쪽에 보이는 관리자 이름
-    notify: !/^(n|no|x|아니오)$/i.test(String(s['함께사용알림'] || 'Y').trim())   // 함께 사용 알림 메일
+    admin: s['관리자'] || ''   // 화면 위쪽에 보이는 관리자 이름
   };
 }
 
-function me_() {
-  var email = currentEmail_();
-  var me = { email: email, name: '', role: '', dept: '', registered: false, admin: false };
-  if (!email) return me;
-  var row = readTab_('사용자').filter(function (u) {
-    return String(u['이메일']).toLowerCase() === email;
-  })[0];
-  if (!row) return me;
-  var role = String(row['역할'] || '');
-  me.role = role.indexOf('관리') >= 0 ? '관리자' : role.indexOf('학생') >= 0 ? '학생' : '교직원';
-  me.name = row['이름'] || email.split('@')[0];
-  me.dept = row['소속'] || '';
-  me.registered = true;
-  me.admin = me.role === '관리자';
-  return me;
+/* ---------- 누가 부르는가 ----------
+ * 로그인 없이 씁니다. 화면이 모든 호출에 who = {device, token} 을 함께 보냅니다.
+ *   device: 브라우저마다 한 번 만들어 기억해 두는 임의의 번호. 사람이 아니라 기기를 구분합니다.
+ *   token : 관리자 비밀번호로 로그인하면 받는 임시 열쇠 (6시간).
+ */
+
+var ADMIN_SESSION_SEC = 21600;   // 관리자 로그인 유지 시간 (6시간)
+var ADMIN_MAX_FAILS = 5;         // 한 기기에서 연속으로 틀릴 수 있는 횟수
+var ADMIN_LOCK_SEC = 600;        // 그 뒤 막는 시간 (10분)
+
+function me_(who) {
+  who = who || {};
+  var device = String(who.device || '').replace(/[^\w-]/g, '').slice(0, 40);
+  var token = String(who.token || '').replace(/[^\w-]/g, '').slice(0, 60);
+  return { device: device, admin: !!token && cacheGet_('adm_' + token) === '1', name: '' };
+}
+
+/** 저장된 관리자 비밀번호와 맞는지. 비밀번호는 [공간대여 → 관리자 비밀번호 정하기] 메뉴로 정합니다. */
+function adminPasswordOk_(pw) {
+  pw = String(pw == null ? '' : pw);
+  var hash = prop_('ADMIN_HASH'), salt = prop_('ADMIN_SALT') || '';
+  if (hash) return !!pw && sha256_(salt + pw) === hash;
+  // 메뉴로 정하지 않았으면 [설정] 탭의 '관리자비밀번호' 값을 씁니다 (시트를 볼 수 있는 사람에게 보이므로 메뉴 쪽을 권합니다).
+  var plain = '';
+  readTab_('설정').forEach(function (r) { if (String(r['항목']).trim() === '관리자비밀번호') plain = String(r['값']).trim(); });
+  return !!plain && pw === plain;
+}
+
+/** 관리자 로그인. 맞으면 {token} 을 돌려줍니다. */
+function adminLogin(who, password) {
+  var me = me_(who);
+  if (!me.device) throw new Error('기기 정보를 확인할 수 없어요. 화면을 새로 고쳐 주세요.');
+  var lockKey = 'admlock_' + me.device, failKey = 'admfail_' + me.device;
+  if (cacheGet_(lockKey) || +cacheGet_('admfail_all') >= 60) {
+    throw new Error('비밀번호를 여러 번 틀려서 잠시 막혔어요. 10분쯤 뒤에 다시 시도해 주세요.');
+  }
+  if (!prop_('ADMIN_HASH') && !readTab_('설정').some(function (r) { return String(r['항목']).trim() === '관리자비밀번호' && String(r['값']).trim(); })) {
+    throw new Error('관리자 비밀번호가 아직 정해지지 않았어요. 구글시트 메뉴 [공간대여 → 관리자 비밀번호 정하기]에서 정해 주세요.');
+  }
+  if (!adminPasswordOk_(password)) {
+    var n = (+cacheGet_(failKey) || 0) + 1;
+    cachePut_('admfail_all', String((+cacheGet_('admfail_all') || 0) + 1), ADMIN_LOCK_SEC);
+    if (n >= ADMIN_MAX_FAILS) {
+      cachePut_(lockKey, '1', ADMIN_LOCK_SEC);
+      cacheRemove_(failKey);
+      throw new Error('비밀번호를 ' + ADMIN_MAX_FAILS + '번 틀려서 10분 동안 막혔어요.');
+    }
+    cachePut_(failKey, String(n), ADMIN_LOCK_SEC);
+    throw new Error('비밀번호가 맞지 않아요. (남은 기회 ' + (ADMIN_MAX_FAILS - n) + '번)');
+  }
+  cacheRemove_(failKey);
+  var token = newId_() + newId_();
+  cachePut_('adm_' + token, '1', ADMIN_SESSION_SEC);
+  return { token: token, hours: ADMIN_SESSION_SEC / 3600 };
+}
+
+function adminLogout(who) {
+  var token = String((who || {}).token || '').replace(/[^\w-]/g, '');
+  if (token) cacheRemove_('adm_' + token);
+  return true;
 }
 
 function rooms_() {
@@ -91,7 +139,7 @@ function bookings_() {
       email: String(r['이메일'] || '').toLowerCase(), name: r['이름'] || '', role: r['역할'] || '', dept: r['소속'] || '',
       purpose: r['목적'] || '', people: parseInt(r['인원'], 10) || 0, status: r['상태'] || '',
       createdAt: r['신청일시'] || '', updatedAt: r['수정일시'] || '', handler: r['처리자'] || '', memo: r['비고'] || '',
-      school: r['사용학교'] || '', unit: r['사용부서'] || '', shared: r['공동사용'] === 'Y'
+      school: r['사용학교'] || '', unit: r['사용부서'] || '', shared: r['공동사용'] === 'Y', device: r['기기'] || ''
     };
   });
 }
@@ -102,22 +150,19 @@ function bookingRow_(b) {
     '이메일': b.email, '이름': b.name, '역할': b.role, '소속': b.dept,
     '목적': b.purpose, '인원': b.people, '상태': b.status,
     '신청일시': b.createdAt, '수정일시': b.updatedAt, '처리자': b.handler, '비고': b.memo,
-    '사용학교': b.school || '', '사용부서': b.unit || '', '공동사용': b.shared ? 'Y' : ''
+    '사용학교': b.school || '', '사용부서': b.unit || '', '공동사용': b.shared ? 'Y' : '', '기기': b.device || ''
   };
   if (b._row) row._row = b._row;
   return row;
 }
 
-/** 화면으로 내보내는 예약. 등록되지 않은 계정에는 이름과 목적을 가립니다. */
+/** 화면으로 내보내는 예약. mine = 이 기기에서 신청한 예약 (수정·취소할 수 있음) */
 function publicBooking_(b, me) {
-  var open = me.registered;
   return {
     id: b.id, groupId: b.groupId, roomId: b.roomId, date: b.date, periods: b.periods, status: b.status,
-    name: open ? b.name : '', dept: open ? b.dept : '', role: open ? b.role : '',
-    purpose: open ? b.purpose : '', people: open ? b.people : 0,
-    memo: open ? b.memo : '', createdAt: open ? b.createdAt : '', ledger: isLedger_(b),
-    school: open ? b.school : '', unit: open ? b.unit : '', shared: !!b.shared,
-    mine: !!me.email && b.email === me.email
+    name: b.name, purpose: b.purpose, people: b.people, memo: b.memo, createdAt: b.createdAt, ledger: isLedger_(b),
+    school: b.school, unit: b.unit, shared: !!b.shared,
+    mine: !!me.device && b.device === me.device
   };
 }
 
@@ -163,7 +208,7 @@ function logRow_(me, action, before, after, ctx) {
   var b = after || before;
   var room = ctx.rooms.filter(function (r) { return r.id === b.roomId; })[0];
   return {
-    '일시': nowStr_(), '이메일': me.email, '이름': me.name, '동작': action,
+    '일시': nowStr_(), '이메일': me.email || '', '이름': me.admin ? '관리자' : (me.name || b.name || ''), '동작': action, '기기': me.device || '',
     '예약ID': b.id, '공간': roomLabel_(room), '날짜': b.date,
     '내용': periodNames_(b.periods, ctx.periods) + ' · ' + (b.school ? '[' + b.school + '] ' : '') + (b.unit ? b.unit + ' · ' : '') + b.purpose + (b.shared ? ' (함께 사용)' : '') + (b.people ? ' · ' + b.people + '명' : '') + ' · 신청자 ' + b.name + ' · ' + b.status,
     '변경전': before ? snapshot_(before) : '', '변경후': after ? snapshot_(after) : ''
@@ -172,11 +217,11 @@ function logRow_(me, action, before, after, ctx) {
 
 /* ---------- 읽기 API ---------- */
 
-function getInit() {
-  var me = me_();
+function getInit(who) {
+  var me = me_(who);
   var now = nowStr_();
   var out = {
-    me: me, settings: settings_(), rooms: rooms_(), periods: periods_(),
+    me: { admin: me.admin }, settings: settings_(), rooms: rooms_(), periods: periods_(),
     today: today_(), now: now.slice(11, 16)
   };
   out.ledgerOn = ledgerOn_();
@@ -185,18 +230,18 @@ function getInit() {
 }
 
 /** 하루치 살아 있는 예약 (확정) */
-function getDay(date) {
+function getDay(who, date) {
   if (!isDate_(date)) throw new Error('날짜가 올바르지 않아요.');
-  var me = me_();
+  var me = me_(who);
   return bookings_().filter(function (b) { return b.date === date && isActive_(b); })
     .map(function (b) { return publicBooking_(b, me); });
 }
 
 /** 한 공간의 기간(최대 1년) 안 살아 있는 예약 — 주간·월간·분기·연간 일정 요약용 */
-function getRoomRange(roomId, from, to) {
+function getRoomRange(who, roomId, from, to) {
   if (!isDate_(from) || !isDate_(to) || to < from) throw new Error('기간이 올바르지 않아요.');
   if (toUtc_(to) - toUtc_(from) > 370 * 86400000) throw new Error('한 번에 1년까지만 볼 수 있어요.');
-  var me = me_();
+  var me = me_(who);
   var order = periodOrder_(periods_());
   return bookings_().filter(function (b) {
     return b.roomId === roomId && b.date >= from && b.date <= to && isActive_(b);
@@ -204,21 +249,56 @@ function getRoomRange(roomId, from, to) {
 }
 
 /** 조건에 맞는 공간을 이유와 함께 추천합니다. */
-function recommend(q) {
+function recommend(who, q) {
   q = q || {};
   if (!isDate_(q.date)) throw new Error('날짜를 골라 주세요.');
   var day = bookings_().filter(function (b) { return b.date === q.date; });
   return recommend_(rooms_(), day, periods_(), q);
 }
 
-function myBookings() {
-  var me = me_();
-  if (!me.registered) return [];
-  var from = addDays_(today_(), -365);   // 지난 1년 치까지 보여 줌
+/** 이 기기에서 신청한 예약 (지난 1년 치부터) */
+function myBookings(who) {
+  var me = me_(who);
+  if (!me.device) return [];
+  var from = addDays_(today_(), -365);
   var order = periodOrder_(periods_());
-  return bookings_().filter(function (b) { return b.email === me.email && b.date >= from; })
+  return bookings_().filter(function (b) { return b.device === me.device && b.date >= from; })
     .sort(byDateThenPeriod_(order))
     .map(function (b) { return publicBooking_(b, me); });
+}
+
+var SEARCH_LIMIT = 300;   // 예약 찾기 한 번에 보여 주는 최대 건수
+
+/**
+ * 예약 찾기. q = {school[], unit, name, from, to}
+ * 사용 학교·부서·신청자 이름·기간으로 찾습니다. 부서와 이름은 일부만 적어도 됩니다.
+ * 기간을 비우면 오늘부터 앞으로의 예약을 찾습니다.
+ */
+function searchBookings(who, q) {
+  q = q || {};
+  var me = me_(who);
+  var norm = function (v) { return String(v == null ? '' : v).toLowerCase().replace(/\s+/g, ''); };
+  var unit = norm(q.unit), name = norm(q.name);
+  var asked = Array.isArray(q.school) ? q.school : splitList_(q.school);
+  var schools = SCHOOLS_.filter(function (x) { return asked.indexOf(x) >= 0; });
+  if (!unit && !name && !schools.length && !isDate_(q.from) && !isDate_(q.to)) {
+    throw new Error('사용 학교, 부서, 이름, 기간 가운데 하나 이상을 넣어 주세요.');
+  }
+  var from = isDate_(q.from) ? q.from : (isDate_(q.to) ? addDays_(q.to, -365) : today_());
+  var to = isDate_(q.to) ? q.to : addDays_(from, 365);
+  if (to < from) throw new Error('기간이 올바르지 않아요.');
+  var order = periodOrder_(periods_());
+  var hits = bookings_().filter(function (b) {
+    if (b.date < from || b.date > to || !isActive_(b)) return false;
+    if (unit && norm(b.unit || (isLedger_(b) ? b.purpose : '')).indexOf(unit) < 0) return false;
+    if (name && norm(b.name).indexOf(name) < 0) return false;
+    if (schools.length) {
+      var mine = (b.school || SCHOOL_DEFAULT_).split(',');
+      if (!schools.some(function (x) { return mine.indexOf(x) >= 0; })) return false;
+    }
+    return true;
+  }).sort(byDateThenPeriod_(order));
+  return { total: hits.length, from: from, to: to, list: hits.slice(0, SEARCH_LIMIT).map(function (b) { return publicBooking_(b, me); }) };
 }
 
 /**
@@ -226,7 +306,7 @@ function myBookings() {
  * 사진이 "링크가 있는 모든 사용자"로 공유되어 있지 않아도, 배포한 계정이 볼 수 있으면 화면에 보입니다.
  * [공간] 탭에 적힌 사진만 읽을 수 있습니다.
  */
-function getPhoto(fileId) {
+function getPhoto(who, fileId) {
   var id = String(fileId || '');
   var listed = rooms_().some(function (r) {
     return r.photos.some(function (u) { return driveId_(u) === id; });
@@ -237,16 +317,15 @@ function getPhoto(fileId) {
 
 /* ---------- 쓰기 API ---------- */
 
-function requireUser_() {
-  var me = me_();
-  if (!me.email) throw new Error('로그인한 계정을 확인할 수 없어요. 학교 구글 계정으로 로그인했는지 확인해 주세요.');
-  if (!me.registered) throw new Error('등록되지 않은 계정(' + me.email + ')이에요. 관리자에게 등록을 요청해 주세요.');
+function requireUser_(who) {
+  var me = me_(who);
+  if (!me.device) throw new Error('기기 정보를 확인할 수 없어요. 화면을 새로 고친 뒤 다시 시도해 주세요.');
   return me;
 }
 
-function requireAdmin_() {
-  var me = requireUser_();
-  if (!me.admin) throw new Error('관리자만 할 수 있어요.');
+function requireAdmin_(who) {
+  var me = me_(who);
+  if (!me.admin) throw new Error('관리자 로그인이 필요해요. 관리 메뉴에서 비밀번호로 로그인해 주세요.');
   return me;
 }
 
@@ -301,14 +380,17 @@ function cleanInput_(data, periods) {
   var school = SCHOOLS_.filter(function (x) { return asked.indexOf(x) >= 0; });
   if (!school.length) throw new Error('사용 학교(중·고·법인)를 한 개 이상 골라 주세요.');
   var unit = String(data.unit || '').trim().slice(0, 40);
-  if (!unit) throw new Error('사용 부서를 적어 주세요. 개인이면 선생님 성함을 적어 주세요.');
+  if (!unit) throw new Error('사용 부서를 적어 주세요.');
+
+  var name = String(data.name || '').trim().slice(0, 20);
+  if (!name) throw new Error('신청자 이름을 적어 주세요.');
 
   var purpose = String(data.purpose || '').trim().slice(0, 100);
   if (!purpose) throw new Error('사용 목적을 적어 주세요.');
 
   var people = parseInt(data.people, 10);
   if (!(people >= 1)) throw new Error('사용 예상 인원을 숫자로 적어 주세요.');
-  return { periods: list, purpose: purpose, people: people, school: school.join(','), unit: unit };
+  return { periods: list, purpose: purpose, people: people, school: school.join(','), unit: unit, name: name };
 }
 
 /**
@@ -319,12 +401,11 @@ function cleanInput_(data, periods) {
  *   {needConfirm, conflicts, existing, okCount} 를 돌려주고 아무것도 만들지 않습니다.
  *   skipConflicts·ackExisting 을 true 로 다시 부르면 자리가 없는 날을 빼고 만듭니다.
  * - 한 번에 두 건 이상 만들면 같은 묶음ID 를 주어 나중에 한꺼번에 취소할 수 있습니다.
- * - 함께 사용으로 들어가면 먼저 예약한 사람에게 메일로 알립니다.
  */
-function createBooking(data) {
+function createBooking(who, data) {
   data = data || {};
   return withLock_(function () {
-    var me = requireUser_();
+    var me = requireUser_(who);
     var conf = settings_();
     var periods = periods_();
     var rooms = rooms_();
@@ -353,8 +434,8 @@ function createBooking(data) {
     var input = cleanInput_(data, periods);
     targets.forEach(function (room) { checkPeople_(input.people, room); });
     var heads = tabHeaders_('예약');
-    if (heads.indexOf('사용학교') < 0 || heads.indexOf('사용부서') < 0 || heads.indexOf('공동사용') < 0) {
-      throw new Error("[예약] 탭에 '사용학교'·'사용부서'·'공동사용' 열이 없어요. 관리자가 앱스크립트 편집기에서 setup 을 한 번 더 실행해야 해요.");
+    if (['사용학교', '사용부서', '공동사용', '기기'].some(function (h) { return heads.indexOf(h) < 0; })) {
+      throw new Error("[예약] 탭에 새 열(사용학교·사용부서·공동사용·기기)이 없어요. 관리자가 앱스크립트 편집기에서 setup 을 한 번 더 실행해야 해요.");
     }
 
     var dates = [data.date];
@@ -423,54 +504,18 @@ function createBooking(data) {
     var made = plan.map(function (x) {
       return {
         id: 'R' + newId_(), groupId: groupId, roomId: x.room.id, date: x.date, periods: input.periods,
-        email: me.email, name: me.name, role: me.role, dept: me.dept,
+        email: '', name: input.name, role: '', dept: '',
         purpose: input.purpose, people: input.people, status: status,
         createdAt: now, updatedAt: '', handler: '', memo: '',
-        school: input.school, unit: input.unit, shared: x.shared
+        school: input.school, unit: input.unit, shared: x.shared, device: me.device
       };
     });
     var action = data.repeat ? '반복신청' : many ? '일괄신청' : '신청';
     appendRows_('예약', made.map(bookingRow_));
     appendRows_('기록', made.map(function (b) { return logRow_(me, action, null, b, ctx); }));
 
-    var notified = conf.notify ? notifyShared_(me, input, plan, periods, conf) : 0;
-    return { created: made.length, status: status, skipped: conflicts, rooms: targets.length, notified: notified };
+    return { created: made.length, status: status, skipped: conflicts, rooms: targets.length };
   });
-}
-
-/**
- * 함께 사용으로 들어간 시간에 먼저 예약해 둔 사람들에게 메일로 알립니다. 보낸 사람 수를 돌려줍니다.
- * 메일을 못 보내도 예약은 그대로 둡니다. (대장에서 가져온 예약은 메일 주소가 없어 알리지 못합니다.)
- */
-function notifyShared_(me, input, plan, periods, conf) {
-  var byMail = {};
-  plan.forEach(function (x) {
-    x.over.forEach(function (b) {
-      if (!b.email || b.email === me.email) return;
-      var both = b.periods.filter(function (p) { return input.periods.indexOf(p) >= 0; });
-      (byMail[b.email] || (byMail[b.email] = { name: b.name, lines: [] })).lines.push(
-        '- ' + dateLabel_(x.date) + ' ' + x.room.name + ' ' + periodNames_(both, periods) +
-        ' (내 예약: ' + (b.unit ? b.unit + ' · ' : '') + b.purpose + ')');
-    });
-  });
-  var sent = 0;
-  Object.keys(byMail).forEach(function (to) {
-    var m = byMail[to];
-    var shown = m.lines.slice(0, 30);
-    var body = m.name + ' 님,\n\n예약하신 시간에 다른 팀이 "함께 사용"으로 신청했습니다.\n\n' +
-      '신청한 팀: ' + (input.school ? '[' + input.school + '] ' : '') + input.unit + ' (' + me.name + ')\n' +
-      '사용 목적: ' + input.purpose + ' · ' + input.people + '명\n\n' +
-      '겹치는 시간:\n' + shown.join('\n') + (m.lines.length > shown.length ? '\n… 외 ' + (m.lines.length - shown.length) + '건' : '') + '\n\n' +
-      '함께 쓰기 어려운 경우에는 신청한 분이나 관리자' + (conf.admin ? '(' + conf.admin + ')' : '') + '에게 알려 주세요.\n\n' +
-      '— ' + conf.school + ' 공간 대여';
-    try {
-      sendMail_(to, '[' + conf.school + ' 공간 대여] 예약하신 시간에 함께 사용 신청이 들어왔습니다', body);
-      sent++;
-    } catch (e) {
-      // 메일 권한이 없거나 하루 발송 한도를 넘은 경우: 예약은 그대로 둡니다.
-    }
-  });
-  return sent;
 }
 
 /** [설정] 탭에 대장 주소가 적혀 있으면 자동 가져오기를 쓰는 것으로 봅니다. */
@@ -491,17 +536,20 @@ function findBooking_(all, id) {
   return b;
 }
 
+/** 고칠 수 있는 사람: 관리자, 또는 그 예약을 신청한 기기 */
 function requireOwner_(b, me, today) {
   if (me.admin) return;
-  if (b.email !== me.email) throw new Error('본인이 신청한 예약만 바꿀 수 있어요.');
+  if (!b.device || b.device !== me.device) {
+    throw new Error('이 기기에서 신청한 예약만 바꿀 수 있어요. 다른 기기에서 신청했다면 그 기기에서 하거나 관리자에게 요청해 주세요.');
+  }
   if (b.date < today) throw new Error('지난 예약은 바꿀 수 없어요.');
 }
 
 /** 예약 수정: 교시·사용 학교·부서·목적·인원 */
-function updateBooking(id, data) {
+function updateBooking(who, id, data) {
   data = data || {};
   return withLock_(function () {
-    var me = requireUser_();
+    var me = requireUser_(who);
     var periods = periods_();
     var rooms = rooms_();
     var all = bookings_();
@@ -523,6 +571,7 @@ function updateBooking(id, data) {
     b.people = input.people;
     b.school = input.school;
     b.unit = input.unit;
+    b.name = input.name;
     b.updatedAt = nowStr_();
     updateRows_('예약', [bookingRow_(b)]);
     appendRows_('기록', [logRow_(me, '수정', before, b, { rooms: rooms, periods: periods })]);
@@ -537,9 +586,9 @@ function updateBooking(id, data) {
  *   'room'      같은 묶음·같은 공간의 오늘 이후 일정 전부 (반복 예약 일괄 취소)
  *   'group'     같은 묶음의 오늘 이후 일정 전부 (함께 신청한 다른 공간까지)
  */
-function cancelBooking(id, scope) {
+function cancelBooking(who, id, scope) {
   return withLock_(function () {
-    var me = requireUser_();
+    var me = requireUser_(who);
     var all = bookings_();
     var b = findBooking_(all, id);
     requireOwner_(b, me, today_());
@@ -560,7 +609,7 @@ function cancelBooking(id, scope) {
       var before = JSON.parse(JSON.stringify(x));
       x.status = '취소';
       x.updatedAt = now;
-      x.handler = me.email === x.email ? '' : me.name;
+      x.handler = me.admin && x.device !== me.device ? '관리자' : '';
       return logRow_(me, '취소', before, x, ctx);
     });
     updateRows_('예약', targets.map(bookingRow_));
@@ -572,8 +621,8 @@ function cancelBooking(id, scope) {
 /* ---------- 관리자 API ---------- */
 
 /** 겹친 예약과, 기간 안의 모든 예약 */
-function adminBookings(q) {
-  var me = requireAdmin_();
+function adminBookings(who, q) {
+  var me = requireAdmin_(who);
   q = q || {};
   var today = today_();
   var from = isDate_(q.from) ? q.from : today;
@@ -585,7 +634,7 @@ function adminBookings(q) {
   var capOf = function (roomId) { return slotCap_(roomOf[roomId], true); };
   var withEmail = function (b) {
     var p = publicBooking_(b, me);
-    p.email = b.email;
+    p.device = b.device;
     p.handler = b.handler;
     return p;
   };
@@ -624,8 +673,8 @@ function confirmPending() {
 }
 
 /** 통계용: 기간(최대 1년) 안의 살아 있는 예약 전체. 관리자만. */
-function getStats(from, to) {
-  var me = requireAdmin_();
+function getStats(who, from, to) {
+  var me = requireAdmin_(who);
   if (!isDate_(from) || !isDate_(to) || to < from) throw new Error('기간이 올바르지 않아요.');
   if (toUtc_(to) - toUtc_(from) > 370 * 86400000) throw new Error('한 번에 1년까지만 볼 수 있어요.');
   return bookings_().filter(function (b) { return isActive_(b) && b.date >= from && b.date <= to; })
@@ -633,25 +682,25 @@ function getStats(from, to) {
 }
 
 /** 관리자가 화면에서 누르는 "지금 가져오기" */
-function runLedgerSync() {
-  requireAdmin_();
+function runLedgerSync(who) {
+  requireAdmin_(who);
   return syncLedger();
 }
 
 /** 최근 기록 (새것부터). q = 검색어 */
-function getHistory(q) {
-  requireAdmin_();
+function getHistory(who, q) {
+  requireAdmin_(who);
   var word = String(q || '').trim().toLowerCase();
   var rows = readTab_('기록').slice().reverse();
   if (word) {
     rows = rows.filter(function (r) {
-      return [r['일시'], r['이메일'], r['이름'], r['동작'], r['공간'], r['날짜'], r['내용']]
+      return [r['일시'], r['이메일'], r['기기'], r['이름'], r['동작'], r['공간'], r['날짜'], r['내용']]
         .join(' ').toLowerCase().indexOf(word) >= 0;
     });
   }
   return rows.slice(0, HISTORY_LIMIT).map(function (r) {
     return {
-      at: r['일시'], email: r['이메일'], name: r['이름'], action: r['동작'], bookingId: r['예약ID'],
+      at: r['일시'], email: r['이메일'], device: r['기기'] || '', name: r['이름'], action: r['동작'], bookingId: r['예약ID'],
       room: r['공간'], date: r['날짜'], text: r['내용'], before: r['변경전'], after: r['변경후']
     };
   });

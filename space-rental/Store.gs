@@ -113,21 +113,26 @@ function photoData_(id) {
   return encode(thumb.getContentType(), thumb.getBytes());
 }
 
-/** 메일 보내기 (함께 사용 알림). 배포한 계정의 이름으로 나갑니다. */
-function sendMail_(to, subject, body) {
-  MailApp.sendEmail(to, subject, body);
-}
-
-/** 알림 메일을 보낼 수 있도록 권한을 허용합니다. 편집기에서 한 번 실행하세요. */
-function allowMail() {
-  console.log('메일 권한이 허용되었습니다. 오늘 더 보낼 수 있는 메일: ' + MailApp.getRemainingDailyQuota() + '통. 새 버전으로 다시 배포해 주세요.');
-}
-
 /** 사진을 서버가 읽을 수 있도록 권한을 허용합니다. 편집기에서 한 번 실행하세요. */
 function allowPhotos() {
   DriveApp.getRootFolder();
   UrlFetchApp.fetch('https://www.google.com/generate_204', { muteHttpExceptions: true });
   console.log('사진 읽기 권한이 허용되었습니다. [배포 → 배포 관리 → 수정 → 새 버전]으로 다시 배포해 주세요.');
+}
+
+/* ---------- 관리자 로그인에 쓰는 저장소 ---------- */
+
+/** 스크립트 속성 (관리자 비밀번호의 해시 등). 시트에는 보이지 않습니다. */
+function prop_(key) { return PropertiesService.getScriptProperties().getProperty(key) || ''; }
+function setProp_(key, value) { PropertiesService.getScriptProperties().setProperty(key, String(value)); }
+
+/** 잠깐 기억해 두는 값 (관리자 로그인 열쇠, 비밀번호 틀린 횟수). 최대 6시간. */
+function cacheGet_(key) { return CacheService.getScriptCache().get(key) || ''; }
+function cachePut_(key, value, seconds) { CacheService.getScriptCache().put(key, String(value), Math.min(21600, seconds)); }
+function cacheRemove_(key) { CacheService.getScriptCache().remove(key); }
+
+function sha256_(text) {
+  return Utilities.base64Encode(Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, String(text), Utilities.Charset.UTF_8));
 }
 
 function currentEmail_() {

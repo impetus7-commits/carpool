@@ -51,7 +51,12 @@ function updateRows_(name, list) {
   if (MOCK.onSave) MOCK.onSave();
 }
 
-function sendMail_(to, subject, body) { (MOCK.mails || (MOCK.mails = [])).push({ to: to, subject: subject, body: body }); }
+function prop_(key) { return (MOCK.props || {})[key] || ''; }
+function setProp_(key, value) { (MOCK.props || (MOCK.props = {}))[key] = String(value); }
+function cacheGet_(key) { return (MOCK.cache || {})[key] || ''; }
+function cachePut_(key, value) { (MOCK.cache || (MOCK.cache = {}))[key] = String(value); }
+function cacheRemove_(key) { if (MOCK.cache) delete MOCK.cache[key]; }
+function sha256_(text) { return 'sha:' + String(text).split('').reverse().join(''); }
 function tabHeaders_(name) { return TABS_[name].slice(); }
 function currentEmail_() { return MOCK.user; }
 function withLock_(fn) { return fn(); }
