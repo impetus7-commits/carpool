@@ -4,7 +4,7 @@
  * 미리보기의 관리자 비밀번호는 preview1234 입니다.
  */
 (function () {
-  var KEY = 'space-rental-preview-v4';
+  var KEY = 'space-rental-preview-v5';
   var PREVIEW_PW = 'preview1234';
   var DEVICES = [['preview-device-a', '기기 A (홍길동 선생님)'], ['preview-device-b', '기기 B (다른 사람)']];
   var saved = null;
@@ -23,8 +23,7 @@
   if (!saved) {
     mockReset_();
     MOCK.db['설정'].forEach(function (r) { if (r['항목'] === '관리자') r['값'] = '(예시) 홍길동T'; });
-    setProp_('ADMIN_SALT', 'preview');
-    setProp_('ADMIN_HASH', sha256_('preview' + PREVIEW_PW));
+    MOCK.db['설정'].forEach(function (r) { if (r['항목'] === '관리자비밀번호') r['값'] = PREVIEW_PW; });
     var t = today_(), A = { device: DEVICES[0][0] }, B = { device: DEVICES[1][0] };
     var seed = [
       [A, { roomId: 'A102', date: t, periods: ['P3', 'P4'], school: ['고'], unit: '진로상담부', name: '홍길동', purpose: '(예시) 진로 특강', people: 90 }],

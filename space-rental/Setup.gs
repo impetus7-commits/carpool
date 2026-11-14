@@ -57,32 +57,15 @@ var SAMPLE_ = {
     ['안내문', '사용 후에는 정리 정돈과 전원 확인을 부탁드립니다.', '첫 화면에 보이는 한 줄 안내 (비워도 됨)'],
     ['예약가능일수', '60', '오늘부터 며칠 뒤까지 신청할 수 있는지'],
     ['반복예약최대일수', '200', '반복 예약의 종료일을 오늘부터 며칠 뒤까지 허용할지'],
-    ['관리자', '', '화면 위쪽에 "관리자 : ○○" 로 보이는 이름 (비우면 표시하지 않음)']
+    ['관리자', '', '화면 위쪽에 "관리자 : ○○" 로 보이는 이름 (비우면 표시하지 않음)'],
+    ['관리자비밀번호', '', '웹 화면의 [관리] 메뉴에 들어갈 때 넣는 비밀번호. 여기서 바로 고칠 수 있음 (비어 있으면 관리 메뉴를 쓸 수 없음)']
   ]
 };
 
 function onOpen() {
   SpreadsheetApp.getUi().createMenu('공간대여')
     .addItem('처음 설정 (탭 만들기)', 'setup')
-    .addItem('관리자 비밀번호 정하기', 'setAdminPassword')
     .addToUi();
-}
-
-/**
- * 웹 화면의 [관리] 메뉴에 들어갈 때 쓰는 비밀번호를 정합니다.
- * 구글시트 메뉴 [공간대여 → 관리자 비밀번호 정하기]로 실행하세요. (편집기에서 실행해도, 시트 화면에 입력 창이 뜹니다.)
- * 비밀번호 자체는 저장하지 않고, 알아볼 수 없게 바꾼 값만 스크립트 속성에 둡니다. 시트에는 보이지 않습니다.
- */
-function setAdminPassword() {
-  var ui = SpreadsheetApp.getUi();
-  var res = ui.prompt('관리자 비밀번호 정하기', '웹 화면의 [관리] 메뉴에서 쓸 비밀번호를 넣어 주세요. (6자 이상)', ui.ButtonSet.OK_CANCEL);
-  if (res.getSelectedButton() !== ui.Button.OK) return;
-  var pw = String(res.getResponseText() || '').trim();
-  if (pw.length < 6) { ui.alert('6자 이상으로 정해 주세요. 바꾸지 않았습니다.'); return; }
-  var salt = Utilities.getUuid();
-  setProp_('ADMIN_SALT', salt);
-  setProp_('ADMIN_HASH', sha256_(salt + pw));
-  ui.alert('관리자 비밀번호를 정했습니다.\n\n이미 로그인해 있던 관리자는 최대 6시간 뒤에 다시 로그인해야 합니다.');
 }
 
 /**

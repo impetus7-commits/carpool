@@ -1269,7 +1269,7 @@ function viewHelp() {
   h += helpSec('mine', 6, '내 예약 찾기·수정·취소', '로그인이 없으므로, 내 예약은 학교·부서·이름·기간으로 찾아봅니다.', [
     '<b>내 예약</b> 메뉴에서 사용 학교, 부서, 신청자 이름, 기간 가운데 아는 것을 넣고 <b>예약 찾기</b>를 누릅니다. 부서와 이름은 일부만 적어도 됩니다.',
     '<b>이 휴대폰·컴퓨터에서 신청한 예약</b>은 찾지 않아도 처음부터 나옵니다. 달력의 날짜를 누르면 그날의 예약이 보입니다.',
-    '<b>수정·취소</b>는 그 예약을 <b>신청한 기기에서만</b> 할 수 있습니다. 다른 기기에서 신청했거나 브라우저 기록을 지웠다면 관리자에게 요청합니다.',
+    '찾은 예약은 <b>누구나 수정·취소</b>할 수 있습니다. 다른 사람의 예약을 바꾸기 전에는 꼭 확인해 주세요. 누가 언제 바꿨는지는 기록에 남습니다.',
     '반복 예약 취소는 이 날만 / 이 날부터 / 이 공간의 반복 전체 / 함께 신청한 공간 모두 가운데 고릅니다. 지난 날짜는 그대로 남습니다.'
   ], demo('예약 찾기', '<label class="f" style="margin-top:0">사용 학교</label><div class="chips">' + chip('중') + chip('고', true) + chip('법인') + '</div>' +
       '<div class="row" style="align-items:flex-end"><div class="grow"><label class="f">사용 부서</label><div class="in hin">교육과정</div></div>' +
@@ -1293,7 +1293,7 @@ function viewHelp() {
       '<p class="sub" style="margin:8px 0 0">색이 진할수록 예약된 교시가 많은 날</p>'));
 
   if (admin) {
-    h += helpSec('admin', 9, '관리자', '관리 메뉴는 관리자 비밀번호로 로그인해야 열립니다. 로그인은 6시간 동안 유지됩니다.', [
+    h += helpSec('admin', 9, '관리자', '관리 메뉴는 관리자 비밀번호로 로그인해야 열립니다. 비밀번호는 구글시트 [설정] 탭의 "관리자비밀번호"에서 고칩니다.', [
       '<b>겹침</b>: 같은 시간에 허용 수보다 많이 잡힌 예약입니다. 한쪽을 취소하거나 대장을 고칩니다.',
       '<b>전체 예약</b>·<b>기록</b>: 기간을 정해 모든 예약을 보고, 누가 무엇을 바꿨는지 변경 전후와 함께 확인합니다.',
       '<b>통계</b>: 기간과 공간을 골라 공간별·학교별·요일별·월별·교시별·부서별·내용별 사용 현황을 보고, 원하는 항목만 골라 <b>PDF 파일로 내려받습니다</b>.',
@@ -1310,7 +1310,6 @@ function bookingActs(b, admin) {
   var live = b.status === '확정' || b.status === '승인대기';
   if (!live || (!admin && b.date < S.init.today)) return '';
   if (b.ledger && S.init.ledgerOn) return '<span class="badge dim">대장에서 수정</span>';
-  if (!admin && !b.mine && !S.init.me.admin) return '<span class="badge dim">신청한 기기에서만 수정·취소</span>';
   return '<button type="button" class="btn small" data-a="edit" data-id="' + esc(b.id) + '">수정</button>' +
     '<button type="button" class="btn small danger" data-a="cancel" data-id="' + esc(b.id) + '">취소</button>';
 }
@@ -1395,8 +1394,8 @@ function viewMine() {
   var past = groups.filter(function (g) { return !g.items.some(isLive); }).reverse();
   h += '<h3 class="sec" style="margin-top:6px">' + (q.on ? '찾은 예약 ' + q.total + '건' + (q.total > S.mine.length ? ' (앞의 ' + S.mine.length + '건만 표시)' : '')
     : '이 기기에서 신청한 예약 · 다가오는 것 ' + now.length + '건') + '</h3>' +
-    '<p class="sub" style="margin-bottom:10px">' + (q.on ? esc(q.rfrom) + ' ~ ' + esc(q.rto) + ' · 수정·취소는 그 예약을 신청한 기기에서만 할 수 있어요. 다른 기기에서 신청했다면 관리자에게 요청해 주세요.'
-      : '이 휴대폰·컴퓨터에서 신청한 예약은 찾지 않아도 여기에 나오고, 바로 수정·취소할 수 있어요.') + '</p>';
+    '<p class="sub" style="margin-bottom:10px">' + (q.on ? esc(q.rfrom) + ' ~ ' + esc(q.rto) + ' · 찾은 예약은 바로 수정·취소할 수 있어요. 다른 사람의 예약을 바꾸기 전에는 꼭 확인해 주세요. 바꾼 내용은 기록에 남아요.'
+      : '이 휴대폰·컴퓨터에서 신청한 예약은 찾지 않아도 여기에 나와요.') + '</p>';
   if (!S.mine.length) {
     return h + '<div class="card empty">' + (q.on ? '조건에 맞는 예약이 없어요. 부서나 이름을 짧게 적어 보세요.' : '이 기기에서 신청한 예약이 없어요. 위에서 부서나 이름으로 찾아보세요.') +
       '<br><button type="button" class="btn primary" style="margin-top:14px" data-a="view" data-v="map">공간 둘러보기</button></div>';
@@ -1417,7 +1416,7 @@ function viewLogin() {
     '<label class="f" for="login-pw">관리자 비밀번호</label><input class="in" id="login-pw" type="password" data-login="1" autocomplete="current-password" value="' + esc(L.pw) + '">' +
     (L.err ? '<div class="err" role="alert">' + esc(L.err) + '</div>' : '') +
     '<button class="btn primary wide" style="margin-top:14px"' + (L.busy ? ' disabled' : '') + '>' + (L.busy ? '확인하는 중…' : '로그인') + '</button>' +
-    '<p class="sub" style="margin-top:10px">5번 틀리면 10분 동안 막혀요. 로그인은 6시간 동안 유지돼요.</p></form>';
+    '<p class="sub" style="margin-top:10px">5번 틀리면 10분 동안 막혀요. 로그인은 6시간 동안 유지돼요. 비밀번호는 구글시트 [설정] 탭의 "관리자비밀번호"에서 고쳐요.</p></form>';
 }
 function viewAdmin() {
   if (!S.init.me.admin) return viewLogin();

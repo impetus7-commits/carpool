@@ -839,32 +839,15 @@ var SAMPLE_ = {
     ['안내문', '사용 후에는 정리 정돈과 전원 확인을 부탁드립니다.', '첫 화면에 보이는 한 줄 안내 (비워도 됨)'],
     ['예약가능일수', '60', '오늘부터 며칠 뒤까지 신청할 수 있는지'],
     ['반복예약최대일수', '200', '반복 예약의 종료일을 오늘부터 며칠 뒤까지 허용할지'],
-    ['관리자', '', '화면 위쪽에 "관리자 : ○○" 로 보이는 이름 (비우면 표시하지 않음)']
+    ['관리자', '', '화면 위쪽에 "관리자 : ○○" 로 보이는 이름 (비우면 표시하지 않음)'],
+    ['관리자비밀번호', '', '웹 화면의 [관리] 메뉴에 들어갈 때 넣는 비밀번호. 여기서 바로 고칠 수 있음 (비어 있으면 관리 메뉴를 쓸 수 없음)']
   ]
 };
 
 function onOpen() {
   SpreadsheetApp.getUi().createMenu('공간대여')
     .addItem('처음 설정 (탭 만들기)', 'setup')
-    .addItem('관리자 비밀번호 정하기', 'setAdminPassword')
     .addToUi();
-}
-
-/**
- * 웹 화면의 [관리] 메뉴에 들어갈 때 쓰는 비밀번호를 정합니다.
- * 구글시트 메뉴 [공간대여 → 관리자 비밀번호 정하기]로 실행하세요. (편집기에서 실행해도, 시트 화면에 입력 창이 뜹니다.)
- * 비밀번호 자체는 저장하지 않고, 알아볼 수 없게 바꾼 값만 스크립트 속성에 둡니다. 시트에는 보이지 않습니다.
- */
-function setAdminPassword() {
-  var ui = SpreadsheetApp.getUi();
-  var res = ui.prompt('관리자 비밀번호 정하기', '웹 화면의 [관리] 메뉴에서 쓸 비밀번호를 넣어 주세요. (6자 이상)', ui.ButtonSet.OK_CANCEL);
-  if (res.getSelectedButton() !== ui.Button.OK) return;
-  var pw = String(res.getResponseText() || '').trim();
-  if (pw.length < 6) { ui.alert('6자 이상으로 정해 주세요. 바꾸지 않았습니다.'); return; }
-  var salt = Utilities.getUuid();
-  setProp_('ADMIN_SALT', salt);
-  setProp_('ADMIN_HASH', sha256_(salt + pw));
-  ui.alert('관리자 비밀번호를 정했습니다.\n\n이미 로그인해 있던 관리자는 최대 6시간 뒤에 다시 로그인해야 합니다.');
 }
 
 /**
@@ -999,7 +982,7 @@ function settings_() {
 /* ---------- 누가 부르는가 ----------
  * 로그인 없이 씁니다. 화면이 모든 호출에 who = {device, token} 을 함께 보냅니다.
  *   device: 브라우저마다 한 번 만들어 기억해 두는 임의의 번호. 사람이 아니라 기기를 구분합니다.
- *   token : 관리자 비밀번호로 로그인하면 받는 임시 열쇠 (6시간).
+ *   token : 관리자 비밀번호로 로그인하면 받는 임시 열쇠 (6시간). 관리자 비밀번호는 [설정] 탭의 '관리자비밀번호'.
  */
 
 var ADMIN_SESSION_SEC = 21600;   // 관리자 로그인 유지 시간 (6시간)
@@ -1010,18 +993,17 @@ function me_(who) {
   who = who || {};
   var device = String(who.device || '').replace(/[^\w-]/g, '').slice(0, 40);
   var token = String(who.token || '').replace(/[^\w-]/g, '').slice(0, 60);
-  return { device: device, admin: !!token && cacheGet_('adm_' + token) === '1', name: '' };
+  // 로그인할 때의 비밀번호가 지금 시트의 비밀번호와 같아야 관리자입니다 (시트에서 비밀번호를 바꾸면 모두 로그아웃됨).
+  var stamp = token ? cacheGet_('adm_' + token) : '';
+  var pw = stamp ? adminPassword_() : '';
+  return { device: device, admin: !!stamp && !!pw && stamp === sha256_(pw), name: '' };
 }
 
-/** 저장된 관리자 비밀번호와 맞는지. 비밀번호는 [공간대여 → 관리자 비밀번호 정하기] 메뉴로 정합니다. */
-function adminPasswordOk_(pw) {
-  pw = String(pw == null ? '' : pw);
-  var hash = prop_('ADMIN_HASH'), salt = prop_('ADMIN_SALT') || '';
-  if (hash) return !!pw && sha256_(salt + pw) === hash;
-  // 메뉴로 정하지 않았으면 [설정] 탭의 '관리자비밀번호' 값을 씁니다 (시트를 볼 수 있는 사람에게 보이므로 메뉴 쪽을 권합니다).
-  var plain = '';
-  readTab_('설정').forEach(function (r) { if (String(r['항목']).trim() === '관리자비밀번호') plain = String(r['값']).trim(); });
-  return !!plain && pw === plain;
+/** 관리자 비밀번호: [설정] 탭의 '관리자비밀번호' 값. 시트에서 바로 고칠 수 있습니다. */
+function adminPassword_() {
+  var pw = '';
+  readTab_('설정').forEach(function (r) { if (String(r['항목']).trim() === '관리자비밀번호') pw = String(r['값']).trim(); });
+  return pw;
 }
 
 /** 관리자 로그인. 맞으면 {token} 을 돌려줍니다. */
@@ -1032,10 +1014,11 @@ function adminLogin(who, password) {
   if (cacheGet_(lockKey) || +cacheGet_('admfail_all') >= 60) {
     throw new Error('비밀번호를 여러 번 틀려서 잠시 막혔어요. 10분쯤 뒤에 다시 시도해 주세요.');
   }
-  if (!prop_('ADMIN_HASH') && !readTab_('설정').some(function (r) { return String(r['항목']).trim() === '관리자비밀번호' && String(r['값']).trim(); })) {
-    throw new Error('관리자 비밀번호가 아직 정해지지 않았어요. 구글시트 메뉴 [공간대여 → 관리자 비밀번호 정하기]에서 정해 주세요.');
+  var real = adminPassword_();
+  if (!real) {
+    throw new Error("관리자 비밀번호가 아직 정해지지 않았어요. 구글시트 [설정] 탭의 '관리자비밀번호' 값에 비밀번호를 적어 주세요.");
   }
-  if (!adminPasswordOk_(password)) {
+  if (String(password == null ? '' : password) !== real) {
     var n = (+cacheGet_(failKey) || 0) + 1;
     cachePut_('admfail_all', String((+cacheGet_('admfail_all') || 0) + 1), ADMIN_LOCK_SEC);
     if (n >= ADMIN_MAX_FAILS) {
@@ -1048,7 +1031,7 @@ function adminLogin(who, password) {
   }
   cacheRemove_(failKey);
   var token = newId_() + newId_();
-  cachePut_('adm_' + token, '1', ADMIN_SESSION_SEC);
+  cachePut_('adm_' + token, sha256_(real), ADMIN_SESSION_SEC);
   return { token: token, hours: ADMIN_SESSION_SEC / 3600 };
 }
 
@@ -1496,12 +1479,12 @@ function findBooking_(all, id) {
   return b;
 }
 
-/** 고칠 수 있는 사람: 관리자, 또는 그 예약을 신청한 기기 */
+/**
+ * 예약은 누구나 고치고 취소할 수 있습니다 (로그인도 예약 비밀번호도 없음). 누가 했는지는 기록에 이름과 기기 번호로 남습니다.
+ * 지난 날짜의 예약만 관리자가 아니면 바꿀 수 없습니다.
+ */
 function requireOwner_(b, me, today) {
   if (me.admin) return;
-  if (!b.device || b.device !== me.device) {
-    throw new Error('이 기기에서 신청한 예약만 바꿀 수 있어요. 다른 기기에서 신청했다면 그 기기에서 하거나 관리자에게 요청해 주세요.');
-  }
   if (b.date < today) throw new Error('지난 예약은 바꿀 수 없어요.');
 }
 
@@ -1569,7 +1552,7 @@ function cancelBooking(who, id, scope) {
       var before = JSON.parse(JSON.stringify(x));
       x.status = '취소';
       x.updatedAt = now;
-      x.handler = me.admin && x.device !== me.device ? '관리자' : '';
+      x.handler = me.admin ? '관리자' : (x.device && x.device === me.device ? '' : '다른 기기');   // 신청한 기기가 아닌 곳에서 취소했는지
       return logRow_(me, '취소', before, x, ctx);
     });
     updateRows_('예약', targets.map(bookingRow_));
@@ -1755,7 +1738,7 @@ var Session = { getEffectiveUser: function () { return { getEmail: function () {
  * 미리보기의 관리자 비밀번호는 preview1234 입니다.
  */
 (function () {
-  var KEY = 'space-rental-preview-v4';
+  var KEY = 'space-rental-preview-v5';
   var PREVIEW_PW = 'preview1234';
   var DEVICES = [['preview-device-a', '기기 A (홍길동 선생님)'], ['preview-device-b', '기기 B (다른 사람)']];
   var saved = null;
@@ -1774,8 +1757,7 @@ var Session = { getEffectiveUser: function () { return { getEmail: function () {
   if (!saved) {
     mockReset_();
     MOCK.db['설정'].forEach(function (r) { if (r['항목'] === '관리자') r['값'] = '(예시) 홍길동T'; });
-    setProp_('ADMIN_SALT', 'preview');
-    setProp_('ADMIN_HASH', sha256_('preview' + PREVIEW_PW));
+    MOCK.db['설정'].forEach(function (r) { if (r['항목'] === '관리자비밀번호') r['값'] = PREVIEW_PW; });
     var t = today_(), A = { device: DEVICES[0][0] }, B = { device: DEVICES[1][0] };
     var seed = [
       [A, { roomId: 'A102', date: t, periods: ['P3', 'P4'], school: ['고'], unit: '진로상담부', name: '홍길동', purpose: '(예시) 진로 특강', people: 90 }],
@@ -2686,7 +2668,7 @@ function viewHelp() {
   h += helpSec('mine', 6, '내 예약 찾기·수정·취소', '로그인이 없으므로, 내 예약은 학교·부서·이름·기간으로 찾아봅니다.', [
     '<b>내 예약</b> 메뉴에서 사용 학교, 부서, 신청자 이름, 기간 가운데 아는 것을 넣고 <b>예약 찾기</b>를 누릅니다. 부서와 이름은 일부만 적어도 됩니다.',
     '<b>이 휴대폰·컴퓨터에서 신청한 예약</b>은 찾지 않아도 처음부터 나옵니다. 달력의 날짜를 누르면 그날의 예약이 보입니다.',
-    '<b>수정·취소</b>는 그 예약을 <b>신청한 기기에서만</b> 할 수 있습니다. 다른 기기에서 신청했거나 브라우저 기록을 지웠다면 관리자에게 요청합니다.',
+    '찾은 예약은 <b>누구나 수정·취소</b>할 수 있습니다. 다른 사람의 예약을 바꾸기 전에는 꼭 확인해 주세요. 누가 언제 바꿨는지는 기록에 남습니다.',
     '반복 예약 취소는 이 날만 / 이 날부터 / 이 공간의 반복 전체 / 함께 신청한 공간 모두 가운데 고릅니다. 지난 날짜는 그대로 남습니다.'
   ], demo('예약 찾기', '<label class="f" style="margin-top:0">사용 학교</label><div class="chips">' + chip('중') + chip('고', true) + chip('법인') + '</div>' +
       '<div class="row" style="align-items:flex-end"><div class="grow"><label class="f">사용 부서</label><div class="in hin">교육과정</div></div>' +
@@ -2710,7 +2692,7 @@ function viewHelp() {
       '<p class="sub" style="margin:8px 0 0">색이 진할수록 예약된 교시가 많은 날</p>'));
 
   if (admin) {
-    h += helpSec('admin', 9, '관리자', '관리 메뉴는 관리자 비밀번호로 로그인해야 열립니다. 로그인은 6시간 동안 유지됩니다.', [
+    h += helpSec('admin', 9, '관리자', '관리 메뉴는 관리자 비밀번호로 로그인해야 열립니다. 비밀번호는 구글시트 [설정] 탭의 "관리자비밀번호"에서 고칩니다.', [
       '<b>겹침</b>: 같은 시간에 허용 수보다 많이 잡힌 예약입니다. 한쪽을 취소하거나 대장을 고칩니다.',
       '<b>전체 예약</b>·<b>기록</b>: 기간을 정해 모든 예약을 보고, 누가 무엇을 바꿨는지 변경 전후와 함께 확인합니다.',
       '<b>통계</b>: 기간과 공간을 골라 공간별·학교별·요일별·월별·교시별·부서별·내용별 사용 현황을 보고, 원하는 항목만 골라 <b>PDF 파일로 내려받습니다</b>.',
@@ -2727,7 +2709,6 @@ function bookingActs(b, admin) {
   var live = b.status === '확정' || b.status === '승인대기';
   if (!live || (!admin && b.date < S.init.today)) return '';
   if (b.ledger && S.init.ledgerOn) return '<span class="badge dim">대장에서 수정</span>';
-  if (!admin && !b.mine && !S.init.me.admin) return '<span class="badge dim">신청한 기기에서만 수정·취소</span>';
   return '<button type="button" class="btn small" data-a="edit" data-id="' + esc(b.id) + '">수정</button>' +
     '<button type="button" class="btn small danger" data-a="cancel" data-id="' + esc(b.id) + '">취소</button>';
 }
@@ -2812,8 +2793,8 @@ function viewMine() {
   var past = groups.filter(function (g) { return !g.items.some(isLive); }).reverse();
   h += '<h3 class="sec" style="margin-top:6px">' + (q.on ? '찾은 예약 ' + q.total + '건' + (q.total > S.mine.length ? ' (앞의 ' + S.mine.length + '건만 표시)' : '')
     : '이 기기에서 신청한 예약 · 다가오는 것 ' + now.length + '건') + '</h3>' +
-    '<p class="sub" style="margin-bottom:10px">' + (q.on ? esc(q.rfrom) + ' ~ ' + esc(q.rto) + ' · 수정·취소는 그 예약을 신청한 기기에서만 할 수 있어요. 다른 기기에서 신청했다면 관리자에게 요청해 주세요.'
-      : '이 휴대폰·컴퓨터에서 신청한 예약은 찾지 않아도 여기에 나오고, 바로 수정·취소할 수 있어요.') + '</p>';
+    '<p class="sub" style="margin-bottom:10px">' + (q.on ? esc(q.rfrom) + ' ~ ' + esc(q.rto) + ' · 찾은 예약은 바로 수정·취소할 수 있어요. 다른 사람의 예약을 바꾸기 전에는 꼭 확인해 주세요. 바꾼 내용은 기록에 남아요.'
+      : '이 휴대폰·컴퓨터에서 신청한 예약은 찾지 않아도 여기에 나와요.') + '</p>';
   if (!S.mine.length) {
     return h + '<div class="card empty">' + (q.on ? '조건에 맞는 예약이 없어요. 부서나 이름을 짧게 적어 보세요.' : '이 기기에서 신청한 예약이 없어요. 위에서 부서나 이름으로 찾아보세요.') +
       '<br><button type="button" class="btn primary" style="margin-top:14px" data-a="view" data-v="map">공간 둘러보기</button></div>';
@@ -2834,7 +2815,7 @@ function viewLogin() {
     '<label class="f" for="login-pw">관리자 비밀번호</label><input class="in" id="login-pw" type="password" data-login="1" autocomplete="current-password" value="' + esc(L.pw) + '">' +
     (L.err ? '<div class="err" role="alert">' + esc(L.err) + '</div>' : '') +
     '<button class="btn primary wide" style="margin-top:14px"' + (L.busy ? ' disabled' : '') + '>' + (L.busy ? '확인하는 중…' : '로그인') + '</button>' +
-    '<p class="sub" style="margin-top:10px">5번 틀리면 10분 동안 막혀요. 로그인은 6시간 동안 유지돼요.</p></form>';
+    '<p class="sub" style="margin-top:10px">5번 틀리면 10분 동안 막혀요. 로그인은 6시간 동안 유지돼요. 비밀번호는 구글시트 [설정] 탭의 "관리자비밀번호"에서 고쳐요.</p></form>';
 }
 function viewAdmin() {
   if (!S.init.me.admin) return viewLogin();

@@ -18,14 +18,20 @@ function server(user) {
   const raw = loadServer();
   raw.MOCK.now = '2026-11-12T10:00:00';
   raw.MOCK.user = user || TEACHER;
-  raw.setProp_('ADMIN_SALT', 'salt');
-  raw.setProp_('ADMIN_HASH', raw.sha256_('salt' + ADMIN_PW));
+  // 관리자 비밀번호는 [설정] 탭의 '관리자비밀번호' 값
+  const setPw = (pw) => {
+    if (!raw.MOCK.db) raw.mockReset_();
+    const row = raw.MOCK.db['설정'].find((r) => r['항목'] === '관리자비밀번호');
+    if (row) row['값'] = pw; else raw.MOCK.db['설정'].push({ '항목': '관리자비밀번호', '값': pw, '설명': '' });
+  };
+  raw.setPw = setPw;
+  setPw(ADMIN_PW);
   let token = '';
   const who = () => {
     const u = raw.MOCK.user;
     const w = { device: 'dev-' + u.split('@')[0] };
     if (u === ADMIN) {
-      if (!token) token = raw.adminLogin(w, ADMIN_PW).token;
+      if (!token || !raw.me_({ device: w.device, token }).admin) { setPw(ADMIN_PW); token = raw.adminLogin(w, ADMIN_PW).token; }
       w.token = token;
     }
     return w;
@@ -139,28 +145,38 @@ test('반복 예약 검증: 요일 없음, 종료일 오류, 횟수 초과', () 
   assert.throws(() => s.createBooking(base({ repeat: { until: '2027-05-01', weekdays: [1, 2, 3, 4, 5] } })), /80회까지만/);
 });
 
-test('수정·취소는 신청한 기기와 관리자만, 모든 변경은 기록에 남는다', () => {
+test('예약은 누구나 수정·취소할 수 있고, 모든 변경은 누가 했는지와 함께 기록에 남는다', () => {
   const s = server(STUDENT);
   s.createBooking(base());
   const id = plain(s.myBookings())[0].id;
 
-  s.MOCK.user = STUDENT2;
-  assert.throws(() => s.updateBooking(id, base()), /이 기기에서 신청한 예약만/);
-  assert.throws(() => s.cancelBooking(id, 'one'), /이 기기에서 신청한 예약만/);
-
+  s.MOCK.user = STUDENT2;   // 신청하지 않은 다른 기기
+  assert.equal(plain(s.getDay('2026-11-13'))[0].mine, false);
+  assert.equal(s.updateBooking(id, base({ purpose: '발표 연습', name: '다른사람' })).status, '확정');
   s.MOCK.user = STUDENT;
-  assert.equal(s.updateBooking(id, base({ purpose: '발표 연습' })).status, '확정');
-  assert.equal(s.updateBooking(id, base({ periods: ['P7'] })).status, '확정', '교시를 바꿔도 확정 그대로');
-  s.cancelBooking(id, 'one');
+  assert.equal(s.updateBooking(id, base({ periods: ['P7'] })).status, '확정');
+  s.MOCK.user = STUDENT2;
+  assert.equal(s.cancelBooking(id, 'one').cancelled, 1);
   assert.throws(() => s.cancelBooking(id, 'one'), /이미 취소/);
   assert.equal(plain(s.getDay('2026-11-13')).length, 0);
 
   s.MOCK.user = ADMIN;
   const h = plain(s.getHistory(''));
   assert.deepEqual(h.map((x) => x.action), ['취소', '수정', '수정', '신청']);
+  assert.deepEqual(h.map((x) => x.device), ['dev-student2', 'dev-student', 'dev-student2', 'dev-student'], '어느 기기에서 했는지 남는다');
   assert.equal(JSON.parse(h[1].before)['교시'], 'P5,P6');
   assert.equal(JSON.parse(h[1].after)['교시'], 'P7');
-  assert.equal(plain(s.getHistory('발표')).length >= 1, true);
+  assert.equal(JSON.parse(h[2].after)['신청자'], '다른사람');
+  assert.equal(s.MOCK.db['예약'][0]['처리자'], '다른 기기', '신청한 기기가 아닌 곳에서 취소했음을 남긴다');
+
+  // 지난 날짜의 예약은 관리자만 바꿀 수 있다
+  s.MOCK.user = TEACHER;
+  s.createBooking(base({ date: '2026-11-12', periods: ['P1'] }));
+  const old = plain(s.myBookings()).find((b) => b.date === '2026-11-12');
+  s.MOCK.now = '2026-11-20T10:00:00';
+  assert.throws(() => s.cancelBooking(old.id, 'one'), /지난 예약은 바꿀 수 없어요/);
+  s.MOCK.user = ADMIN;
+  assert.equal(s.cancelBooking(old.id, 'one').cancelled, 1);
 });
 
 test('수정할 때 다른 예약과 겹치면 막는다', () => {
@@ -200,11 +216,18 @@ test('관리 기능은 관리자 비밀번호로 로그인해야 쓸 수 있다'
   raw.adminLogout(mine);
   assert.equal(raw.me_(mine).admin, false);
 
-  // 비밀번호를 정하지 않았으면 로그인할 수 없고, [설정] 탭에 적어 둔 값으로도 로그인할 수 있다
-  raw.MOCK.props = {};
-  assert.throws(() => raw.adminLogin({ device: 'dev-q' }, 'anything'), /아직 정해지지 않았어요/);
-  raw.MOCK.db['설정'].push({ '항목': '관리자비밀번호', '값': 'sheet-pw', '설명': '' });
-  assert.ok(raw.adminLogin({ device: 'dev-q' }, 'sheet-pw').token);
+  // 비밀번호는 [설정] 탭에서 고친다: 바꾸면 이전 로그인은 모두 풀리고, 새 비밀번호로만 들어간다
+  const keep = { device: 'dev-k' };
+  keep.token = raw.adminLogin(keep, ADMIN_PW).token;
+  assert.equal(raw.me_(keep).admin, true);
+  raw.setPw('new-password');
+  assert.equal(raw.me_(keep).admin, false, '비밀번호를 바꾸면 로그아웃된다');
+  assert.throws(() => raw.adminLogin({ device: 'dev-q' }, ADMIN_PW), /맞지 않아요/);
+  assert.ok(raw.adminLogin({ device: 'dev-q' }, 'new-password').token);
+  // 비워 두면 관리 메뉴를 쓸 수 없다
+  raw.setPw('');
+  assert.throws(() => raw.adminLogin({ device: 'dev-r' }, ''), /아직 정해지지 않았어요.*설정.*관리자비밀번호/);
+  assert.throws(() => raw.adminLogin({ device: 'dev-r' }, 'anything'), /아직 정해지지 않았어요/);
 });
 
 test('추천: 빈 시간·인원·용도·시설로 고르고 이유를 붙인다', () => {
@@ -441,8 +464,6 @@ test('반복·일괄 예약 한꺼번에 취소: 이 공간 전체, 함께 신�
   assert.equal(s.cancelBooking(one.id, 'group').cancelled, 4, '함께 신청한 공간까지: 오늘 이후(11/27, 12/4) × 2곳');
   const past = plain(s.myBookings()).filter((b) => b.roomId === 'A204' && b.status === '확정');
   assert.deepEqual(past.map((b) => b.date), ['2026-11-13', '2026-11-20'], '지난 날짜는 기록으로 남긴다');
-  s.MOCK.user = STUDENT;
-  assert.throws(() => s.cancelBooking(one.id, 'group'), /이 기기에서 신청한 예약만/);
 });
 
 test('학교 구분 짐작과 화면 설정(관리자 이름)', () => {
@@ -503,7 +524,7 @@ test('통계: 관리자만 기간 안의 모든 공간 예약을 받는다', () 
   assert.throws(() => s.getStats('2026-01-01', '2027-12-31'), /1년까지만/);
 });
 
-test('예약 찾기: 사용 학교·부서·이름·기간으로 찾는다 (다른 기기에서도 보이지만 고치지는 못한다)', () => {
+test('예약 찾기: 사용 학교·부서·이름·기간으로 찾고, 찾은 예약은 누구나 고친다', () => {
   const s = server(TEACHER);
   s.createBooking(base({ unit: '교육과정부', name: '홍길동' }));
   s.createBooking(base({ roomId: 'A203', date: '2026-11-20', unit: '1학년부', name: '김철수', school: ['중'] }));
@@ -526,7 +547,7 @@ test('예약 찾기: 사용 학교·부서·이름·기간으로 찾는다 (다�
 
   const hit = plain(s.searchBookings({ unit: '교육과정부' })).list[0];
   assert.equal(hit.mine, false);
-  assert.throws(() => s.cancelBooking(hit.id, 'one'), /이 기기에서 신청한 예약만/);
+  assert.equal(s.updateBooking(hit.id, base({ unit: '교육과정부', name: '홍길동', purpose: '찾아서 고침' })).status, '확정', '찾은 예약은 누구나 고칠 수 있다');
   s.MOCK.user = TEACHER;
   assert.equal(plain(s.searchBookings({ unit: '교육과정부' })).list[0].mine, true);
   s.MOCK.user = ADMIN;

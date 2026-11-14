@@ -39,7 +39,7 @@ function settings_() {
 /* ---------- 누가 부르는가 ----------
  * 로그인 없이 씁니다. 화면이 모든 호출에 who = {device, token} 을 함께 보냅니다.
  *   device: 브라우저마다 한 번 만들어 기억해 두는 임의의 번호. 사람이 아니라 기기를 구분합니다.
- *   token : 관리자 비밀번호로 로그인하면 받는 임시 열쇠 (6시간).
+ *   token : 관리자 비밀번호로 로그인하면 받는 임시 열쇠 (6시간). 관리자 비밀번호는 [설정] 탭의 '관리자비밀번호'.
  */
 
 var ADMIN_SESSION_SEC = 21600;   // 관리자 로그인 유지 시간 (6시간)
@@ -50,18 +50,17 @@ function me_(who) {
   who = who || {};
   var device = String(who.device || '').replace(/[^\w-]/g, '').slice(0, 40);
   var token = String(who.token || '').replace(/[^\w-]/g, '').slice(0, 60);
-  return { device: device, admin: !!token && cacheGet_('adm_' + token) === '1', name: '' };
+  // 로그인할 때의 비밀번호가 지금 시트의 비밀번호와 같아야 관리자입니다 (시트에서 비밀번호를 바꾸면 모두 로그아웃됨).
+  var stamp = token ? cacheGet_('adm_' + token) : '';
+  var pw = stamp ? adminPassword_() : '';
+  return { device: device, admin: !!stamp && !!pw && stamp === sha256_(pw), name: '' };
 }
 
-/** 저장된 관리자 비밀번호와 맞는지. 비밀번호는 [공간대여 → 관리자 비밀번호 정하기] 메뉴로 정합니다. */
-function adminPasswordOk_(pw) {
-  pw = String(pw == null ? '' : pw);
-  var hash = prop_('ADMIN_HASH'), salt = prop_('ADMIN_SALT') || '';
-  if (hash) return !!pw && sha256_(salt + pw) === hash;
-  // 메뉴로 정하지 않았으면 [설정] 탭의 '관리자비밀번호' 값을 씁니다 (시트를 볼 수 있는 사람에게 보이므로 메뉴 쪽을 권합니다).
-  var plain = '';
-  readTab_('설정').forEach(function (r) { if (String(r['항목']).trim() === '관리자비밀번호') plain = String(r['값']).trim(); });
-  return !!plain && pw === plain;
+/** 관리자 비밀번호: [설정] 탭의 '관리자비밀번호' 값. 시트에서 바로 고칠 수 있습니다. */
+function adminPassword_() {
+  var pw = '';
+  readTab_('설정').forEach(function (r) { if (String(r['항목']).trim() === '관리자비밀번호') pw = String(r['값']).trim(); });
+  return pw;
 }
 
 /** 관리자 로그인. 맞으면 {token} 을 돌려줍니다. */
@@ -72,10 +71,11 @@ function adminLogin(who, password) {
   if (cacheGet_(lockKey) || +cacheGet_('admfail_all') >= 60) {
     throw new Error('비밀번호를 여러 번 틀려서 잠시 막혔어요. 10분쯤 뒤에 다시 시도해 주세요.');
   }
-  if (!prop_('ADMIN_HASH') && !readTab_('설정').some(function (r) { return String(r['항목']).trim() === '관리자비밀번호' && String(r['값']).trim(); })) {
-    throw new Error('관리자 비밀번호가 아직 정해지지 않았어요. 구글시트 메뉴 [공간대여 → 관리자 비밀번호 정하기]에서 정해 주세요.');
+  var real = adminPassword_();
+  if (!real) {
+    throw new Error("관리자 비밀번호가 아직 정해지지 않았어요. 구글시트 [설정] 탭의 '관리자비밀번호' 값에 비밀번호를 적어 주세요.");
   }
-  if (!adminPasswordOk_(password)) {
+  if (String(password == null ? '' : password) !== real) {
     var n = (+cacheGet_(failKey) || 0) + 1;
     cachePut_('admfail_all', String((+cacheGet_('admfail_all') || 0) + 1), ADMIN_LOCK_SEC);
     if (n >= ADMIN_MAX_FAILS) {
@@ -88,7 +88,7 @@ function adminLogin(who, password) {
   }
   cacheRemove_(failKey);
   var token = newId_() + newId_();
-  cachePut_('adm_' + token, '1', ADMIN_SESSION_SEC);
+  cachePut_('adm_' + token, sha256_(real), ADMIN_SESSION_SEC);
   return { token: token, hours: ADMIN_SESSION_SEC / 3600 };
 }
 
@@ -536,12 +536,12 @@ function findBooking_(all, id) {
   return b;
 }
 
-/** 고칠 수 있는 사람: 관리자, 또는 그 예약을 신청한 기기 */
+/**
+ * 예약은 누구나 고치고 취소할 수 있습니다 (로그인도 예약 비밀번호도 없음). 누가 했는지는 기록에 이름과 기기 번호로 남습니다.
+ * 지난 날짜의 예약만 관리자가 아니면 바꿀 수 없습니다.
+ */
 function requireOwner_(b, me, today) {
   if (me.admin) return;
-  if (!b.device || b.device !== me.device) {
-    throw new Error('이 기기에서 신청한 예약만 바꿀 수 있어요. 다른 기기에서 신청했다면 그 기기에서 하거나 관리자에게 요청해 주세요.');
-  }
   if (b.date < today) throw new Error('지난 예약은 바꿀 수 없어요.');
 }
 
@@ -609,7 +609,7 @@ function cancelBooking(who, id, scope) {
       var before = JSON.parse(JSON.stringify(x));
       x.status = '취소';
       x.updatedAt = now;
-      x.handler = me.admin && x.device !== me.device ? '관리자' : '';
+      x.handler = me.admin ? '관리자' : (x.device && x.device === me.device ? '' : '다른 기기');   // 신청한 기기가 아닌 곳에서 취소했는지
       return logRow_(me, '취소', before, x, ctx);
     });
     updateRows_('예약', targets.map(bookingRow_));
