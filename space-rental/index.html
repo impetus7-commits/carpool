@@ -10,29 +10,30 @@
 <link href="https://fonts.googleapis.com/css2?family=Hahmlet:wght@600;700&family=IBM+Plex+Sans+KR:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
 :root {
-  /* 그린 파스텔 톤 */
-  --bg: #f0f8f1; --card: #fcfefb; --ink: #1c3a29; --sub: #567062; --line: #cde3d2; --soft: #e2f1e5;
-  --brand: #1c7c45; --brand-ink: #ffffff; --brand-soft: #d5efdc;
-  --top-bg: #9fd8b1; --top-ink: #0f3520; --top-on: rgba(255, 255, 255, .55);
-  --free: #1c7c45; --free-bg: #dcf3e2;
+  /* 진한 남색 그라데이션 톤: 왼쪽 위 #17325a → 오른쪽 아래 #24508a (135°) */
+  --grad: linear-gradient(135deg, #17325a 0%, #24508a 100%);
+  --bg: #eef2f8; --card: #fbfcfe; --ink: #14243d; --sub: #56657c; --line: #d3dbe8; --soft: #e6ecf5;
+  --brand: #1f4277; --brand-ink: #ffffff; --brand-soft: #dde6f3;
+  --top-bg: var(--grad); --top-ink: #ffffff; --top-on: rgba(255, 255, 255, .18);
+  --free: #1f7350; --free-bg: #dcf1e5;
   --busy: #b0463c; --busy-bg: #fbe2dd;
   --wait: #866000; --wait-bg: #fcefc6;
-  --mine: #2a6a8c; --mine-bg: #dcecf6;
-  --grid: rgba(28, 124, 69, .08);
-  --shadow: 0 1px 2px rgba(28, 58, 41, .05), 0 8px 24px rgba(28, 58, 41, .08);
+  --mine: #6d45a8; --mine-bg: #ece3f8;
+  --grid: rgba(31, 66, 119, .07);
+  --shadow: 0 1px 2px rgba(20, 36, 61, .06), 0 8px 24px rgba(20, 36, 61, .09);
   --display: 'Hahmlet', 'Noto Serif KR', serif;
   --body: 'IBM Plex Sans KR', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
 }
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #0f1913; --card: #17231b; --ink: #e5f2e8; --sub: #9bb2a3; --line: #2a3d30; --soft: #203026;
-    --brand: #8fd8a8; --brand-ink: #0e2a19; --brand-soft: #1f3b2a;
-    --top-bg: #1b3526; --top-ink: #dcf3e2; --top-on: rgba(143, 216, 168, .2);
-    --free: #84d6a2; --free-bg: #173624;
+    --bg: #0c1424; --card: #131e33; --ink: #e6ecf6; --sub: #9aa8bf; --line: #263552; --soft: #1b2842;
+    --brand: #8fb4ec; --brand-ink: #0d1a30; --brand-soft: #1c2d4b;
+    --top-bg: var(--grad); --top-ink: #ffffff; --top-on: rgba(255, 255, 255, .16);
+    --free: #7fd3a2; --free-bg: #15332a;
     --busy: #f29a8d; --busy-bg: #40221e;
     --wait: #e8c466; --wait-bg: #3a3012;
-    --mine: #8fc6e8; --mine-bg: #1c3344;
-    --grid: rgba(143, 216, 168, .07);
+    --mine: #c4a8f0; --mine-bg: #2c2244;
+    --grid: rgba(143, 180, 236, .07);
     --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 8px 24px rgba(0, 0, 0, .35);
   }
 }
@@ -45,7 +46,7 @@ h1, h2, h3, p { margin: 0; }
 :focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; border-radius: 6px; }
 
 /* ----- 머리 ----- */
-.top { position: sticky; top: 0; z-index: 20; background: var(--top-bg); color: var(--top-ink); border-bottom: 1px solid var(--line); padding: max(10px, env(safe-area-inset-top)) 16px 10px; }
+.top { position: sticky; top: 0; z-index: 20; background: var(--top-bg); color: var(--top-ink); box-shadow: 0 2px 10px rgba(16, 32, 58, .25); padding: max(10px, env(safe-area-inset-top)) 16px 10px; }
 .top-in { max-width: 1180px; margin: 0 auto; display: flex; align-items: center; gap: 16px; }
 .brand { min-width: 0; flex: 1; }
 .brand small { display: block; font-size: 12px; letter-spacing: .08em; opacity: .8; }
@@ -111,6 +112,7 @@ main { max-width: 1180px; margin: 0 auto; padding: 16px 16px 110px; }
 .sub { color: var(--sub); font-size: 14px; }
 .btn { border: 1px solid var(--line); background: var(--card); border-radius: 10px; padding: 10px 14px; font-weight: 500; min-height: 44px; }
 .btn.primary { background: var(--brand); color: var(--brand-ink); border-color: var(--brand); font-weight: 600; }
+@media (prefers-color-scheme: light) { .btn.primary { background: var(--grad); border-color: #1d4070; } .fl.on { background: var(--grad); } }
 .btn.danger { color: var(--busy); border-color: var(--busy); }
 .btn.small { min-height: 36px; padding: 6px 12px; font-size: 14px; }
 .btn.wide { width: 100%; }
@@ -297,10 +299,10 @@ input.in, select.in { width: 100%; border: 1px solid var(--line); background: va
 
 /* ----- 통계 보고서 (화면과 PDF 공용) ----- */
 .report { display: grid; gap: 12px; }
-.report.print { --card: #ffffff; --ink: #1c3a29; --sub: #567062; --line: #cde3d2; --soft: #e9f4ec; --brand: #1c7c45; --brand-ink: #ffffff; --brand-soft: #d5efdc;
-  --busy: #b0463c; --wait: #b98a16; --mine: #2a6a8c; background: #fff; color: var(--ink); font-family: var(--body); gap: 0; }
+.report.print { --card: #ffffff; --ink: #14243d; --sub: #56657c; --line: #d3dbe8; --soft: #e9eef6; --brand: #1f4277; --brand-ink: #ffffff; --brand-soft: #dde6f3;
+  --busy: #b0463c; --wait: #b98a16; --mine: #6d45a8; background: #fff; color: var(--ink); font-family: var(--body); gap: 0; }
 .report.print > * { margin-bottom: 0; border-radius: 0; box-shadow: none; }
-.rhead { background: var(--brand); color: var(--brand-ink); border-radius: 16px; padding: 18px 20px; }
+.rhead { background: var(--grad); color: #ffffff; border-radius: 16px; padding: 18px 20px; }
 .rhead p { font-size: 13px; opacity: .85; }
 .rhead h3 { font: 700 26px/1.25 var(--display); margin: 2px 0 10px; }
 .rmeta { display: flex; gap: 6px 18px; flex-wrap: wrap; font-size: 13px; }

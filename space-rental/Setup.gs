@@ -102,7 +102,7 @@ function setup() {
       }
     }
     var width = sh.getLastColumn();
-    sh.getRange(1, 1, 1, width).setFontWeight('bold').setBackground('#1c7c45').setFontColor('#ffffff');
+    sh.getRange(1, 1, 1, width).setFontWeight('bold').setBackground('#1f4277').setFontColor('#ffffff');
     sh.setFrozenRows(1);
     if (sh.getLastRow() === 1 && SAMPLE_[name]) {
       sh.getRange(2, 1, SAMPLE_[name].length, head.length).setValues(SAMPLE_[name]);
