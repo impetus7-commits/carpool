@@ -233,7 +233,7 @@ function getInit(who) {
 function getDay(who, date) {
   if (!isDate_(date)) throw new Error('날짜가 올바르지 않아요.');
   var me = me_(who);
-  return bookings_().filter(function (b) { return b.date === date && isActive_(b); })
+  return bookings_().filter(function (b) { return b.date === date && isActive_(b); }).sort(byCreated_)
     .map(function (b) { return publicBooking_(b, me); });
 }
 
@@ -677,9 +677,14 @@ function getStats(who, from, to) {
   var me = requireAdmin_(who);
   if (!isDate_(from) || !isDate_(to) || to < from) throw new Error('기간이 올바르지 않아요.');
   if (toUtc_(to) - toUtc_(from) > 370 * 86400000) throw new Error('한 번에 1년까지만 볼 수 있어요.');
+  var order = periodOrder_(periods_());
   return bookings_().filter(function (b) { return isActive_(b) && b.date >= from && b.date <= to; })
+    .sort(byDateThenPeriod_(order))
     .map(function (b) { return publicBooking_(b, me); });
 }
+
+/** 먼저 신청한 것부터 (시트는 최근순으로 정렬돼 있으므로 순서를 따로 맞춥니다) */
+function byCreated_(a, b) { return a.createdAt < b.createdAt ? -1 : a.createdAt > b.createdAt ? 1 : 0; }
 
 /** 관리자가 화면에서 누르는 "지금 가져오기" */
 function runLedgerSync(who) {
@@ -691,7 +696,11 @@ function runLedgerSync(who) {
 function getHistory(who, q) {
   requireAdmin_(who);
   var word = String(q || '').trim().toLowerCase();
-  var rows = readTab_('기록').slice().reverse();
+  // 새것부터 (시트의 줄 순서와 상관없이 일시로 정렬)
+  var rows = readTab_('기록').map(function (r, i) { return [r, i]; }).sort(function (a, b) {
+    var x = a[0]['일시'] || '', y = b[0]['일시'] || '';
+    return x !== y ? (x < y ? 1 : -1) : b[1] - a[1];
+  }).map(function (p) { return p[0]; });
   if (word) {
     rows = rows.filter(function (r) {
       return [r['일시'], r['이메일'], r['기기'], r['이름'], r['동작'], r['공간'], r['날짜'], r['내용']]

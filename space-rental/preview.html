@@ -846,9 +846,16 @@ var SAMPLE_ = {
   ]
 };
 
+/** [예약]·[기록] 탭을 최근 것이 위로 오도록 다시 정렬합니다. 시트에서 직접 고친 뒤에 쓰세요. */
+function sortSheets() {
+  withLock_(function () { sortTab_('예약'); sortTab_('기록'); });
+  try { SpreadsheetApp.getActiveSpreadsheet().toast('예약·기록 탭을 최근순으로 정렬했습니다.'); } catch (e) {}
+}
+
 function onOpen() {
   SpreadsheetApp.getUi().createMenu('공간대여')
     .addItem('처음 설정 (탭 만들기)', 'setup')
+    .addItem('예약·기록 최근순 정렬', 'sortSheets')
     .addToUi();
 }
 
@@ -931,6 +938,9 @@ function setup() {
   var first = ss.getSheetByName('시트1') || ss.getSheetByName('Sheet1');
   if (first && first.getLastRow() === 0 && ss.getSheets().length > 1) ss.deleteSheet(first);
 
+  // 이미 들어 있는 예약·기록도 최근 것이 위로 오게 정렬합니다.
+  sortTab_('예약');
+  sortTab_('기록');
   SpreadsheetApp.flush();
   var made = ss.getSheets().map(function (s) { return s.getName(); }).join(', ');
   console.log('설정이 끝났습니다. 탭: ' + made);
@@ -1178,7 +1188,7 @@ function getInit(who) {
 function getDay(who, date) {
   if (!isDate_(date)) throw new Error('날짜가 올바르지 않아요.');
   var me = me_(who);
-  return bookings_().filter(function (b) { return b.date === date && isActive_(b); })
+  return bookings_().filter(function (b) { return b.date === date && isActive_(b); }).sort(byCreated_)
     .map(function (b) { return publicBooking_(b, me); });
 }
 
@@ -1622,9 +1632,14 @@ function getStats(who, from, to) {
   var me = requireAdmin_(who);
   if (!isDate_(from) || !isDate_(to) || to < from) throw new Error('기간이 올바르지 않아요.');
   if (toUtc_(to) - toUtc_(from) > 370 * 86400000) throw new Error('한 번에 1년까지만 볼 수 있어요.');
+  var order = periodOrder_(periods_());
   return bookings_().filter(function (b) { return isActive_(b) && b.date >= from && b.date <= to; })
+    .sort(byDateThenPeriod_(order))
     .map(function (b) { return publicBooking_(b, me); });
 }
+
+/** 먼저 신청한 것부터 (시트는 최근순으로 정렬돼 있으므로 순서를 따로 맞춥니다) */
+function byCreated_(a, b) { return a.createdAt < b.createdAt ? -1 : a.createdAt > b.createdAt ? 1 : 0; }
 
 /** 관리자가 화면에서 누르는 "지금 가져오기" */
 function runLedgerSync(who) {
@@ -1636,7 +1651,11 @@ function runLedgerSync(who) {
 function getHistory(who, q) {
   requireAdmin_(who);
   var word = String(q || '').trim().toLowerCase();
-  var rows = readTab_('기록').slice().reverse();
+  // 새것부터 (시트의 줄 순서와 상관없이 일시로 정렬)
+  var rows = readTab_('기록').map(function (r, i) { return [r, i]; }).sort(function (a, b) {
+    var x = a[0]['일시'] || '', y = b[0]['일시'] || '';
+    return x !== y ? (x < y ? 1 : -1) : b[1] - a[1];
+  }).map(function (p) { return p[0]; });
   if (word) {
     rows = rows.filter(function (r) {
       return [r['일시'], r['이메일'], r['기기'], r['이름'], r['동작'], r['공간'], r['날짜'], r['내용']]
@@ -1694,7 +1713,22 @@ function appendRows_(name, objs) {
     TABS_[name].forEach(function (h) { r[h] = o[h] == null ? '' : String(o[h]); });
     MOCK.db[name].push(r);
   });
+  sortTab_(name);
   if (MOCK.onSave) MOCK.onSave();
+}
+
+// Store.gs 와 같은 규칙: [예약]은 날짜·신청일시, [기록]은 일시 내림차순
+var SORT_KEYS_ = { '예약': ['날짜', '신청일시'], '기록': ['일시'] };
+function sortTab_(name) {
+  var keys = SORT_KEYS_[name];
+  if (!keys || !MOCK.db || !MOCK.db[name]) return;
+  MOCK.db[name] = MOCK.db[name].map(function (r, i) { return [r, i]; }).sort(function (a, b) {
+    for (var k = 0; k < keys.length; k++) {
+      var x = a[0][keys[k]] || '', y = b[0][keys[k]] || '';
+      if (x !== y) return x < y ? 1 : -1;
+    }
+    return a[1] - b[1];   // 같은 값이면 원래 순서 유지
+  }).map(function (p) { return p[0]; });
 }
 
 function updateRows_(name, list) {

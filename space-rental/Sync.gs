@@ -175,6 +175,7 @@ function syncRun_(tabs) {
   if (last > 1) sh.getRange(2, 1, last - 1, cols.length).clearContent();
   if (all.length) sh.getRange(2, 1, all.length, cols.length).setNumberFormat('@').setValues(all);
   delete tabCache_['예약'];
+  sortTab_('예약');
 
   // 4) 기록
   var ctx = { rooms: rooms, periods: periods };

@@ -40,7 +40,22 @@ function appendRows_(name, objs) {
     TABS_[name].forEach(function (h) { r[h] = o[h] == null ? '' : String(o[h]); });
     MOCK.db[name].push(r);
   });
+  sortTab_(name);
   if (MOCK.onSave) MOCK.onSave();
+}
+
+// Store.gs 와 같은 규칙: [예약]은 날짜·신청일시, [기록]은 일시 내림차순
+var SORT_KEYS_ = { '예약': ['날짜', '신청일시'], '기록': ['일시'] };
+function sortTab_(name) {
+  var keys = SORT_KEYS_[name];
+  if (!keys || !MOCK.db || !MOCK.db[name]) return;
+  MOCK.db[name] = MOCK.db[name].map(function (r, i) { return [r, i]; }).sort(function (a, b) {
+    for (var k = 0; k < keys.length; k++) {
+      var x = a[0][keys[k]] || '', y = b[0][keys[k]] || '';
+      if (x !== y) return x < y ? 1 : -1;
+    }
+    return a[1] - b[1];   // 같은 값이면 원래 순서 유지
+  }).map(function (p) { return p[0]; });
 }
 
 function updateRows_(name, list) {

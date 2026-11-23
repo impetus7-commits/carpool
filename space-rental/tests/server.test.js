@@ -556,3 +556,27 @@ test('예약 찾기: 사용 학교·부서·이름·기간으로 찾고, 찾은 
   assert.equal(h.name, '관리자');
   assert.equal(h.device, 'dev-admin');
 });
+
+test('구글시트: [예약]은 날짜, [기록]은 일시 내림차순으로 정렬돼 최근 것이 위에 온다', () => {
+  const s = server(TEACHER);
+  s.createBooking(base({ date: '2026-11-20' }));
+  s.MOCK.now = '2026-11-12T10:05:00';
+  s.createBooking(base({ date: '2026-11-13', periods: ['P1'] }));
+  s.MOCK.now = '2026-11-12T10:10:00';
+  s.createBooking(base({ date: '2026-12-01' }));
+  s.MOCK.now = '2026-11-12T10:15:00';
+  s.createBooking(base({ date: '2026-11-13', periods: ['P2'] }));
+  assert.deepEqual(plain(s.MOCK.db['예약'].map((r) => r['날짜'] + ' ' + r['교시'])),
+    ['2026-12-01 P5,P6', '2026-11-20 P5,P6', '2026-11-13 P2', '2026-11-13 P1'], '날짜 내림차순, 같은 날은 나중에 신청한 것이 위');
+  const times = plain(s.MOCK.db['기록'].map((r) => r['일시']));
+  assert.deepEqual(times, times.slice().sort().reverse(), '기록은 최근 일시가 위');
+  // 정렬된 뒤에도 수정·취소가 맞는 줄에 들어간다
+  const target = plain(s.myBookings()).find((b) => b.date === '2026-11-20');
+  s.cancelBooking(target.id, 'one');
+  assert.equal(s.MOCK.db['예약'].find((r) => r['날짜'] === '2026-11-20')['상태'], '취소');
+  assert.equal(s.MOCK.db['예약'].filter((r) => r['상태'] === '취소').length, 1);
+  // 화면에 주는 순서는 시트 순서와 상관없다
+  assert.deepEqual(plain(s.getDay('2026-11-13')).map((b) => b.periods[0]), ['P1', 'P2'], '같은 날은 먼저 신청한 것부터');
+  s.MOCK.user = ADMIN;
+  assert.equal(plain(s.getHistory(''))[0].action, '취소', '기록은 새것부터');
+});

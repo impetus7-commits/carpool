@@ -62,9 +62,16 @@ var SAMPLE_ = {
   ]
 };
 
+/** [예약]·[기록] 탭을 최근 것이 위로 오도록 다시 정렬합니다. 시트에서 직접 고친 뒤에 쓰세요. */
+function sortSheets() {
+  withLock_(function () { sortTab_('예약'); sortTab_('기록'); });
+  try { SpreadsheetApp.getActiveSpreadsheet().toast('예약·기록 탭을 최근순으로 정렬했습니다.'); } catch (e) {}
+}
+
 function onOpen() {
   SpreadsheetApp.getUi().createMenu('공간대여')
     .addItem('처음 설정 (탭 만들기)', 'setup')
+    .addItem('예약·기록 최근순 정렬', 'sortSheets')
     .addToUi();
 }
 
@@ -147,6 +154,9 @@ function setup() {
   var first = ss.getSheetByName('시트1') || ss.getSheetByName('Sheet1');
   if (first && first.getLastRow() === 0 && ss.getSheets().length > 1) ss.deleteSheet(first);
 
+  // 이미 들어 있는 예약·기록도 최근 것이 위로 오게 정렬합니다.
+  sortTab_('예약');
+  sortTab_('기록');
   SpreadsheetApp.flush();
   var made = ss.getSheets().map(function (s) { return s.getName(); }).join(', ');
   console.log('설정이 끝났습니다. 탭: ' + made);

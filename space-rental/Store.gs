@@ -68,6 +68,28 @@ function appendRows_(name, objs) {
   if (need > 0) sh.insertRowsAfter(sh.getMaxRows(), need);
   sh.getRange(start, 1, vals.length, head.length).setNumberFormat('@').setValues(vals);
   delete tabCache_[name];
+  sortTab_(name);
+}
+
+/**
+ * [예약]·[기록] 탭은 최근 것이 위로 오도록 내림차순으로 정렬해 둡니다.
+ *   예약: 날짜 → 신청일시 내림차순,  기록: 일시 내림차순
+ * 줄을 덧붙일 때마다 자동으로 정렬하고, 시트에서 직접 고친 뒤에는 메뉴 [공간대여 → 예약·기록 최근순 정렬]로 다시 정렬합니다.
+ */
+var SORT_KEYS_ = { '예약': ['날짜', '신청일시'], '기록': ['일시'] };
+
+function sortTab_(name) {
+  var keys = SORT_KEYS_[name];
+  if (!keys) return;
+  var sh = sheet_(name);
+  var last = sh.getLastRow();
+  if (last < 3) return;
+  var head = headers_(sh);
+  var spec = keys.map(function (k) { return head.indexOf(k); }).filter(function (i) { return i >= 0; })
+    .map(function (i) { return { column: i + 1, ascending: false }; });
+  if (!spec.length) return;
+  sh.getRange(2, 1, last - 1, head.length).sort(spec);
+  delete tabCache_[name];
 }
 
 /** list = [{_row, 머리글: 새 값, …}] — 적힌 머리글의 칸만 바꿉니다. */
