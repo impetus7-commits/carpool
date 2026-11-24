@@ -129,6 +129,10 @@ main { max-width: 1180px; margin: 0 auto; padding: 16px 16px 110px; }
 .badge.no { background: var(--busy-bg); color: var(--busy); }
 .badge.dim { background: var(--soft); color: var(--sub); }
 .notice { background: var(--brand-soft); border-radius: 12px; padding: 10px 14px; font-size: 14px; margin-bottom: 14px; }
+.notices { display: flex; flex-wrap: wrap; gap: 6px 20px; align-items: baseline; }
+.notices .nbusy { color: var(--sub); }
+.notices .nbusy::before { content: 'ⓘ '; }
+@media (min-width: 900px) { .notices .nbusy { padding-right: 20px; border-right: 1px solid var(--line); } }
 .notice.warn { background: var(--wait-bg); color: var(--wait); }
 .err { background: var(--busy-bg); color: var(--busy); border-radius: 10px; padding: 10px 12px; font-size: 14px; margin: 10px 0; }
 .empty { text-align: center; color: var(--sub); padding: 40px 16px; }
@@ -711,9 +715,9 @@ function render() {
 function viewMap() {
   var me = S.init.me, st = S.init.settings;
   var h = '';
-  if (st.notice) {
-    h += '<div class="notice">' + esc(st.notice) + '</div>';
-  }
+  // 왼쪽: 동시 접속 안내(늘 표시), 오른쪽: [설정] 탭의 안내문
+  h += '<div class="notice notices"><span class="nbusy">사이트 동시 접속자가 많을 경우 처리가 어려울 수 있으니, 잠시 후 사용해 주시면 됩니다.</span>' +
+    (st.notice ? '<span class="nmain">' + esc(st.notice) + '</span>' : '') + '</div>';
   h += '<section class="ctl">' + dateBar('date', S.date) +
     '<div class="chips scroll" id="periodchips" role="group" aria-label="교시 고르기">' +
     '<button type="button" class="chip ' + (S.period === 'all' ? 'on' : '') + '" data-a="period" data-p="all" aria-pressed="' + (S.period === 'all') + '">하루 전체</button>' +
