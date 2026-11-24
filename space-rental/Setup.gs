@@ -68,6 +68,11 @@ function sortSheets() {
   try { SpreadsheetApp.getActiveSpreadsheet().toast('예약·기록 탭을 최근순으로 정렬했습니다.'); } catch (e) {}
 }
 
+/** 시트에서 직접 고치면 그 탭의 읽기 캐시를 바로 지워, 웹 화면에 곧바로 반영되게 합니다. */
+function onEdit(e) {
+  try { readCacheDrop_(e.range.getSheet().getName()); } catch (err) {}
+}
+
 function onOpen() {
   SpreadsheetApp.getUi().createMenu('공간대여')
     .addItem('처음 설정 (탭 만들기)', 'setup')
@@ -154,6 +159,7 @@ function setup() {
   var first = ss.getSheetByName('시트1') || ss.getSheetByName('Sheet1');
   if (first && first.getLastRow() === 0 && ss.getSheets().length > 1) ss.deleteSheet(first);
 
+  ['예약', '공간', '교시', '설정'].forEach(readCacheDrop_);
   // 이미 들어 있는 예약·기록도 최근 것이 위로 오게 정렬합니다.
   sortTab_('예약');
   sortTab_('기록');

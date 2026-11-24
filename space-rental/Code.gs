@@ -226,6 +226,7 @@ function getInit(who) {
   };
   out.ledgerOn = ledgerOn_();
   if (me.admin) out.sheetUrl = sheetUrl_();
+  out.day = getDay(who, out.today);   // 첫 화면에 필요한 오늘 예약도 함께 보내 서버 호출을 한 번 줄임
   return out;
 }
 

@@ -175,6 +175,7 @@ function syncRun_(tabs) {
   if (last > 1) sh.getRange(2, 1, last - 1, cols.length).clearContent();
   if (all.length) sh.getRange(2, 1, all.length, cols.length).setNumberFormat('@').setValues(all);
   delete tabCache_['예약'];
+  readCacheDrop_('예약');
   sortTab_('예약');
 
   // 4) 기록
@@ -277,6 +278,7 @@ function fillSchools() {
     });
     sh.getRange(2, c('사용학교') + 1, out.length, 1).setNumberFormat('@').setValues(out);
     delete tabCache_['예약'];
+    readCacheDrop_('예약');
     var msg = '사용학교를 ' + filled + '줄 채웠습니다 (중 ' + count['중'] + ', 고 ' + count['고'] + ', 법인 ' + count['법인'] + '). 중학교·법인 표시가 없는 줄은 고등학교로 넣었습니다.';
     appendRows_('기록', [{ '일시': nowStr_(), '이메일': String(Session.getEffectiveUser().getEmail() || ''), '이름': '학교 구분 채우기', '동작': '학교채움',
       '예약ID': '', '공간': '', '날짜': '', '내용': msg, '변경전': '', '변경후': '' }]);

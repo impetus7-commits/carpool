@@ -35,9 +35,85 @@ function headers_(sh) {
 function tabHeaders_(name) { return headers_(sheet_(name)); }
 
 /** 탭의 모든 행을 [{_row, 머리글: 값, …}] 으로 읽습니다. 값은 모두 글자입니다. */
+/* ---------- 읽기 캐시 ----------
+ * 로그인 없이 많은 사람이 동시에 쓰면 모든 실행이 배포한 계정 하나로 몰려
+ * "너무 많은 스크립트가 동시에 실행되고 있습니다"(동시 실행 약 30개 한도)가 날 수 있습니다.
+ * 실행 하나하나를 짧게 끝내도록, 자주 읽는 탭은 시트 대신 캐시(최대 READ_CACHE_SEC 초)에서 읽습니다.
+ * - 웹에서 쓰면(신청·수정·취소·대장 가져오기) 그 탭의 캐시를 바로 지웁니다.
+ * - 시트에서 직접 고친 내용은 최대 READ_CACHE_SEC 초 뒤에 화면에 반영됩니다.
+ * - 쓰기 작업(잠금 안)은 캐시를 쓰지 않고 늘 시트를 직접 읽습니다.
+ */
+var READ_CACHE_SEC = 120;
+var READ_CACHE_TABS_ = { '예약': 1, '공간': 1, '교시': 1, '설정': 1 };
+var READ_CACHE_CHUNK = 25000;   // 캐시 값 하나의 크기 한도(100KB)를 넘지 않게 나눠 담는 글자 수
+var inLock_ = false;            // 지금 이 실행이 잠금을 쥐고 있는지
+
+function readCacheKey_(name) { return 'tabv_' + encodeURIComponent(name); }
+
+/** 캐시에서 탭 내용(2차원 배열)을 꺼냅니다. 없으면 null */
+function readCacheGet_(name) {
+  try {
+    var c = CacheService.getScriptCache();
+    var meta = c.get(readCacheKey_(name));
+    if (!meta) return null;
+    var m = meta.split(':'), ver = m[0], n = +m[1];
+    var keys = [];
+    for (var i = 0; i < n; i++) keys.push('tabd_' + ver + '_' + i);
+    var got = c.getAll(keys);
+    var text = '';
+    for (var j = 0; j < n; j++) {
+      if (got[keys[j]] == null) return null;
+      text += got[keys[j]];
+    }
+    return JSON.parse(text);
+  } catch (e) {
+    return null;
+  }
+}
+
+function readCachePut_(name, values) {
+  try {
+    var c = CacheService.getScriptCache();
+    var text = JSON.stringify(values), ver = Utilities.getUuid().slice(0, 8), parts = {}, n = 0;
+    for (var i = 0; i < text.length; i += READ_CACHE_CHUNK) parts['tabd_' + ver + '_' + (n++)] = text.slice(i, i + READ_CACHE_CHUNK);
+    c.putAll(parts, READ_CACHE_SEC + 30);
+    c.put(readCacheKey_(name), ver + ':' + n, READ_CACHE_SEC);
+  } catch (e) {
+    // 캐시에 못 담아도 동작에는 문제없음 (다음에 시트를 다시 읽음)
+  }
+}
+
+/** 웹에서 탭을 바꿨을 때 그 탭의 캐시를 지웁니다. */
+function readCacheDrop_(name) {
+  try { CacheService.getScriptCache().remove(readCacheKey_(name)); } catch (e) {}
+}
+
+/** 탭 내용(2차원 배열). 잠금 밖의 읽기는 캐시를 먼저 봅니다. */
+function tabValues_(name) {
+  var cached = !inLock_ && READ_CACHE_TABS_[name];
+  if (cached) {
+    var hit = readCacheGet_(name);
+    if (hit) return hit;
+  }
+  if (!cached) return sheet_(name).getDataRange().getDisplayValues();
+  // 캐시가 비었을 때: 쓰는 사람이 없을 때만(잠금을 바로 얻을 때만) 읽은 내용을 캐시에 담습니다.
+  // 쓰는 도중에 읽은 옛 내용이 캐시에 남는 일을 막기 위함입니다.
+  var lock = LockService.getScriptLock();
+  if (lock.tryLock(0)) {
+    try {
+      var fresh = sheet_(name).getDataRange().getDisplayValues();
+      readCachePut_(name, fresh);
+      return fresh;
+    } finally {
+      lock.releaseLock();
+    }
+  }
+  return sheet_(name).getDataRange().getDisplayValues();
+}
+
 function readTab_(name) {
   if (tabCache_[name]) return tabCache_[name];
-  var v = sheet_(name).getDataRange().getDisplayValues();
+  var v = tabValues_(name);
   var head = v[0].map(function (h) { return String(h).trim(); });
   var rows = [];
   for (var i = 1; i < v.length; i++) {
@@ -68,6 +144,7 @@ function appendRows_(name, objs) {
   if (need > 0) sh.insertRowsAfter(sh.getMaxRows(), need);
   sh.getRange(start, 1, vals.length, head.length).setNumberFormat('@').setValues(vals);
   delete tabCache_[name];
+  readCacheDrop_(name);
   sortTab_(name);
 }
 
@@ -90,6 +167,7 @@ function sortTab_(name) {
   if (!spec.length) return;
   sh.getRange(2, 1, last - 1, head.length).sort(spec);
   delete tabCache_[name];
+  readCacheDrop_(name);
 }
 
 /** list = [{_row, 머리글: 새 값, …}] — 적힌 머리글의 칸만 바꿉니다. */
@@ -108,6 +186,7 @@ function updateRows_(name, list) {
   });
   range.setNumberFormat('@').setValues(v.map(function (r) { return r.map(cell_); }));
   delete tabCache_[name];
+  readCacheDrop_(name);
 }
 
 /** 드라이브 사진을 data: 주소로 돌려줍니다. 너비 1200 으로 줄인 그림을 먼저 받고, 안 되면 원본(5MB 이하)이나 작은 미리보기를 씁니다. */
@@ -162,15 +241,20 @@ function currentEmail_() {
 }
 
 function withLock_(fn) {
+  if (inLock_) return fn();   // 이미 잠금 안
   var lock = LockService.getScriptLock();
   try {
-    lock.waitLock(28000);
+    lock.waitLock(20000);
   } catch (e) {
-    throw new Error('다른 작업이 끝나기를 기다리다 시간이 지났어요. 잠시 뒤에 다시 시도해 주세요.');
+    throw new Error('지금 사용하는 사람이 많아요. 잠시 뒤에 다시 시도해 주세요.');
   }
+  inLock_ = true;
+  tabCache_ = {};   // 잠금 안에서는 늘 시트를 새로 읽음
   try {
     return fn();
   } finally {
+    inLock_ = false;
+    tabCache_ = {};
     lock.releaseLock();
   }
 }

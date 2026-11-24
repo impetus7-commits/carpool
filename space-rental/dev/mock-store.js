@@ -73,6 +73,7 @@ function cachePut_(key, value) { (MOCK.cache || (MOCK.cache = {}))[key] = String
 function cacheRemove_(key) { if (MOCK.cache) delete MOCK.cache[key]; }
 function sha256_(text) { return 'sha:' + String(text).split('').reverse().join(''); }
 function tabHeaders_(name) { return TABS_[name].slice(); }
+function readCacheDrop_(name) {}
 function currentEmail_() { return MOCK.user; }
 function withLock_(fn) { return fn(); }
 

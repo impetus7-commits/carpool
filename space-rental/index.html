@@ -468,8 +468,26 @@ function setAdminToken(t) {
   ADMIN_TOKEN = t || '';
   try { if (t) localStorage.setItem('space.admin', t); else localStorage.removeItem('space.admin'); } catch (e) {}
 }
+/** 서버가 붐빌 때 나는 오류인지 (동시 실행 한도, 잠금 대기 시간 초과 등). 이런 오류는 잠시 뒤 다시 시도하면 대개 됩니다. */
+function isBusyError(msg) {
+  return /너무 많은 스크립트|too many simultaneous|사용하는 사람이 많아요|Service invoked too many times|서비스.*너무 많이|Exceeded maximum execution|일시적인 오류|temporarily unavailable|Internal error|내부 오류/i.test(msg);
+}
+var BUSY_RETRY_MS = [1200, 2500, 5000];   // 붐빌 때 다시 시도하는 간격 (조금씩 흩뜨려 동시에 몰리지 않게)
 function call(name) {
-  var args = [{ device: DEVICE, token: ADMIN_TOKEN }].concat(Array.prototype.slice.call(arguments, 1));
+  var rest = Array.prototype.slice.call(arguments, 1);
+  var attempt = function (n) {
+    return callOnce(name, rest).catch(function (e) {
+      if (n >= BUSY_RETRY_MS.length || !isBusyError(e.message)) {
+        if (isBusyError(e.message)) e.message = '지금 사용하는 사람이 많아 처리하지 못했어요. 잠시 뒤에 다시 시도해 주세요.';
+        throw e;
+      }
+      return new Promise(function (r) { setTimeout(r, BUSY_RETRY_MS[n] * (0.7 + Math.random() * 0.6)); }).then(function () { return attempt(n + 1); });
+    });
+  };
+  return attempt(0);
+}
+function callOnce(name, rest) {
+  var args = [{ device: DEVICE, token: ADMIN_TOKEN }].concat(rest);
   return new Promise(function (resolve, reject) {
     if (!(window.google && google.script && google.script.run)) {
       reject(new Error('서버에 연결할 수 없어요. 웹앱 주소로 열었는지 확인해 주세요.'));
@@ -2025,8 +2043,11 @@ document.addEventListener('error', function (e) {
 }, true);
 
 /* 다른 사람의 신청이 보이도록 1분마다, 그리고 화면으로 돌아올 때 새로 읽습니다. */
+var refreshing = false, lastRefresh = 0;
 function quietRefresh() {
-  if (!S.init || document.hidden || S.view !== 'map' || (S.sheet && S.sheet.busy)) return;
+  if (!S.init || document.hidden || S.view !== 'map' || (S.sheet && S.sheet.busy) || refreshing) return;
+  if (Date.now() - lastRefresh < 60000) return;   // 화면을 자주 오가도 1분에 한 번만
+  refreshing = true; lastRefresh = Date.now();
   var before = JSON.stringify(S.days[S.date] || null);
   call('getDay', S.date).then(function (list) {
     S.days[S.date] = list;
@@ -2034,9 +2055,10 @@ function quietRefresh() {
     var tag = document.activeElement && document.activeElement.tagName;
     if (tag === 'INPUT' || tag === 'SELECT') return;
     render();
-  }).catch(function () {});
+  }).catch(function () {}).then(function () { refreshing = false; });
 }
-setInterval(quietRefresh, 60000);
+// 다른 사람의 신청이 보이도록 2분쯤마다 새로 읽음. 여러 사람이 같은 시각에 몰리지 않도록 간격을 조금씩 흩뜨림.
+setInterval(quietRefresh, 110000 + Math.floor(Math.random() * 30000));
 document.addEventListener('visibilitychange', quietRefresh);
 
 /* ---------- 시작 ---------- */
@@ -2051,7 +2073,8 @@ call('getInit').then(function (init) {
   S.period = cur ? cur.id : 'all';
   document.title = init.settings.school + ' 공간 대여';
   if (!init.me.admin && ADMIN_TOKEN) setAdminToken('');   // 로그인 유지 시간이 지난 열쇠는 버림
-  var jobs = [loadDay(S.date)];
+  if (init.day) S.days[S.date] = init.day;   // 첫 화면의 오늘 예약은 getInit 이 함께 보내 줌
+  var jobs = [init.day ? Promise.resolve() : loadDay(S.date)];
   if (init.me.admin) jobs.push(loadAdmin());
   return Promise.all(jobs).then(render);
 }).catch(function (e) {
